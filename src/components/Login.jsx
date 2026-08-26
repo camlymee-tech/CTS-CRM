@@ -6,7 +6,6 @@ export default function Login() {
   const [mode, setMode] = useState('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,14 +19,7 @@ export default function Login() {
       if (mode === 'signin') {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-      } else if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name: fullName } },
-        })
-        if (error) throw error
-      } else if (mode === 'forgot') {
+      } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/?doi-mat-khau=1`,
         })
@@ -35,22 +27,10 @@ export default function Login() {
         setNotice('Đã gửi email đặt lại mật khẩu. Kiểm tra hộp thư (cả mục Spam) và bấm vào liên kết trong email.')
       }
     } catch (err) {
-      setError(
-        err.message === 'Invalid login credentials'
-          ? 'Sai email hoặc mật khẩu'
-          : err.message.includes('already registered')
-            ? 'Email này đã có tài khoản rồi'
-            : err.message
-      )
+      setError(err.message === 'Invalid login credentials' ? 'Sai email hoặc mật khẩu' : err.message)
     } finally {
       setLoading(false)
     }
-  }
-
-  const titles = {
-    signin: 'Đăng nhập',
-    signup: 'Tạo tài khoản',
-    forgot: 'Gửi link đặt lại mật khẩu',
   }
 
   return (
@@ -65,11 +45,8 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          {mode === 'signup' && (
-            <Input label="Họ tên" value={fullName} onChange={(e) => setFullName(e.target.value)} required placeholder="Nguyễn Văn A" />
-          )}
           <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="ban@tuki.vn" />
-          {mode !== 'forgot' && (
+          {mode === 'signin' && (
             <Input label="Mật khẩu" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
           )}
 
@@ -77,27 +54,24 @@ export default function Login() {
           {notice && <p className="rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-600">{notice}</p>}
 
           <Button type="submit" disabled={loading} className="mt-2 w-full">
-            {loading ? 'Đang xử lý...' : titles[mode]}
+            {loading ? 'Đang xử lý...' : mode === 'signin' ? 'Đăng nhập' : 'Gửi link đặt lại mật khẩu'}
           </Button>
         </form>
 
-        <div className="mt-4 flex flex-col gap-2 text-center text-sm">
-          {mode === 'signin' && (
-            <>
-              <button className="text-ink-600 hover:text-coral-500" onClick={() => { setMode('forgot'); setError(''); setNotice('') }}>
-                Quên mật khẩu?
-              </button>
-              <button className="text-ink-600 hover:text-coral-500" onClick={() => { setMode('signup'); setError(''); setNotice('') }}>
-                Chưa có tài khoản? Tạo mới
-              </button>
-            </>
-          )}
-          {mode !== 'signin' && (
-            <button className="text-ink-600 hover:text-coral-500" onClick={() => { setMode('signin'); setError(''); setNotice('') }}>
-              ← Quay lại đăng nhập
-            </button>
-          )}
+        <div className="mt-4 text-center text-sm">
+          <button
+            className="text-ink-600 hover:text-coral-500"
+            onClick={() => { setMode(mode === 'signin' ? 'forgot' : 'signin'); setError(''); setNotice('') }}
+          >
+            {mode === 'signin' ? 'Quên mật khẩu?' : '← Quay lại đăng nhập'}
+          </button>
         </div>
+
+        {mode === 'signin' && (
+          <p className="mt-5 border-t border-slate-100 pt-4 text-center text-xs text-ink-400">
+            Tài khoản do quản trị viên cấp. Chưa có tài khoản, liên hệ quản lý của bạn.
+          </p>
+        )}
       </div>
     </div>
   )
