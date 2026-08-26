@@ -19,7 +19,7 @@ function laKhachChung(c) {
   const moc = c.ngay_lien_he_gan_nhat || (c.created_at || '').slice(0, 10)
   const soNgay = moc ? Math.floor((Date.now() - new Date(moc).getTime()) / 86400000) : 999
   if (c.trang_thai_cham_soc === 'chua_lien_he') return true
-  if (c.trang_thai_cham_soc === 'tam_dung') return true
+  if (c.trang_thai_cham_soc === 'tu_choi') return true
   if (c.trang_thai_cham_soc === 'khong_nghe_may') return soNgay >= 5
   if (c.trang_thai_cham_soc === 'dang_tu_van') return soNgay >= 30
   return false
@@ -45,6 +45,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   const [filterTrangThai, setFilterTrangThai] = useState('')
   const [filterSale, setFilterSale] = useState('')
   const [filterDichVu, setFilterDichVu] = useState('')
+  const [filterNguon, setFilterNguon] = useState('')
   const [quickFilter, setQuickFilter] = useState('')
   const [tuNgay, setTuNgay] = useState('')
   const [denNgay, setDenNgay] = useState('')
@@ -138,11 +139,12 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       if (filterTrangThai && c.trang_thai_cham_soc !== filterTrangThai) return false
       if (filterSale && c.sale_id !== filterSale) return false
       if (filterDichVu && !(c.dich_vu || []).includes(filterDichVu)) return false
+      if (filterNguon && c.nguon_khach !== filterNguon) return false
       if (tuNgay && (!c.ngay_lien_he_gan_nhat || c.ngay_lien_he_gan_nhat < tuNgay)) return false
       if (denNgay && (!c.ngay_lien_he_gan_nhat || c.ngay_lien_he_gan_nhat > denNgay)) return false
       return true
     })
-  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, tuNgay, denNgay, quickFilter, isAdmin, currentProfile?.id, homNay, dauThang])
+  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay, quickFilter, isAdmin, currentProfile?.id, homNay, dauThang])
 
   const stats = useMemo(() => ({
     canChamSoc: phamVi.filter((c) => c.ngay_cham_soc_tiep_theo && c.ngay_cham_soc_tiep_theo <= homNay
@@ -212,6 +214,10 @@ export default function CustomerList({ currentProfile, onChotDon }) {
             <option value="">Tất cả dịch vụ</option>
             {DICH_VU_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </Select>
+          <Select value={filterNguon} onChange={(e) => setFilterNguon(e.target.value)} className="w-44">
+            <option value="">Tất cả nguồn</option>
+            {NGUON_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
           <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
             <option value="">Tất cả sale</option>
             {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
@@ -222,9 +228,9 @@ export default function CustomerList({ currentProfile, onChotDon }) {
             <span>đến</span>
             <Input type="date" value={denNgay} onChange={(e) => setDenNgay(e.target.value)} className="w-40" />
           </div>
-          {(search || filterLoai || filterTrangThai || filterSale || filterDichVu || tuNgay || denNgay || quickFilter) && (
+          {(search || filterLoai || filterTrangThai || filterSale || filterDichVu || filterNguon || tuNgay || denNgay || quickFilter) && (
             <button
-              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setTuNgay(''); setDenNgay(''); setQuickFilter('') }}
+              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setFilterNguon(''); setTuNgay(''); setDenNgay(''); setQuickFilter('') }}
               className="text-sm text-ink-600 hover:text-coral-500">
               Xoá bộ lọc
             </button>

@@ -26,7 +26,8 @@ export const TRANG_THAI_OPTIONS = [
   { value: 'dang_tu_van', label: 'Đang tư vấn', className: 'bg-amber-100 text-amber-700' },
   { value: 'da_ky', label: 'Đã ký hợp đồng', className: 'bg-emerald-100 text-emerald-700' },
   { value: 'dang_trien_khai', label: 'Đang triển khai', className: 'bg-teal-50 text-teal-600' },
-  { value: 'tam_dung', label: 'Tạm dừng', className: 'bg-rose-100 text-rose-600' },
+  { value: 'hoan_thanh', label: 'Hoàn thành', className: 'bg-violet-100 text-violet-700' },
+  { value: 'tu_choi', label: 'Từ chối / Ngừng', className: 'bg-rose-100 text-rose-600' },
 ]
 
 export const TRANG_THAI_DON_OPTIONS = [
