@@ -72,6 +72,17 @@ export default function CustomerList({ currentProfile, onChotDon }) {
     setLoading(false)
   }
 
+  const isAdmin = currentProfile?.role === 'admin'
+
+  // Sale xem số của mình, admin xem số toàn team
+  const phamVi = useMemo(
+    () => (isAdmin ? customers : customers.filter((c) => c.sale_id === currentProfile?.id)),
+    [customers, isAdmin, currentProfile?.id]
+  )
+
+  const homNay = new Date().toISOString().slice(0, 10)
+  const dauThang = homNay.slice(0, 8) + '01'
+
   // Gộp kết quả tra cứu SĐT vào danh sách, không trùng lặp
   const nguon = useMemo(() => {
     const map = new Map(customers.map((c) => [c.id, c]))
@@ -102,17 +113,6 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       return true
     })
   }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, tuNgay, denNgay, quickFilter, isAdmin, currentProfile?.id, homNay, dauThang])
-
-  const isAdmin = currentProfile?.role === 'admin'
-
-  // Sale xem số của mình, admin xem số toàn team
-  const phamVi = useMemo(
-    () => (isAdmin ? customers : customers.filter((c) => c.sale_id === currentProfile?.id)),
-    [customers, isAdmin, currentProfile?.id]
-  )
-
-  const homNay = new Date().toISOString().slice(0, 10)
-  const dauThang = homNay.slice(0, 8) + '01'
 
   const stats = useMemo(() => ({
     canChamSoc: phamVi.filter((c) => c.ngay_cham_soc_tiep_theo && c.ngay_cham_soc_tiep_theo <= homNay
