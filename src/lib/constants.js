@@ -26,7 +26,7 @@ export const TRANG_THAI_OPTIONS = [
   { value: 'dang_tu_van', label: 'Đang tư vấn', className: 'bg-amber-100 text-amber-700' },
   { value: 'da_ky', label: 'Đã ký hợp đồng', className: 'bg-emerald-100 text-emerald-700' },
   { value: 'dang_trien_khai', label: 'Đang triển khai', className: 'bg-teal-50 text-teal-600' },
-  { value: 'hoan_thanh', label: 'Hoàn thành', className: 'bg-violet-100 text-violet-700' },
+  { value: 'hoan_thanh', label: 'Hoàn thành dịch vụ', className: 'bg-violet-100 text-violet-700' },
   { value: 'tu_choi', label: 'Từ chối / Ngừng', className: 'bg-rose-100 text-rose-600' },
 ]
 
@@ -50,6 +50,26 @@ export function labelOf(options, value) {
 
 export function classOf(options, value) {
   return options.find((o) => o.value === value)?.className ?? 'bg-slate-100 text-slate-600'
+}
+
+// Đã từng ký hợp đồng (dùng để loại khỏi danh sách cần chăm sóc)
+export const TT_DA_KY = ['da_ky', 'dang_trien_khai', 'hoan_thanh']
+
+// Phễu: mỗi trạng thái chỉ nằm ở ĐÚNG MỘT bước, không cộng dồn
+export const PHEU_BUOC = [
+  { value: 'chua_lien_he',    label: 'Chưa liên hệ' },
+  { value: 'khong_nghe_may',  label: 'Không nghe máy' },
+  { value: 'dang_tu_van',     label: 'Đang tư vấn' },
+  { value: 'da_ky',           label: 'Đã ký hợp đồng' },
+  { value: 'dang_trien_khai', label: 'Đang triển khai' },
+  { value: 'hoan_thanh',      label: 'Hoàn thành dịch vụ' },
+]
+// Rơi khỏi phễu, thống kê riêng
+export const PHEU_ROI = 'tu_choi'
+
+// Data do người khác giao cho sale (không tính data sale tự nhập / tự nhận)
+export function laDataDuocChia(c) {
+  return !!c.nguoi_chia && c.nguoi_chia !== c.sale_id
 }
 
 export function formatVnd(n) {

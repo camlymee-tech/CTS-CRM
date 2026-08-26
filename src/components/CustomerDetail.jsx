@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   X, Phone, MessageCircle, Users as UsersIcon, MoreHorizontal, Plus, Pencil,
-  Link2, Store, HandHeart, CircleAlert, CircleCheck, History, Check,
+  Link2, Store, HandHeart, CircleAlert, CircleCheck, History, Check, Trash2, CalendarClock,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Textarea, Select, Badge, Input } from './ui'
@@ -65,6 +65,13 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     setCustomer({ ...customer, sale_id: currentProfile.id })
     setMsg('')
     load(); onChanged?.()
+  }
+
+  async function xoaTuongTac(it) {
+    if (!window.confirm('Xoá dòng lịch sử chăm sóc này?')) return
+    const { error } = await supabase.from('customer_interactions').delete().eq('id', it.id)
+    if (error) { setMsg('Không xoá được: ' + error.message); return }
+    setMsg(''); load(); onChanged?.()
   }
 
   async function doiTrangThai(tt) {
@@ -185,7 +192,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
               {tab === 'van_de' && (
                 <IssuesTab customerId={customer.id} issues={issues} suaDuoc={suaDuoc}
-                  currentProfile={currentProfile} tenNguoi={tenNguoi} onChanged={load} />
+                  currentProfile={currentProfile} isAdmin={isAdmin} tenNguoi={tenNguoi} onChanged={load} />
               )}
 
               {tab === 'cham_soc' && (
@@ -200,12 +207,18 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                             <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-teal-50 text-teal-500">
                               <Icon size={15} />
                             </div>
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <p className="text-sm text-navy-900">{it.noi_dung}</p>
                               <p className="mt-0.5 text-xs text-ink-400">
                                 {tenNguoi(it.sale_id)} · {new Date(it.ngay_thuc_hien).toLocaleString('vi-VN')}
                               </p>
                             </div>
+                            {(it.sale_id === currentProfile?.id || isAdmin) && (
+                              <button onClick={() => xoaTuongTac(it)}
+                                className="flex-none text-ink-400 hover:text-rose-500" title="Xoá">
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </li>
                         )
                       })}
@@ -241,7 +254,11 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
         {tab === 'cham_soc' && suaDuoc && (
           <AddInteraction customerId={customer.id} currentProfile={currentProfile}
-            onAdded={() => { load(); onChanged?.() }} />
+            ngayHen={customer.ngay_cham_soc_tiep_theo}
+            onAdded={(ngayMoi) => {
+              if (ngayMoi !== undefined) setCustomer({ ...customer, ngay_cham_soc_tiep_theo: ngayMoi })
+              load(); onChanged?.()
+            }} />
         )}
       </div>
     </div>
@@ -257,7 +274,7 @@ function Field({ label, value }) {
   )
 }
 
-function IssuesTab({ customerId, issues, suaDuoc, currentProfile, tenNguoi, onChanged }) {
+function IssuesTab({ customerId, issues, suaDuoc, currentProfile, isAdmin, tenNguoi, onChanged }) {
   const [vanDe, setVanDe] = useState('')
   const [giaiPhap, setGiaiPhap] = useState('')
   const [saving, setSaving] = useState(false)
@@ -273,6 +290,12 @@ function IssuesTab({ customerId, issues, suaDuoc, currentProfile, tenNguoi, onCh
       created_by: currentProfile.id,
     })
     setSaving(false); setVanDe(''); setGiaiPhap(''); onChanged()
+  }
+
+  async function xoa(i) {
+    if (!window.confirm('Xoá vấn đề này cùng giải pháp kèm theo?')) return
+    await supabase.from('customer_issues').delete().eq('id', i.id)
+    onChanged()
   }
 
   async function capNhat(id, patch) {
@@ -294,12 +317,19 @@ function IssuesTab({ customerId, issues, suaDuoc, currentProfile, tenNguoi, onCh
               <p className="text-sm text-navy-900">{i.van_de}</p>
             </div>
             {suaDuoc && (
-              <button onClick={() => capNhat(i.id, { trang_thai: i.trang_thai === 'da_giai_quyet' ? 'dang_xu_ly' : 'da_giai_quyet' })}
-                className={`flex-none rounded-lg px-2 py-1 text-xs ${
-                  i.trang_thai === 'da_giai_quyet' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                }`}>
-                {i.trang_thai === 'da_giai_quyet' ? <><Check size={11} className="mr-0.5 inline" />Đã xử lý</> : 'Đang xử lý'}
-              </button>
+              <div className="flex flex-none items-center gap-2">
+                <button onClick={() => capNhat(i.id, { trang_thai: i.trang_thai === 'da_giai_quyet' ? 'dang_xu_ly' : 'da_giai_quyet' })}
+                  className={`rounded-lg px-2 py-1 text-xs ${
+                    i.trang_thai === 'da_giai_quyet' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                  {i.trang_thai === 'da_giai_quyet' ? <><Check size={11} className="mr-0.5 inline" />Đã xử lý</> : 'Đang xử lý'}
+                </button>
+                {(i.created_by === currentProfile?.id || isAdmin) && (
+                  <button onClick={() => xoa(i)} className="text-ink-400 hover:text-rose-500" title="Xoá">
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -343,10 +373,17 @@ function IssuesTab({ customerId, issues, suaDuoc, currentProfile, tenNguoi, onCh
   )
 }
 
-function AddInteraction({ customerId, currentProfile, onAdded }) {
+function AddInteraction({ customerId, currentProfile, ngayHen, onAdded }) {
   const [noiDung, setNoiDung] = useState('')
   const [loai, setLoai] = useState('goi_dien')
+  const [ngayTiepTheo, setNgayTiepTheo] = useState('')
   const [saving, setSaving] = useState(false)
+
+  function congNgay(n) {
+    const d = new Date()
+    d.setDate(d.getDate() + n)
+    setNgayTiepTheo(d.toISOString().slice(0, 10))
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -355,14 +392,24 @@ function AddInteraction({ customerId, currentProfile, onAdded }) {
     const { error } = await supabase.from('customer_interactions').insert({
       customer_id: customerId, sale_id: currentProfile?.id, loai, noi_dung: noiDung.trim(),
     })
+    if (error) { setSaving(false); return }
+
+    const patch = { ngay_lien_he_gan_nhat: new Date().toISOString().slice(0, 10) }
+    if (ngayTiepTheo) patch.ngay_cham_soc_tiep_theo = ngayTiepTheo
+    await supabase.from('customers').update(patch).eq('id', customerId)
+
     setSaving(false)
-    if (!error) {
-      setNoiDung('')
-      await supabase.from('customers')
-        .update({ ngay_lien_he_gan_nhat: new Date().toISOString().slice(0, 10) }).eq('id', customerId)
-      onAdded()
-    }
+    setNoiDung('')
+    setNgayTiepTheo('')
+    onAdded(ngayTiepTheo || undefined)
   }
+
+  const NHANH = [
+    { label: 'Mai', ngay: 1 },
+    { label: '3 ngày', ngay: 3 },
+    { label: '1 tuần', ngay: 7 },
+    { label: '2 tuần', ngay: 14 },
+  ]
 
   return (
     <form onSubmit={submit} className="border-t border-slate-100 px-6 py-4">
@@ -373,8 +420,33 @@ function AddInteraction({ customerId, currentProfile, onAdded }) {
       </div>
       <Textarea rows={2} placeholder="Ghi lại nội dung đã trao đổi với khách..."
         value={noiDung} onChange={(e) => setNoiDung(e.target.value)} />
-      <Button type="submit" disabled={saving} className="mt-2 w-full">
-        <Plus size={15} /> Thêm vào lịch sử
+
+      <div className="mt-3 rounded-xl bg-slate-50 p-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-navy-900">
+          <CalendarClock size={15} className="text-coral-500" />
+          Hẹn chăm sóc lại
+          {ngayHen && !ngayTiepTheo && (
+            <span className="font-normal text-ink-400">· đang hẹn {ngayHen}</span>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {NHANH.map((n) => (
+            <button type="button" key={n.ngay} onClick={() => congNgay(n.ngay)}
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-ink-600 hover:border-coral-500 hover:text-coral-500">
+              {n.label}
+            </button>
+          ))}
+          <input type="date" value={ngayTiepTheo} onChange={(e) => setNgayTiepTheo(e.target.value)}
+            className="rounded-lg border border-slate-200 px-2 py-1 text-xs outline-none focus:border-coral-500" />
+          {ngayTiepTheo && (
+            <button type="button" onClick={() => setNgayTiepTheo('')}
+              className="text-xs text-ink-400 hover:text-rose-500">Bỏ chọn</button>
+          )}
+        </div>
+      </div>
+
+      <Button type="submit" disabled={saving} className="mt-3 w-full">
+        <Plus size={15} /> {saving ? 'Đang lưu...' : 'Lưu chăm sóc' + (ngayTiepTheo ? ' & đặt lịch hẹn' : '')}
       </Button>
     </form>
   )

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Phone, Link2, Store, Users2 } from 'lucide-react'
+import { Plus, Search, Phone, Link2, Store, Users2, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import CustomerForm from './CustomerForm'
@@ -10,6 +10,7 @@ import {
   LOAI_KHACH_OPTIONS,
   NGUON_KHACH_OPTIONS,
   TRANG_THAI_OPTIONS,
+  TT_DA_KY,
   classOf,
   labelOf,
 } from '../lib/constants'
@@ -55,12 +56,20 @@ export default function CustomerList({ currentProfile, onChotDon }) {
 
   const [doanhSoThang, setDoanhSoThang] = useState(null)
   const [doanhSoTruoc, setDoanhSoTruoc] = useState(0)
+  const [khachChotThang, setKhachChotThang] = useState(new Set())
 
   useEffect(() => {
     loadProfiles()
     loadCustomers()
     loadDoanhSo()
   }, [])
+
+  async function xoaKhach(c) {
+    if (!window.confirm(`Xoá khách "${c.ten_khach}"?\n\nToàn bộ lịch sử chăm sóc, vấn đề và nhật ký của khách này cũng bị xoá. Không khôi phục được.`)) return
+    const { error } = await supabase.from('customers').delete().eq('id', c.id)
+    if (error) { alert('Không xoá được: ' + error.message); return }
+    loadCustomers()
+  }
 
   async function loadDoanhSo() {
     const nay = new Date(); nay.setDate(1)
@@ -69,15 +78,18 @@ export default function CustomerList({ currentProfile, onChotDon }) {
     const mocTruoc = truoc.toISOString().slice(0, 10)
 
     const { data } = await supabase.from('orders')
-      .select('gia_tri, ngay_chot').neq('trang_thai', 'huy').gte('ngay_chot', mocTruoc)
+      .select('gia_tri, ngay_chot, customer_id').neq('trang_thai', 'huy').gte('ngay_chot', mocTruoc)
 
     let a = 0, b = 0
+    const ids = new Set()
     for (const o of data || []) {
       const tien = Number(o.gia_tri) || 0
-      if (o.ngay_chot >= mocNay) a += tien; else b += tien
+      if (o.ngay_chot >= mocNay) { a += tien; if (o.customer_id) ids.add(o.customer_id) }
+      else b += tien
     }
     setDoanhSoThang(a)
     setDoanhSoTruoc(b)
+    setKhachChotThang(ids)
   }
 
   // Gõ đủ số điện thoại -> tra cứu được cả khách của sale khác
@@ -129,11 +141,10 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       if (quickFilter) {
         if (!isAdmin && c.sale_id !== currentProfile?.id) return false
         if (quickFilter === 'can_cham_soc' && !(c.ngay_cham_soc_tiep_theo && c.ngay_cham_soc_tiep_theo <= homNay
-          && !['da_ky', 'dang_trien_khai'].includes(c.trang_thai_cham_soc))) return false
+          && !TT_DA_KY.includes(c.trang_thai_cham_soc))) return false
         if (quickFilter === 'chua_lien_he' && c.trang_thai_cham_soc !== 'chua_lien_he') return false
         if (quickFilter === 'dang_tu_van' && c.trang_thai_cham_soc !== 'dang_tu_van') return false
-        if (quickFilter === 'chot_thang_nay' && !(['da_ky', 'dang_trien_khai'].includes(c.trang_thai_cham_soc)
-          && (c.updated_at || '').slice(0, 10) >= dauThang)) return false
+        if (quickFilter === 'chot_thang_nay' && !khachChotThang.has(c.id)) return false
       }
       if (filterLoai && c.loai_khach !== filterLoai) return false
       if (filterTrangThai && c.trang_thai_cham_soc !== filterTrangThai) return false
@@ -144,16 +155,15 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       if (denNgay && (!c.ngay_lien_he_gan_nhat || c.ngay_lien_he_gan_nhat > denNgay)) return false
       return true
     })
-  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay, quickFilter, isAdmin, currentProfile?.id, homNay, dauThang])
+  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay, quickFilter, khachChotThang, isAdmin, currentProfile?.id, homNay, dauThang])
 
   const stats = useMemo(() => ({
     canChamSoc: phamVi.filter((c) => c.ngay_cham_soc_tiep_theo && c.ngay_cham_soc_tiep_theo <= homNay
-      && !['da_ky', 'dang_trien_khai'].includes(c.trang_thai_cham_soc)).length,
+      && !TT_DA_KY.includes(c.trang_thai_cham_soc)).length,
     chuaLienHe: phamVi.filter((c) => c.trang_thai_cham_soc === 'chua_lien_he').length,
     dangTuVan: phamVi.filter((c) => c.trang_thai_cham_soc === 'dang_tu_van').length,
-    chotThangNay: phamVi.filter((c) => ['da_ky', 'dang_trien_khai'].includes(c.trang_thai_cham_soc)
-      && (c.updated_at || '').slice(0, 10) >= dauThang).length,
-  }), [phamVi, homNay, dauThang])
+    chotThangNay: phamVi.filter((c) => khachChotThang.has(c.id)).length,
+  }), [phamVi, homNay, dauThang, khachChotThang])
 
   const profileName = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
@@ -321,11 +331,17 @@ export default function CustomerList({ currentProfile, onChotDon }) {
                   </td>
                   <td className="px-4 py-3 text-ink-600">{profileName(c.sale_id)}</td>
                   <td className="px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
                     <a href={c.sdt ? `tel:${c.sdt}` : undefined} onClick={(e) => e.stopPropagation()}
-                      className={`inline-flex items-center gap-1 text-xs ${c.sdt ? 'text-teal-500 hover:underline' : 'text-ink-400'}`}>
+                      className={`mr-3 inline-flex items-center gap-1 text-xs ${c.sdt ? 'text-teal-500 hover:underline' : 'text-ink-400'}`}>
                       <Phone size={13} /> Gọi
                     </a>
+                    {(isAdmin || cuaMinh) && (
+                      <button onClick={(e) => { e.stopPropagation(); xoaKhach(c) }}
+                        className="text-ink-400 hover:text-rose-500" title="Xoá khách hàng">
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               )
