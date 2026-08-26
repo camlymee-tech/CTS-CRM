@@ -67,7 +67,12 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   async function xoaKhach(c) {
     if (!window.confirm(`Xoá khách "${c.ten_khach}"?\n\nToàn bộ lịch sử chăm sóc, vấn đề và nhật ký của khách này cũng bị xoá. Không khôi phục được.`)) return
     const { error } = await supabase.from('customers').delete().eq('id', c.id)
-    if (error) { alert('Không xoá được: ' + error.message); return }
+    if (error) {
+      alert(error.message.includes('đơn dịch vụ')
+        ? `Không thể xoá "${c.ten_khach}".\n\nKhách này đã có đơn dịch vụ / hợp đồng nên dữ liệu phải được giữ lại. Nếu khách dừng hợp tác, hãy đổi trạng thái sang "Từ chối / Ngừng" thay vì xoá.`
+        : 'Không xoá được: ' + error.message)
+      return
+    }
     loadCustomers()
   }
 

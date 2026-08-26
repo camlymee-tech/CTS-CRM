@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 const NAV = [
   { key: 'customers', label: 'Khách hàng', icon: Users, ready: true },
   { key: 'orders', label: 'Đơn dịch vụ', icon: ShoppingBag, ready: true },
-  { key: 'contracts', label: 'Hợp đồng', icon: FileText, ready: false },
+  { key: 'contracts', label: 'Hợp đồng', icon: FileText, ready: true },
   { key: 'reports', label: 'Tổng kết doanh số', icon: BarChart3, ready: true },
   { key: 'analytics', label: 'Báo cáo', icon: PieChart, ready: true },
   { key: 'documents', label: 'Tài liệu', icon: BookOpen, ready: true },

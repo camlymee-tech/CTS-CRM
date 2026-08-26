@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import {
   X, Phone, MessageCircle, Users as UsersIcon, MoreHorizontal, Plus, Pencil,
-  Link2, Store, HandHeart, CircleAlert, CircleCheck, History, Check, Trash2, CalendarClock,
+  Link2, Store, HandHeart, CircleAlert, CircleCheck, History, Check, Trash2, CalendarClock, FileText, ShoppingBag,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Textarea, Select, Badge, Input } from './ui'
 import {
   LOAI_TUONG_TAC_OPTIONS, TRANG_THAI_OPTIONS, NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, LOAI_KHACH_OPTIONS,
-  classOf, labelOf,
+  TRANG_THAI_DON_OPTIONS, TRANG_THAI_HD_OPTIONS,
+  classOf, labelOf, formatVnd,
 } from '../lib/constants'
 
 const ICONS = { goi_dien: Phone, nhan_tin: MessageCircle, gap_mat: UsersIcon, khac: MoreHorizontal }
@@ -29,6 +30,9 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const [interactions, setInteractions] = useState([])
   const [issues, setIssues] = useState([])
   const [logs, setLogs] = useState([])
+  const [donHang, setDonHang] = useState([])
+  const [hopDong, setHopDong] = useState([])
+  const [dvTheoDon, setDvTheoDon] = useState({})
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState('')
@@ -42,7 +46,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   async function load() {
     setLoading(true)
-    const [{ data: it }, { data: iss }, { data: lg }, { data: pf }] = await Promise.all([
+    const [{ data: it }, { data: iss }, { data: lg }, { data: pf }, { data: od }, { data: ct }] = await Promise.all([
       supabase.from('customer_interactions').select('*').eq('customer_id', customer.id)
         .order('ngay_thuc_hien', { ascending: false }),
       supabase.from('customer_issues').select('*').eq('customer_id', customer.id)
@@ -50,8 +54,19 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
       supabase.from('customer_logs').select('*').eq('customer_id', customer.id)
         .order('created_at', { ascending: false }).limit(50),
       supabase.from('profiles').select('id, full_name'),
+      supabase.from('orders').select('*').eq('customer_id', customer.id).order('ngay_chot', { ascending: false }),
+      supabase.from('contracts').select('*').eq('customer_id', customer.id).order('ngay_ky', { ascending: false }),
     ])
     setInteractions(it || []); setIssues(iss || []); setLogs(lg || []); setProfiles(pf || [])
+    setDonHang(od || []); setHopDong(ct || [])
+
+    const ids = (od || []).map((o) => o.id)
+    if (ids.length) {
+      const { data: dv } = await supabase.from('order_items').select('*').in('order_id', ids)
+      const g = {}
+      for (const i of dv || []) g[i.order_id] = [...(g[i.order_id] || []), i]
+      setDvTheoDon(g)
+    } else setDvTheoDon({})
     setLoading(false)
   }
 
@@ -84,6 +99,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   const TABS = [
     { key: 'thong_tin', label: 'Thông tin' },
+    { key: 'don_hd', label: `Đơn & HĐ (${donHang.length})` },
     { key: 'van_de', label: `Vấn đề (${issues.length})` },
     { key: 'cham_soc', label: `Chăm sóc (${interactions.length})` },
     { key: 'nhat_ky', label: 'Nhật ký' },
@@ -188,6 +204,65 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                     </div>
                   )}
                 </div>
+              )}
+
+              {tab === 'don_hd' && (
+                donHang.length === 0
+                  ? <p className="text-sm text-ink-400">
+                      Khách chưa có đơn dịch vụ nào. Chuyển trạng thái sang "Chốt hợp đồng" để tạo đơn.
+                    </p>
+                  : (
+                    <div className="space-y-3">
+                      {donHang.map((o) => {
+                        const hd = hopDong.find((h) => h.order_id === o.id)
+                        return (
+                          <div key={o.id} className="rounded-xl border border-slate-100 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <ShoppingBag size={14} className="text-coral-500" />
+                                  <p className="font-medium text-navy-900">{o.ma_don}</p>
+                                  <Badge className={classOf(TRANG_THAI_DON_OPTIONS, o.trang_thai)}>
+                                    {labelOf(TRANG_THAI_DON_OPTIONS, o.trang_thai)}
+                                  </Badge>
+                                </div>
+                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                  {(dvTheoDon[o.id] || []).map((i) => (
+                                    <Badge key={i.id} className="bg-slate-100 text-slate-600">
+                                      {i.ten_dich_vu} · {formatVnd(i.gia)}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                              <p className="flex-none font-display font-bold text-coral-500">{formatVnd(o.gia_tri)}</p>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-50 pt-3 text-xs text-ink-600">
+                              <span>Chốt: <b className="text-navy-900">{o.ngay_chot || '—'}</b></span>
+                              {o.so_thang && <span>Thời hạn: <b className="text-navy-900">{o.so_thang} tháng</b></span>}
+                              {hd && (
+                                <>
+                                  <span className="inline-flex items-center gap-1">
+                                    <FileText size={12} className="text-teal-500" />
+                                    <b className="text-navy-900">{hd.so_hop_dong}</b>
+                                  </span>
+                                  <Badge className={classOf(TRANG_THAI_HD_OPTIONS, hd.trang_thai)}>
+                                    {labelOf(TRANG_THAI_HD_OPTIONS, hd.trang_thai)}
+                                  </Badge>
+                                  {hd.ngay_het_han && <span>Hết hạn: <b className="text-navy-900">{hd.ngay_het_han}</b></span>}
+                                  {hd.file_url && (
+                                    <a href={hd.file_url} target="_blank" rel="noreferrer"
+                                      className="text-teal-500 hover:underline">Mở file</a>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                            {o.ghi_chu && <p className="mt-2 text-xs text-ink-600">{o.ghi_chu}</p>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
               )}
 
               {tab === 'van_de' && (

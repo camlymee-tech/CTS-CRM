@@ -9,6 +9,7 @@ import DocumentsPage from './components/DocumentsPage'
 import NotificationsPage from './components/NotificationsPage'
 import OrdersPage from './components/OrdersPage'
 import ReportsPage from './components/ReportsPage'
+import ContractsPage from './components/ContractsPage'
 import AnalyticsPage from './components/AnalyticsPage'
 
 export default function App() {
@@ -104,6 +105,7 @@ export default function App() {
           onPendingHandled={() => setChotDonCustomer(null)}
         />
       )}
+      {page === 'contracts' && <ContractsPage currentProfile={profile} />}
       {page === 'reports' && <ReportsPage />}
       {page === 'analytics' && <AnalyticsPage />}
       {page === 'team' && <TeamPage currentProfile={profile} />}

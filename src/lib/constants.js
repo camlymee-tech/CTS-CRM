@@ -24,7 +24,7 @@ export const TRANG_THAI_OPTIONS = [
   { value: 'chua_lien_he', label: 'Chưa liên hệ', className: 'bg-slate-100 text-slate-600' },
   { value: 'khong_nghe_may', label: 'Không nghe máy', className: 'bg-orange-100 text-orange-700' },
   { value: 'dang_tu_van', label: 'Đang tư vấn', className: 'bg-amber-100 text-amber-700' },
-  { value: 'da_ky', label: 'Đã ký hợp đồng', className: 'bg-emerald-100 text-emerald-700' },
+  { value: 'da_ky', label: 'Chốt hợp đồng', className: 'bg-emerald-100 text-emerald-700' },
   { value: 'dang_trien_khai', label: 'Đang triển khai', className: 'bg-teal-50 text-teal-600' },
   { value: 'hoan_thanh', label: 'Hoàn thành dịch vụ', className: 'bg-violet-100 text-violet-700' },
   { value: 'tu_choi', label: 'Từ chối / Ngừng', className: 'bg-rose-100 text-rose-600' },
@@ -60,7 +60,7 @@ export const PHEU_BUOC = [
   { value: 'chua_lien_he',    label: 'Chưa liên hệ' },
   { value: 'khong_nghe_may',  label: 'Không nghe máy' },
   { value: 'dang_tu_van',     label: 'Đang tư vấn' },
-  { value: 'da_ky',           label: 'Đã ký hợp đồng' },
+  { value: 'da_ky',           label: 'Chốt hợp đồng' },
   { value: 'dang_trien_khai', label: 'Đang triển khai' },
   { value: 'hoan_thanh',      label: 'Hoàn thành dịch vụ' },
 ]
@@ -71,6 +71,12 @@ export const PHEU_ROI = 'tu_choi'
 export function laDataDuocChia(c) {
   return !!c.nguoi_chia && c.nguoi_chia !== c.sale_id
 }
+
+export const TRANG_THAI_HD_OPTIONS = [
+  { value: 'hieu_luc', label: 'Còn hiệu lực', className: 'bg-emerald-100 text-emerald-700' },
+  { value: 'het_han', label: 'Hết hạn', className: 'bg-slate-100 text-slate-600' },
+  { value: 'da_huy', label: 'Đã huỷ', className: 'bg-rose-100 text-rose-600' },
+]
 
 export function formatVnd(n) {
   return new Intl.NumberFormat('vi-VN').format(Number(n) || 0) + ' đ'
