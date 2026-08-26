@@ -1,22 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Login from './components/Login'
 import ResetPassword from './components/ResetPassword'
 import Sidebar from './components/Sidebar'
 import CustomerList from './components/CustomerList'
 import TeamPage from './components/TeamPage'
+import DocumentsPage from './components/DocumentsPage'
+import NotificationsPage from './components/NotificationsPage'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
   const [page, setPage] = useState('customers')
   const [recovering, setRecovering] = useState(false)
+  const [unread, setUnread] = useState(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
-      // Người dùng vừa bấm link đặt lại mật khẩu trong email
       if (event === 'PASSWORD_RECOVERY') setRecovering(true)
     })
     return () => sub.subscription.unsubscribe()
@@ -31,6 +33,18 @@ export default function App() {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
     setProfile(data)
   }
+
+  const loadUnread = useCallback(async () => {
+    if (!profile?.id) return
+    const [{ data: notis }, { data: readRows }] = await Promise.all([
+      supabase.from('notifications').select('id').limit(200),
+      supabase.from('notification_reads').select('notification_id').eq('user_id', profile.id),
+    ])
+    const daDoc = new Set((readRows || []).map((r) => r.notification_id))
+    setUnread((notis || []).filter((n) => !daDoc.has(n.id)).length)
+  }, [profile?.id])
+
+  useEffect(() => { loadUnread() }, [loadUnread, page])
 
   if (session === undefined) {
     return <div className="flex min-h-screen items-center justify-center bg-navy-950 text-white">Đang tải...</div>
@@ -70,10 +84,15 @@ export default function App() {
         current={page}
         onNavigate={setPage}
         profile={profile}
+        unreadCount={unread}
         onChangePassword={() => setRecovering(true)}
       />
       {page === 'customers' && <CustomerList currentProfile={profile} />}
       {page === 'team' && <TeamPage currentProfile={profile} />}
+      {page === 'documents' && <DocumentsPage currentProfile={profile} />}
+      {page === 'notifications' && profile && (
+        <NotificationsPage currentProfile={profile} onRead={loadUnread} />
+      )}
     </div>
   )
 }
