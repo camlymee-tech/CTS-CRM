@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { TriangleAlert } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { Modal, Input, Select, Textarea, Button } from './ui'
+import { Modal, Input, Select, Textarea, Button, Badge } from './ui'
 import {
   NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS,
   LOAI_KHACH_OPTIONS,
   NGUON_KHACH_OPTIONS,
   TRANG_THAI_OPTIONS,
+  classOf, labelOf,
 } from '../lib/constants'
 
 export default function CustomerForm({ customer, profiles, currentProfile, onClose, onSaved }) {
@@ -30,6 +32,29 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [khachTrung, setKhachTrung] = useState(null)
+  const [dangKiemTra, setDangKiemTra] = useState(false)
+  const [saleList, setSaleList] = useState({})
+
+  const chiSo = (v) => (v || '').replace(/\D/g, '')
+
+  // Kiểm tra trùng số điện thoại ngay khi gõ
+  useEffect(() => {
+    const so = chiSo(form.sdt)
+    if (so.length < 8) { setKhachTrung(null); return }
+    setDangKiemTra(true)
+    const t = setTimeout(async () => {
+      const { data } = await supabase.rpc('tim_khach_theo_sdt', { p_sdt: form.sdt })
+      const trung = (data || []).find((k) => k.id !== customer?.id)
+      setKhachTrung(trung || null)
+      if (trung?.sale_id && !saleList[trung.sale_id]) {
+        const { data: p } = await supabase.from('profiles').select('id, full_name').eq('id', trung.sale_id).single()
+        if (p) setSaleList((old) => ({ ...old, [p.id]: p.full_name }))
+      }
+      setDangKiemTra(false)
+    }, 500)
+    return () => clearTimeout(t)
+  }, [form.sdt])
 
   function toggleArray(field, value) {
     setForm((f) => ({
@@ -40,6 +65,10 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (khachTrung) {
+      setError('Số điện thoại này đã có trong hệ thống. Vui lòng dùng số khác hoặc cập nhật vào khách hàng đã có.')
+      return
+    }
     setSaving(true)
     setError('')
     const payload = {
@@ -54,7 +83,12 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
       ? await supabase.from('customers').update(payload).eq('id', customer.id).select().single()
       : await supabase.from('customers').insert(payload).select().single()
     setSaving(false)
-    if (error) { setError(error.message); return }
+    if (error) {
+      setError(error.message.includes('SDT_TRUNG')
+        ? 'Số điện thoại này đã thuộc về một khách hàng khác trong hệ thống.'
+        : error.message)
+      return
+    }
 
     // Vừa chuyển sang "Đã ký hợp đồng" -> mời tạo đơn dịch vụ ngay
     const vuaChotDon = form.trang_thai_cham_soc === 'da_ky' && trangThaiCu !== 'da_ky'
@@ -68,8 +102,12 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
       <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
         <Input label="Tên khách hàng *" required value={form.ten_khach}
           onChange={(e) => setForm({ ...form, ten_khach: e.target.value })} />
-        <Input label="Số điện thoại" value={form.sdt}
-          onChange={(e) => setForm({ ...form, sdt: e.target.value })} />
+        <div>
+          <Input label="Số điện thoại" value={form.sdt}
+            onChange={(e) => setForm({ ...form, sdt: e.target.value })}
+            className={khachTrung ? 'border-amber-400 bg-amber-50' : ''} />
+          {dangKiemTra && <p className="mt-1 text-xs text-ink-400">Đang kiểm tra trùng...</p>}
+        </div>
         <Input label="Ngành hàng" value={form.nganh_hang}
           onChange={(e) => setForm({ ...form, nganh_hang: e.target.value })}
           placeholder="Thời trang, mỹ phẩm..." />
@@ -79,6 +117,35 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
         <Input label="Link shop" value={form.link_shop}
           onChange={(e) => setForm({ ...form, link_shop: e.target.value })}
           placeholder="https://shopee.vn/... hoặc TikTok Shop" />
+
+        {khachTrung && (
+          <div className="col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <div className="flex items-center gap-2 text-amber-900">
+              <TriangleAlert size={16} />
+              <p className="text-sm font-semibold">Số điện thoại này đã có trong hệ thống</p>
+            </div>
+            <div className="mt-3 rounded-lg bg-white/70 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-display font-semibold text-navy-900">{khachTrung.ten_khach}</p>
+                  <p className="text-xs text-ink-400">{khachTrung.ma_khach} · {khachTrung.sdt}</p>
+                </div>
+                <Badge className={classOf(TRANG_THAI_OPTIONS, khachTrung.trang_thai_cham_soc)}>
+                  {labelOf(TRANG_THAI_OPTIONS, khachTrung.trang_thai_cham_soc)}
+                </Badge>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink-600">
+                <span>Sale phụ trách: <b className="text-navy-900">{saleList[khachTrung.sale_id] || 'Chưa gán'}</b></span>
+                <span>Nguồn: <b className="text-navy-900">{labelOf(NGUON_KHACH_OPTIONS, khachTrung.nguon_khach)}</b></span>
+                <span>Ngành hàng: <b className="text-navy-900">{khachTrung.nganh_hang || '—'}</b></span>
+                <span>Liên hệ gần nhất: <b className="text-navy-900">{khachTrung.ngay_lien_he_gan_nhat || '—'}</b></span>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-amber-800">
+              Không thể tạo trùng số. Hãy dùng số khác, hoặc đóng form này và cập nhật trực tiếp vào khách hàng ở trên.
+            </p>
+          </div>
+        )}
 
         <div className="col-span-2 flex flex-col gap-1.5 text-sm">
           <span className="font-medium text-navy-900">Nền tảng</span>
@@ -147,7 +214,9 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
 
         <div className="col-span-2 mt-2 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>Hủy</Button>
-          <Button type="submit" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu khách hàng'}</Button>
+          <Button type="submit" disabled={saving || !!khachTrung}>
+            {saving ? 'Đang lưu...' : khachTrung ? 'Số điện thoại bị trùng' : 'Lưu khách hàng'}
+          </Button>
         </div>
       </form>
     </Modal>

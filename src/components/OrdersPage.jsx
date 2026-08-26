@@ -3,7 +3,7 @@ import { Plus, Search, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import OrderForm from './OrderForm'
-import { TRANG_THAI_DON_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
+import { TRANG_THAI_DON_OPTIONS, DICH_VU_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
 
 export default function OrdersPage({ currentProfile, pendingCustomer, onPendingHandled }) {
   const [orders, setOrders] = useState([])
@@ -96,27 +96,10 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
       </div>
 
       {chuaCoDon.length > 0 && (
-        <div className="mx-8 mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <div className="flex items-center gap-2 text-amber-800">
-            <AlertTriangle size={16} />
-            <p className="text-sm font-medium">
-              {chuaCoDon.length} khách đã chốt hợp đồng nhưng chưa lên đơn dịch vụ
-            </p>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {chuaCoDon.map((c) => (
-              <button key={c.id}
-                onClick={() => { setEditing(null); setKhachTuChon(c); setShowForm(true) }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-navy-900 transition hover:border-coral-500 hover:text-coral-500">
-                <Plus size={13} /> {c.ten_khach}
-                <span className="text-xs text-ink-400">{c.ma_khach}</span>
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-amber-700">
-            Bấm vào tên khách để tạo đơn ngay. Doanh số chỉ được tính khi đơn dịch vụ đã được tạo.
-          </p>
-        </div>
+        <p className="px-8 pt-3 text-sm text-amber-700">
+          {chuaCoDon.length} khách đã chốt hợp đồng nhưng chưa lên đơn — nằm ở đầu danh sách bên dưới.
+          Doanh số chỉ được tính khi đơn đã được tạo.
+        </p>
       )}
 
       <div className="mx-8 mt-6 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
@@ -150,9 +133,42 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
             </tr>
           </thead>
           <tbody>
+            {/* Khách đã chốt nhưng chưa lên đơn — nằm ngay đầu danh sách để không bị bỏ sót */}
+            {!loading && chuaCoDon.map((c) => (
+              <tr key={`cho-${c.id}`} className="border-b border-slate-50 bg-amber-50/60 last:border-0">
+                <td className="px-5 py-3">
+                  <span className="text-ink-400">—</span>
+                </td>
+                <td className="px-5 py-3">
+                  <p className="font-medium text-navy-900">{c.ten_khach}</p>
+                  <p className="text-xs text-ink-400">{c.ma_khach}</p>
+                </td>
+                <td className="px-5 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {(c.dich_vu || []).map((dv) => (
+                      <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-5 py-3 text-right text-ink-400">—</td>
+                <td className="px-5 py-3 text-ink-400">—</td>
+                <td className="px-5 py-3 text-ink-600">{nameOf(c.sale_id, profiles, 'full_name')}</td>
+                <td className="px-5 py-3">
+                  <Badge className="bg-amber-100 text-amber-800">Chưa lên đơn</Badge>
+                </td>
+                <td className="whitespace-nowrap px-5 py-3 text-right">
+                  <button
+                    onClick={() => { setEditing(null); setKhachTuChon(c); setShowForm(true) }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600">
+                    <Plus size={13} /> Tạo đơn
+                  </button>
+                </td>
+              </tr>
+            ))}
+
             {loading ? (
               <tr><td colSpan={8} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
-            ) : filtered.length === 0 ? (
+            ) : filtered.length === 0 && chuaCoDon.length === 0 ? (
               <tr><td colSpan={8} className="px-5 py-8 text-center text-ink-400">
                 {orders.length === 0 ? 'Chưa có đơn dịch vụ nào.' : 'Không tìm thấy đơn phù hợp.'}
               </td></tr>
