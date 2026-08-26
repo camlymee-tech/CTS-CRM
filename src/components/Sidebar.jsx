@@ -1,4 +1,4 @@
-import { Users, FileText, ShoppingBag, BarChart3, LogOut } from 'lucide-react'
+import { Users, FileText, ShoppingBag, BarChart3, LogOut, UserCog } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 const NAV = [
@@ -6,6 +6,7 @@ const NAV = [
   { key: 'orders', label: 'Đơn dịch vụ', icon: ShoppingBag, ready: false },
   { key: 'contracts', label: 'Hợp đồng', icon: FileText, ready: false },
   { key: 'reports', label: 'Tổng kết doanh số', icon: BarChart3, ready: false },
+  { key: 'team', label: 'Nhân sự', icon: UserCog, ready: true, adminOnly: true },
 ]
 
 export default function Sidebar({ current, onNavigate, profile }) {
@@ -20,7 +21,7 @@ export default function Sidebar({ current, onNavigate, profile }) {
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
-        {NAV.map((item) => {
+        {NAV.filter((item) => !item.adminOnly || profile?.role === 'admin').map((item) => {
           const Icon = item.icon
           const active = current === item.key
           return (
