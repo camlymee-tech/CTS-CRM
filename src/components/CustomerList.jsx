@@ -376,6 +376,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
           onClose={() => setViewingCustomer(null)}
           onChanged={loadCustomers}
           onEdit={(c) => { setViewingCustomer(null); setEditingCustomer(c); setShowForm(true) }}
+          onChotDon={(khach) => { setViewingCustomer(null); onChotDon?.(khach) }}
         />
       )}
     </div>

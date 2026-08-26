@@ -91,7 +91,7 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
           <div className="col-span-2 rounded-xl bg-emerald-50 px-4 py-3">
             <p className="text-xs uppercase tracking-wide text-emerald-700">Khách hàng</p>
             <p className="font-display font-semibold text-navy-900">{customer.ten_khach}</p>
-            {customer.ten_shop && <p className="text-sm text-ink-600">{customer.ten_shop}</p>}
+            {customer.ma_khach && <p className="text-sm text-ink-600">{customer.ma_khach}</p>}
           </div>
         ) : (
           <div className="col-span-2">
@@ -99,7 +99,7 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
               onChange={(e) => setForm({ ...form, customer_id: e.target.value })}>
               <option value="">-- Chọn khách hàng --</option>
               {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.ten_khach}{c.ten_shop ? ` — ${c.ten_shop}` : ''}</option>
+                <option key={c.id} value={c.id}>{c.ten_khach}{c.ma_khach ? ` — ${c.ma_khach}` : ''}</option>
               ))}
             </Select>
           </div>

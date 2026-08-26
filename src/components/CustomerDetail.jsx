@@ -24,7 +24,7 @@ function laKhachChung(c) {
   return false
 }
 
-export default function CustomerDetail({ customer: khachBanDau, currentProfile, onClose, onChanged, onEdit }) {
+export default function CustomerDetail({ customer: khachBanDau, currentProfile, onClose, onChanged, onEdit, onChotDon }) {
   const [customer, setCustomer] = useState(khachBanDau)
   const [tab, setTab] = useState('thong_tin')
   const [interactions, setInteractions] = useState([])
@@ -90,11 +90,18 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   }
 
   async function doiTrangThai(tt) {
+    const truoc = customer.trang_thai_cham_soc
     const { error } = await supabase.from('customers')
       .update({ trang_thai_cham_soc: tt }).eq('id', customer.id)
     if (error) { setMsg('Lỗi: ' + error.message); return }
-    setCustomer({ ...customer, trang_thai_cham_soc: tt })
+    const moi = { ...customer, trang_thai_cham_soc: tt }
+    setCustomer(moi)
     load(); onChanged?.()
+
+    // Vừa chuyển sang Chốt hợp đồng -> sang tạo đơn dịch vụ luôn
+    if (tt === 'da_ky' && truoc !== 'da_ky') {
+      onChotDon?.(moi)
+    }
   }
 
   const TABS = [

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import OrderForm from './OrderForm'
@@ -16,6 +16,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
   const [filterSale, setFilterSale] = useState('')
   const [showForm, setShowForm] = useState(!!pendingCustomer)
   const [editing, setEditing] = useState(null)
+  const [khachTuChon, setKhachTuChon] = useState(null)
 
   useEffect(() => { load() }, [])
   useEffect(() => { if (pendingCustomer) setShowForm(true) }, [pendingCustomer])
@@ -25,7 +26,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
     const [{ data: ords }, { data: its }, { data: custs }, { data: profs }] = await Promise.all([
       supabase.from('orders').select('*').order('ngay_chot', { ascending: false }),
       supabase.from('order_items').select('*'),
-      supabase.from('customers').select('id, ten_khach, ten_shop, sale_id').order('ten_khach'),
+      supabase.from('customers').select('id, ten_khach, ma_khach, sale_id, trang_thai_cham_soc, dich_vu').order('ten_khach'),
       supabase.from('profiles').select('id, full_name').order('full_name'),
     ])
     setOrders(ords || [])
@@ -58,6 +59,12 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
     return true
   }), [orders, items, customers, search, filterTT, filterSale])
 
+  // Khách đã chuyển sang "Chốt hợp đồng" nhưng chưa có đơn dịch vụ nào
+  const chuaCoDon = useMemo(() => {
+    const coDon = new Set(orders.map((o) => o.customer_id))
+    return customers.filter((c) => c.trang_thai_cham_soc === 'da_ky' && !coDon.has(c.id))
+  }, [customers, orders])
+
   const tongDoanhSo = filtered
     .filter((o) => o.trang_thai !== 'huy')
     .reduce((s, o) => s + (Number(o.gia_tri) || 0), 0)
@@ -65,6 +72,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
   function closeForm() {
     setShowForm(false)
     setEditing(null)
+    setKhachTuChon(null)
     onPendingHandled?.()
   }
 
@@ -86,6 +94,30 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
         <StatCard label="Đơn đang triển khai"
           value={filtered.filter((o) => o.trang_thai === 'dang_xu_ly').length} accent="teal" />
       </div>
+
+      {chuaCoDon.length > 0 && (
+        <div className="mx-8 mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-center gap-2 text-amber-800">
+            <AlertTriangle size={16} />
+            <p className="text-sm font-medium">
+              {chuaCoDon.length} khách đã chốt hợp đồng nhưng chưa lên đơn dịch vụ
+            </p>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {chuaCoDon.map((c) => (
+              <button key={c.id}
+                onClick={() => { setEditing(null); setKhachTuChon(c); setShowForm(true) }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-navy-900 transition hover:border-coral-500 hover:text-coral-500">
+                <Plus size={13} /> {c.ten_khach}
+                <span className="text-xs text-ink-400">{c.ma_khach}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-amber-700">
+            Bấm vào tên khách để tạo đơn ngay. Doanh số chỉ được tính khi đơn dịch vụ đã được tạo.
+          </p>
+        </div>
+      )}
 
       <div className="mx-8 mt-6 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
         <div className="relative min-w-[200px] flex-1">
@@ -129,7 +161,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
                 <td className="px-5 py-3 font-medium text-navy-900">{o.ma_don}</td>
                 <td className="px-5 py-3">
                   <p className="text-navy-900">{nameOf(o.customer_id, customers, 'ten_khach')}</p>
-                  <p className="text-xs text-ink-400">{nameOf(o.customer_id, customers, 'ten_shop')}</p>
+                  <p className="text-xs text-ink-400">{nameOf(o.customer_id, customers, 'ma_khach')}</p>
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex flex-wrap gap-1">
@@ -161,7 +193,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
       {showForm && (
         <OrderForm
           order={editing}
-          customer={!editing ? pendingCustomer : null}
+          customer={!editing ? (khachTuChon || pendingCustomer) : null}
           customers={customers}
           profiles={profiles}
           currentProfile={currentProfile}
