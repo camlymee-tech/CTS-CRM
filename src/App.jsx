@@ -7,6 +7,8 @@ import CustomerList from './components/CustomerList'
 import TeamPage from './components/TeamPage'
 import DocumentsPage from './components/DocumentsPage'
 import NotificationsPage from './components/NotificationsPage'
+import OrdersPage from './components/OrdersPage'
+import ReportsPage from './components/ReportsPage'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -14,6 +16,7 @@ export default function App() {
   const [page, setPage] = useState('customers')
   const [recovering, setRecovering] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [chotDonCustomer, setChotDonCustomer] = useState(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -87,7 +90,20 @@ export default function App() {
         unreadCount={unread}
         onChangePassword={() => setRecovering(true)}
       />
-      {page === 'customers' && <CustomerList currentProfile={profile} />}
+      {page === 'customers' && (
+        <CustomerList
+          currentProfile={profile}
+          onChotDon={(khach) => { setChotDonCustomer(khach); setPage('orders') }}
+        />
+      )}
+      {page === 'orders' && (
+        <OrdersPage
+          currentProfile={profile}
+          pendingCustomer={chotDonCustomer}
+          onPendingHandled={() => setChotDonCustomer(null)}
+        />
+      )}
+      {page === 'reports' && <ReportsPage />}
       {page === 'team' && <TeamPage currentProfile={profile} />}
       {page === 'documents' && <DocumentsPage currentProfile={profile} />}
       {page === 'notifications' && profile && (

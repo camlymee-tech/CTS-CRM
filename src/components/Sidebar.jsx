@@ -3,9 +3,9 @@ import { supabase } from '../supabaseClient'
 
 const NAV = [
   { key: 'customers', label: 'Khách hàng', icon: Users, ready: true },
-  { key: 'orders', label: 'Đơn dịch vụ', icon: ShoppingBag, ready: false },
+  { key: 'orders', label: 'Đơn dịch vụ', icon: ShoppingBag, ready: true },
   { key: 'contracts', label: 'Hợp đồng', icon: FileText, ready: false },
-  { key: 'reports', label: 'Tổng kết doanh số', icon: BarChart3, ready: false },
+  { key: 'reports', label: 'Tổng kết doanh số', icon: BarChart3, ready: true },
   { key: 'documents', label: 'Tài liệu', icon: BookOpen, ready: true },
   { key: 'notifications', label: 'Thông báo', icon: Bell, ready: true },
   { key: 'team', label: 'Nhân sự', icon: UserCog, ready: true, adminOnly: true },

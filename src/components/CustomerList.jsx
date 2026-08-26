@@ -6,13 +6,14 @@ import CustomerForm from './CustomerForm'
 import CustomerDetail from './CustomerDetail'
 import {
   NEN_TANG_OPTIONS,
+  DICH_VU_OPTIONS,
   LOAI_KHACH_OPTIONS,
   TRANG_THAI_OPTIONS,
   classOf,
   labelOf,
 } from '../lib/constants'
 
-export default function CustomerList({ currentProfile }) {
+export default function CustomerList({ currentProfile, onChotDon }) {
   const [customers, setCustomers] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -65,7 +66,7 @@ export default function CustomerList({ currentProfile }) {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
+      <header className="flex items-center justify-between border-b border-slate-200 bg-white py-5 pl-8 pr-24">
         <div>
           <h1 className="font-display text-xl font-bold text-navy-900">Khách hàng</h1>
           <p className="text-sm text-ink-600">Quản lý & phân loại toàn bộ khách hàng của team sale</p>
@@ -112,6 +113,7 @@ export default function CustomerList({ currentProfile }) {
             <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
               <th className="px-5 py-3">Khách hàng</th>
               <th className="px-5 py-3">Nền tảng</th>
+              <th className="px-5 py-3">Dịch vụ</th>
               <th className="px-5 py-3">Loại khách</th>
               <th className="px-5 py-3">Trạng thái</th>
               <th className="px-5 py-3">Sale phụ trách</th>
@@ -121,9 +123,9 @@ export default function CustomerList({ currentProfile }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
+              <tr><td colSpan={8} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
+              <tr><td colSpan={8} className="px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
             ) : (
               filtered.map((c) => (
                 <tr
@@ -139,6 +141,13 @@ export default function CustomerList({ currentProfile }) {
                     <div className="flex gap-1">
                       {(c.nen_tang || []).map((nt) => (
                         <Badge key={nt} className={classOf(NEN_TANG_OPTIONS, nt)}>{labelOf(NEN_TANG_OPTIONS, nt)}</Badge>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(c.dich_vu || []).map((dv) => (
+                        <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
                       ))}
                     </div>
                   </td>
@@ -176,7 +185,11 @@ export default function CustomerList({ currentProfile }) {
           profiles={profiles}
           currentProfile={currentProfile}
           onClose={() => setShowForm(false)}
-          onSaved={() => { setShowForm(false); loadCustomers() }}
+          onSaved={(khachVuaChot) => {
+            setShowForm(false)
+            loadCustomers()
+            if (khachVuaChot) onChotDon?.(khachVuaChot)
+          }}
         />
       )}
 
