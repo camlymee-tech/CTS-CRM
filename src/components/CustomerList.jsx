@@ -27,6 +27,14 @@ function laKhachChung(c) {
 
 const chiSo = (s) => (s || '').replace(/\D/g, '')
 
+function gonTien(n) {
+  const v = Number(n) || 0
+  if (v >= 1_000_000_000) return (v / 1_000_000_000).toFixed(1).replace('.', ',') + ' tỷ'
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(1).replace('.', ',') + ' tr'
+  if (v >= 1_000) return Math.round(v / 1_000) + 'k'
+  return String(v)
+}
+
 export default function CustomerList({ currentProfile, onChotDon }) {
   const [customers, setCustomers] = useState([])
   const [phoneHits, setPhoneHits] = useState([])
@@ -44,10 +52,32 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   const [editingCustomer, setEditingCustomer] = useState(null)
   const [viewingCustomer, setViewingCustomer] = useState(null)
 
+  const [doanhSoThang, setDoanhSoThang] = useState(null)
+  const [doanhSoTruoc, setDoanhSoTruoc] = useState(0)
+
   useEffect(() => {
     loadProfiles()
     loadCustomers()
+    loadDoanhSo()
   }, [])
+
+  async function loadDoanhSo() {
+    const nay = new Date(); nay.setDate(1)
+    const mocNay = nay.toISOString().slice(0, 10)
+    const truoc = new Date(); truoc.setDate(1); truoc.setMonth(truoc.getMonth() - 1)
+    const mocTruoc = truoc.toISOString().slice(0, 10)
+
+    const { data } = await supabase.from('orders')
+      .select('gia_tri, ngay_chot').neq('trang_thai', 'huy').gte('ngay_chot', mocTruoc)
+
+    let a = 0, b = 0
+    for (const o of data || []) {
+      const tien = Number(o.gia_tri) || 0
+      if (o.ngay_chot >= mocNay) a += tien; else b += tien
+    }
+    setDoanhSoThang(a)
+    setDoanhSoTruoc(b)
+  }
 
   // Gõ đủ số điện thoại -> tra cứu được cả khách của sale khác
   useEffect(() => {
@@ -137,7 +167,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
         </Button>
       </header>
 
-      <div className="grid grid-cols-4 gap-4 px-8 pt-6">
+      <div className="grid grid-cols-5 gap-4 px-8 pt-6">
         <StatCard label="Cần chăm sóc hôm nay" value={stats.canChamSoc} accent="coral"
           active={quickFilter === 'can_cham_soc'}
           onClick={() => setQuickFilter(quickFilter === 'can_cham_soc' ? '' : 'can_cham_soc')} />
@@ -150,6 +180,12 @@ export default function CustomerList({ currentProfile, onChotDon }) {
         <StatCard label="Chốt tháng này" value={stats.chotThangNay} accent="emerald"
           active={quickFilter === 'chot_thang_nay'}
           onClick={() => setQuickFilter(quickFilter === 'chot_thang_nay' ? '' : 'chot_thang_nay')} />
+        <StatCard label={`Doanh số tháng ${new Date().getMonth() + 1}`}
+          value={doanhSoThang === null ? '...' : gonTien(doanhSoThang)} accent="coral"
+          note={doanhSoTruoc > 0 && doanhSoThang !== null
+            ? `${doanhSoThang >= doanhSoTruoc ? '▲' : '▼'} ${Math.abs(Math.round(((doanhSoThang - doanhSoTruoc) / doanhSoTruoc) * 100))}% so tháng trước`
+            : null}
+          noteUp={doanhSoThang >= doanhSoTruoc} />
       </div>
       <p className="px-8 pt-2 text-xs text-ink-400">
         {isAdmin ? 'Số liệu toàn team · bấm vào thẻ để lọc danh sách' : 'Số liệu khách của bạn · bấm vào thẻ để lọc danh sách'}
@@ -319,7 +355,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   )
 }
 
-function StatCard({ label, value, accent = 'navy', active = false, onClick }) {
+function StatCard({ label, value, accent = 'navy', active = false, onClick, note, noteUp }) {
   const accents = {
     navy: 'text-navy-900',
     coral: 'text-coral-500',
@@ -336,6 +372,9 @@ function StatCard({ label, value, accent = 'navy', active = false, onClick }) {
     >
       <p className={`text-xs font-medium uppercase tracking-wide ${active ? 'text-white/60' : 'text-ink-400'}`}>{label}</p>
       <p className={`mt-1 font-display text-2xl font-bold ${active ? 'text-white' : accents[accent]}`}>{value}</p>
+      {note && (
+        <p className={`mt-0.5 text-[11px] font-medium ${noteUp ? 'text-emerald-600' : 'text-rose-500'}`}>{note}</p>
+      )}
     </button>
   )
 }
