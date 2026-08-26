@@ -14,7 +14,8 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
   const trangThaiCu = customer?.trang_thai_cham_soc || null
   const [form, setForm] = useState({
     ten_khach: customer?.ten_khach || '',
-    ten_shop: customer?.ten_shop || '',
+    link_fb: customer?.link_fb || '',
+    link_shop: customer?.link_shop || '',
     sdt: customer?.sdt || '',
     nen_tang: customer?.nen_tang || [],
     dich_vu: customer?.dich_vu || [],
@@ -46,6 +47,8 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
       ngay_lien_he_gan_nhat: form.ngay_lien_he_gan_nhat || null,
       ngay_cham_soc_tiep_theo: form.ngay_cham_soc_tiep_theo || null,
       sale_id: form.sale_id || null,
+      link_fb: form.link_fb || null,
+      link_shop: form.link_shop || null,
     }
     const { data, error } = isEdit
       ? await supabase.from('customers').update(payload).eq('id', customer.id).select().single()
@@ -65,13 +68,17 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
       <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
         <Input label="Tên khách hàng *" required value={form.ten_khach}
           onChange={(e) => setForm({ ...form, ten_khach: e.target.value })} />
-        <Input label="Tên shop" value={form.ten_shop}
-          onChange={(e) => setForm({ ...form, ten_shop: e.target.value })} />
         <Input label="Số điện thoại" value={form.sdt}
           onChange={(e) => setForm({ ...form, sdt: e.target.value })} />
         <Input label="Ngành hàng" value={form.nganh_hang}
           onChange={(e) => setForm({ ...form, nganh_hang: e.target.value })}
           placeholder="Thời trang, mỹ phẩm..." />
+        <Input label="Link Facebook cá nhân" value={form.link_fb}
+          onChange={(e) => setForm({ ...form, link_fb: e.target.value })}
+          placeholder="https://facebook.com/..." />
+        <Input label="Link shop" value={form.link_shop}
+          onChange={(e) => setForm({ ...form, link_shop: e.target.value })}
+          placeholder="https://shopee.vn/... hoặc TikTok Shop" />
 
         <div className="col-span-2 flex flex-col gap-1.5 text-sm">
           <span className="font-medium text-navy-900">Nền tảng</span>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Phone } from 'lucide-react'
+import { Plus, Search, Phone, Link2, Store, Users2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import CustomerForm from './CustomerForm'
@@ -8,19 +8,37 @@ import {
   NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS,
   LOAI_KHACH_OPTIONS,
+  NGUON_KHACH_OPTIONS,
   TRANG_THAI_OPTIONS,
   classOf,
   labelOf,
 } from '../lib/constants'
 
+// Khách "chung" — cả team đều xem được (khớp với hàm la_khach_chung trong database)
+function laKhachChung(c) {
+  const moc = c.ngay_lien_he_gan_nhat || (c.created_at || '').slice(0, 10)
+  const soNgay = moc ? Math.floor((Date.now() - new Date(moc).getTime()) / 86400000) : 999
+  if (c.trang_thai_cham_soc === 'chua_lien_he') return true
+  if (c.trang_thai_cham_soc === 'tam_dung') return true
+  if (c.trang_thai_cham_soc === 'khong_nghe_may') return soNgay >= 5
+  if (c.trang_thai_cham_soc === 'dang_tu_van') return soNgay >= 30
+  return false
+}
+
+const chiSo = (s) => (s || '').replace(/\D/g, '')
+
 export default function CustomerList({ currentProfile, onChotDon }) {
   const [customers, setCustomers] = useState([])
+  const [phoneHits, setPhoneHits] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterLoai, setFilterLoai] = useState('')
   const [filterTrangThai, setFilterTrangThai] = useState('')
   const [filterSale, setFilterSale] = useState('')
+  const [filterDichVu, setFilterDichVu] = useState('')
+  const [tuNgay, setTuNgay] = useState('')
+  const [denNgay, setDenNgay] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
   const [viewingCustomer, setViewingCustomer] = useState(null)
@@ -29,6 +47,17 @@ export default function CustomerList({ currentProfile, onChotDon }) {
     loadProfiles()
     loadCustomers()
   }, [])
+
+  // Gõ đủ số điện thoại -> tra cứu được cả khách của sale khác
+  useEffect(() => {
+    const so = chiSo(search)
+    if (so.length < 8) { setPhoneHits([]); return }
+    const t = setTimeout(async () => {
+      const { data } = await supabase.rpc('tim_khach_theo_sdt', { p_sdt: search })
+      setPhoneHits(data || [])
+    }, 400)
+    return () => clearTimeout(t)
+  }, [search])
 
   async function loadProfiles() {
     const { data } = await supabase.from('profiles').select('*').order('full_name')
@@ -42,31 +71,40 @@ export default function CustomerList({ currentProfile, onChotDon }) {
     setLoading(false)
   }
 
+  // Gộp kết quả tra cứu SĐT vào danh sách, không trùng lặp
+  const nguon = useMemo(() => {
+    const map = new Map(customers.map((c) => [c.id, c]))
+    for (const c of phoneHits) if (!map.has(c.id)) map.set(c.id, { ...c, _tuTraCuu: true })
+    return [...map.values()]
+  }, [customers, phoneHits])
+
   const filtered = useMemo(() => {
-    return customers.filter((c) => {
-      if (search && !`${c.ten_khach} ${c.ten_shop} ${c.ma_khach} ${c.sdt}`.toLowerCase().includes(search.toLowerCase())) return false
+    return nguon.filter((c) => {
+      if (search && !`${c.ten_khach} ${c.ma_khach} ${c.sdt || ''} ${c.nganh_hang || ''}`.toLowerCase().includes(search.toLowerCase())) {
+        if (!c._tuTraCuu) return false
+      }
       if (filterLoai && c.loai_khach !== filterLoai) return false
       if (filterTrangThai && c.trang_thai_cham_soc !== filterTrangThai) return false
       if (filterSale && c.sale_id !== filterSale) return false
+      if (filterDichVu && !(c.dich_vu || []).includes(filterDichVu)) return false
+      if (tuNgay && (!c.ngay_lien_he_gan_nhat || c.ngay_lien_he_gan_nhat < tuNgay)) return false
+      if (denNgay && (!c.ngay_lien_he_gan_nhat || c.ngay_lien_he_gan_nhat > denNgay)) return false
       return true
     })
-  }, [customers, search, filterLoai, filterTrangThai, filterSale])
+  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, tuNgay, denNgay])
 
-  const stats = useMemo(() => {
-    const total = customers.length
-    const moi = customers.filter((c) => c.loai_khach === 'moi').length
-    const cu = customers.filter((c) => c.loai_khach === 'cu').length
-    const daKy = customers.filter((c) => c.trang_thai_cham_soc === 'da_ky' || c.trang_thai_cham_soc === 'dang_trien_khai').length
-    return { total, moi, cu, daKy }
-  }, [customers])
+  const stats = useMemo(() => ({
+    total: customers.length,
+    moi: customers.filter((c) => c.loai_khach === 'moi').length,
+    cu: customers.filter((c) => c.loai_khach === 'cu').length,
+    daKy: customers.filter((c) => ['da_ky', 'dang_trien_khai'].includes(c.trang_thai_cham_soc)).length,
+  }), [customers])
 
-  function profileName(id) {
-    return profiles.find((p) => p.id === id)?.full_name || '—'
-  }
+  const profileName = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white py-5 pl-8 pr-24">
+      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
         <div>
           <h1 className="font-display text-xl font-bold text-navy-900">Khách hàng</h1>
           <p className="text-sm text-ink-600">Quản lý & phân loại toàn bộ khách hàng của team sale</p>
@@ -83,98 +121,139 @@ export default function CustomerList({ currentProfile, onChotDon }) {
         <StatCard label="Đã ký / đang triển khai" value={stats.daKy} accent="emerald" />
       </div>
 
-      <div className="mx-8 mt-6 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-          <Input
-            placeholder="Tìm theo tên, shop, mã KH, SĐT..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      <div className="mx-8 mt-6 space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[220px] flex-1">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+            <Input placeholder="Tìm theo tên, mã KH, SĐT, ngành hàng..." value={search}
+              onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          </div>
+          <Select value={filterLoai} onChange={(e) => setFilterLoai(e.target.value)} className="w-40">
+            <option value="">Tất cả loại khách</option>
+            {LOAI_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
+          <Select value={filterTrangThai} onChange={(e) => setFilterTrangThai(e.target.value)} className="w-48">
+            <option value="">Tất cả trạng thái</option>
+            {TRANG_THAI_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
         </div>
-        <Select value={filterLoai} onChange={(e) => setFilterLoai(e.target.value)} className="w-40">
-          <option value="">Tất cả loại khách</option>
-          {LOAI_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </Select>
-        <Select value={filterTrangThai} onChange={(e) => setFilterTrangThai(e.target.value)} className="w-48">
-          <option value="">Tất cả trạng thái</option>
-          {TRANG_THAI_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </Select>
-        <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
-          <option value="">Tất cả sale</option>
-          {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-        </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={filterDichVu} onChange={(e) => setFilterDichVu(e.target.value)} className="w-48">
+            <option value="">Tất cả dịch vụ</option>
+            {DICH_VU_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
+          <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
+            <option value="">Tất cả sale</option>
+            {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+          </Select>
+          <div className="flex items-center gap-2 text-sm text-ink-600">
+            <span className="whitespace-nowrap">Liên hệ từ</span>
+            <Input type="date" value={tuNgay} onChange={(e) => setTuNgay(e.target.value)} className="w-40" />
+            <span>đến</span>
+            <Input type="date" value={denNgay} onChange={(e) => setDenNgay(e.target.value)} className="w-40" />
+          </div>
+          {(search || filterLoai || filterTrangThai || filterSale || filterDichVu || tuNgay || denNgay) && (
+            <button
+              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setTuNgay(''); setDenNgay('') }}
+              className="text-sm text-ink-600 hover:text-coral-500">
+              Xoá bộ lọc
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="mx-8 my-6 overflow-hidden rounded-2xl bg-white shadow-sm">
-        <table className="w-full text-sm">
+      <div className="mx-8 my-6 overflow-x-auto rounded-2xl bg-white shadow-sm">
+        <table className="w-full min-w-[1100px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
-              <th className="px-5 py-3">Khách hàng</th>
-              <th className="px-5 py-3">Nền tảng</th>
-              <th className="px-5 py-3">Dịch vụ</th>
-              <th className="px-5 py-3">Loại khách</th>
-              <th className="px-5 py-3">Trạng thái</th>
-              <th className="px-5 py-3">Sale phụ trách</th>
-              <th className="px-5 py-3">Liên hệ gần nhất</th>
-              <th className="px-5 py-3"></th>
+              <th className="px-4 py-3 w-12">STT</th>
+              <th className="px-4 py-3">Khách hàng</th>
+              <th className="px-4 py-3">Số điện thoại</th>
+              <th className="px-4 py-3">Nền tảng</th>
+              <th className="px-4 py-3">Dịch vụ</th>
+              <th className="px-4 py-3">Nguồn</th>
+              <th className="px-4 py-3">Loại</th>
+              <th className="px-4 py-3">Trạng thái</th>
+              <th className="px-4 py-3">Sale phụ trách</th>
+              <th className="px-4 py-3">Liên hệ gần nhất</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
+              <tr><td colSpan={11} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
-            ) : (
-              filtered.map((c) => (
-                <tr
-                  key={c.id}
+              <tr><td colSpan={11} className="px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
+            ) : filtered.map((c, idx) => {
+              const chung = laKhachChung(c)
+              const cuaMinh = c.sale_id === currentProfile?.id
+              return (
+                <tr key={c.id}
                   className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50"
-                  onClick={() => setViewingCustomer(c)}
-                >
-                  <td className="px-5 py-3">
-                    <p className="font-medium text-navy-900">{c.ten_khach}</p>
-                    <p className="text-xs text-ink-400">{c.ma_khach} {c.ten_shop && `· ${c.ten_shop}`}</p>
+                  onClick={() => setViewingCustomer(c)}>
+                  <td className="px-4 py-3 text-ink-400">{idx + 1}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-navy-900">{c.ten_khach}</p>
+                      {chung && !cuaMinh && (
+                        <span title="Khách chung — cả team đều xem được">
+                          <Users2 size={13} className="text-amber-500" />
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-ink-400">
+                      <span>{c.ma_khach}</span>
+                      {c.link_fb && (
+                        <a href={c.link_fb} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-0.5 text-teal-500 hover:underline">
+                          <Link2 size={10} /> FB
+                        </a>
+                      )}
+                      {c.link_shop && (
+                        <a href={c.link_shop} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-0.5 text-teal-500 hover:underline">
+                          <Store size={10} /> Shop
+                        </a>
+                      )}
+                    </div>
                   </td>
-                  <td className="px-5 py-3">
-                    <div className="flex gap-1">
+                  <td className="px-4 py-3 text-ink-600">{c.sdt || '—'}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
                       {(c.nen_tang || []).map((nt) => (
                         <Badge key={nt} className={classOf(NEN_TANG_OPTIONS, nt)}>{labelOf(NEN_TANG_OPTIONS, nt)}</Badge>
                       ))}
                     </div>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {(c.dich_vu || []).map((dv) => (
                         <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
                       ))}
                     </div>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-3 text-ink-600">{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '—'}</td>
+                  <td className="px-4 py-3">
                     <Badge className={c.loai_khach === 'moi' ? 'bg-coral-50 text-coral-600' : 'bg-slate-100 text-slate-600'}>
                       {labelOf(LOAI_KHACH_OPTIONS, c.loai_khach)}
                     </Badge>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-3">
                     <Badge className={classOf(TRANG_THAI_OPTIONS, c.trang_thai_cham_soc)}>
                       {labelOf(TRANG_THAI_OPTIONS, c.trang_thai_cham_soc)}
                     </Badge>
                   </td>
-                  <td className="px-5 py-3 text-ink-600">{profileName(c.sale_id)}</td>
-                  <td className="px-5 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>
-                  <td className="px-5 py-3 text-right">
-                    <a
-                      href={c.sdt ? `tel:${c.sdt}` : undefined}
-                      onClick={(e) => e.stopPropagation()}
-                      className={`inline-flex items-center gap-1 text-xs ${c.sdt ? 'text-teal-500 hover:underline' : 'text-ink-400'}`}
-                    >
+                  <td className="px-4 py-3 text-ink-600">{profileName(c.sale_id)}</td>
+                  <td className="px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>
+                  <td className="px-4 py-3 text-right">
+                    <a href={c.sdt ? `tel:${c.sdt}` : undefined} onClick={(e) => e.stopPropagation()}
+                      className={`inline-flex items-center gap-1 text-xs ${c.sdt ? 'text-teal-500 hover:underline' : 'text-ink-400'}`}>
                       <Phone size={13} /> Gọi
                     </a>
                   </td>
                 </tr>
-              ))
-            )}
+              )
+            })}
           </tbody>
         </table>
       </div>

@@ -54,7 +54,14 @@ export default function CustomerDetail({ customer, currentProfile, onClose, onCh
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-ink-400">{customer.ma_khach}</p>
             <h2 className="font-display text-lg font-bold text-navy-900">{customer.ten_khach}</h2>
-            {customer.ten_shop && <p className="text-sm text-ink-600">{customer.ten_shop}</p>}
+            <div className="mt-1 flex gap-3 text-sm">
+              {customer.link_fb && (
+                <a href={customer.link_fb} target="_blank" rel="noreferrer" className="text-teal-500 hover:underline">Facebook</a>
+              )}
+              {customer.link_shop && (
+                <a href={customer.link_shop} target="_blank" rel="noreferrer" className="text-teal-500 hover:underline">Link shop</a>
+              )}
+            </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {(customer.nen_tang || []).map((nt) => (
                 <Badge key={nt} className={classOf(NEN_TANG_OPTIONS, nt)}>{labelOf(NEN_TANG_OPTIONS, nt)}</Badge>
