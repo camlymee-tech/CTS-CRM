@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Login from './components/Login'
+import ResetPassword from './components/ResetPassword'
 import Sidebar from './components/Sidebar'
 import CustomerList from './components/CustomerList'
 import TeamPage from './components/TeamPage'
@@ -9,10 +10,15 @@ export default function App() {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
   const [page, setPage] = useState('customers')
+  const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s)
+      // Người dùng vừa bấm link đặt lại mật khẩu trong email
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+    })
     return () => sub.subscription.unsubscribe()
   }, [])
 
@@ -28,6 +34,17 @@ export default function App() {
 
   if (session === undefined) {
     return <div className="flex min-h-screen items-center justify-center bg-navy-950 text-white">Đang tải...</div>
+  }
+
+  if (recovering && session) {
+    return (
+      <ResetPassword
+        onDone={() => {
+          setRecovering(false)
+          window.history.replaceState({}, '', window.location.pathname)
+        }}
+      />
+    )
   }
 
   if (!session) return <Login />
@@ -49,7 +66,12 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-bg">
-      <Sidebar current={page} onNavigate={setPage} profile={profile} />
+      <Sidebar
+        current={page}
+        onNavigate={setPage}
+        profile={profile}
+        onChangePassword={() => setRecovering(true)}
+      />
       {page === 'customers' && <CustomerList currentProfile={profile} />}
       {page === 'team' && <TeamPage currentProfile={profile} />}
     </div>

@@ -1,4 +1,4 @@
-import { Users, FileText, ShoppingBag, BarChart3, LogOut, UserCog } from 'lucide-react'
+import { Users, FileText, ShoppingBag, BarChart3, LogOut, UserCog, KeyRound } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 const NAV = [
@@ -9,7 +9,7 @@ const NAV = [
   { key: 'team', label: 'Nhân sự', icon: UserCog, ready: true, adminOnly: true },
 ]
 
-export default function Sidebar({ current, onNavigate, profile }) {
+export default function Sidebar({ current, onNavigate, profile, onChangePassword }) {
   return (
     <aside className="flex h-screen w-60 flex-col bg-navy-950 text-white">
       <div className="flex items-center gap-2.5 px-5 py-6">
@@ -45,8 +45,14 @@ export default function Sidebar({ current, onNavigate, profile }) {
         <p className="truncate text-sm font-medium">{profile?.full_name || 'Nhân viên'}</p>
         <p className="truncate text-xs text-white/40">{profile?.role === 'admin' ? 'Quản trị' : 'Sale'}</p>
         <button
-          onClick={() => supabase.auth.signOut()}
+          onClick={onChangePassword}
           className="mt-3 flex items-center gap-2 text-xs text-white/60 hover:text-white"
+        >
+          <KeyRound size={14} /> Đổi mật khẩu
+        </button>
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="mt-2 flex items-center gap-2 text-xs text-white/60 hover:text-white"
         >
           <LogOut size={14} /> Đăng xuất
         </button>
