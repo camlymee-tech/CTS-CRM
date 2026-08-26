@@ -9,6 +9,7 @@ import DocumentsPage from './components/DocumentsPage'
 import NotificationsPage from './components/NotificationsPage'
 import OrdersPage from './components/OrdersPage'
 import ReportsPage from './components/ReportsPage'
+import AnalyticsPage from './components/AnalyticsPage'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -104,6 +105,7 @@ export default function App() {
         />
       )}
       {page === 'reports' && <ReportsPage />}
+      {page === 'analytics' && <AnalyticsPage />}
       {page === 'team' && <TeamPage currentProfile={profile} />}
       {page === 'documents' && <DocumentsPage currentProfile={profile} />}
       {page === 'notifications' && profile && (

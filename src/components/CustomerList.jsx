@@ -37,6 +37,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   const [filterTrangThai, setFilterTrangThai] = useState('')
   const [filterSale, setFilterSale] = useState('')
   const [filterDichVu, setFilterDichVu] = useState('')
+  const [quickFilter, setQuickFilter] = useState('')
   const [tuNgay, setTuNgay] = useState('')
   const [denNgay, setDenNgay] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -83,6 +84,15 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       if (search && !`${c.ten_khach} ${c.ma_khach} ${c.sdt || ''} ${c.nganh_hang || ''}`.toLowerCase().includes(search.toLowerCase())) {
         if (!c._tuTraCuu) return false
       }
+      if (quickFilter) {
+        if (!isAdmin && c.sale_id !== currentProfile?.id) return false
+        if (quickFilter === 'can_cham_soc' && !(c.ngay_cham_soc_tiep_theo && c.ngay_cham_soc_tiep_theo <= homNay
+          && !['da_ky', 'dang_trien_khai'].includes(c.trang_thai_cham_soc))) return false
+        if (quickFilter === 'chua_lien_he' && c.trang_thai_cham_soc !== 'chua_lien_he') return false
+        if (quickFilter === 'dang_tu_van' && c.trang_thai_cham_soc !== 'dang_tu_van') return false
+        if (quickFilter === 'chot_thang_nay' && !(['da_ky', 'dang_trien_khai'].includes(c.trang_thai_cham_soc)
+          && (c.updated_at || '').slice(0, 10) >= dauThang)) return false
+      }
       if (filterLoai && c.loai_khach !== filterLoai) return false
       if (filterTrangThai && c.trang_thai_cham_soc !== filterTrangThai) return false
       if (filterSale && c.sale_id !== filterSale) return false
@@ -91,14 +101,27 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       if (denNgay && (!c.ngay_lien_he_gan_nhat || c.ngay_lien_he_gan_nhat > denNgay)) return false
       return true
     })
-  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, tuNgay, denNgay])
+  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, tuNgay, denNgay, quickFilter, isAdmin, currentProfile?.id, homNay, dauThang])
+
+  const isAdmin = currentProfile?.role === 'admin'
+
+  // Sale xem số của mình, admin xem số toàn team
+  const phamVi = useMemo(
+    () => (isAdmin ? customers : customers.filter((c) => c.sale_id === currentProfile?.id)),
+    [customers, isAdmin, currentProfile?.id]
+  )
+
+  const homNay = new Date().toISOString().slice(0, 10)
+  const dauThang = homNay.slice(0, 8) + '01'
 
   const stats = useMemo(() => ({
-    total: customers.length,
-    moi: customers.filter((c) => c.loai_khach === 'moi').length,
-    cu: customers.filter((c) => c.loai_khach === 'cu').length,
-    daKy: customers.filter((c) => ['da_ky', 'dang_trien_khai'].includes(c.trang_thai_cham_soc)).length,
-  }), [customers])
+    canChamSoc: phamVi.filter((c) => c.ngay_cham_soc_tiep_theo && c.ngay_cham_soc_tiep_theo <= homNay
+      && !['da_ky', 'dang_trien_khai'].includes(c.trang_thai_cham_soc)).length,
+    chuaLienHe: phamVi.filter((c) => c.trang_thai_cham_soc === 'chua_lien_he').length,
+    dangTuVan: phamVi.filter((c) => c.trang_thai_cham_soc === 'dang_tu_van').length,
+    chotThangNay: phamVi.filter((c) => ['da_ky', 'dang_trien_khai'].includes(c.trang_thai_cham_soc)
+      && (c.updated_at || '').slice(0, 10) >= dauThang).length,
+  }), [phamVi, homNay, dauThang])
 
   const profileName = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
@@ -115,11 +138,22 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       </header>
 
       <div className="grid grid-cols-4 gap-4 px-8 pt-6">
-        <StatCard label="Tổng khách hàng" value={stats.total} />
-        <StatCard label="Khách mới" value={stats.moi} accent="coral" />
-        <StatCard label="Khách cũ" value={stats.cu} accent="teal" />
-        <StatCard label="Đã ký / đang triển khai" value={stats.daKy} accent="emerald" />
+        <StatCard label="Cần chăm sóc hôm nay" value={stats.canChamSoc} accent="coral"
+          active={quickFilter === 'can_cham_soc'}
+          onClick={() => setQuickFilter(quickFilter === 'can_cham_soc' ? '' : 'can_cham_soc')} />
+        <StatCard label="Chưa liên hệ" value={stats.chuaLienHe}
+          active={quickFilter === 'chua_lien_he'}
+          onClick={() => setQuickFilter(quickFilter === 'chua_lien_he' ? '' : 'chua_lien_he')} />
+        <StatCard label="Đang tư vấn" value={stats.dangTuVan} accent="teal"
+          active={quickFilter === 'dang_tu_van'}
+          onClick={() => setQuickFilter(quickFilter === 'dang_tu_van' ? '' : 'dang_tu_van')} />
+        <StatCard label="Chốt tháng này" value={stats.chotThangNay} accent="emerald"
+          active={quickFilter === 'chot_thang_nay'}
+          onClick={() => setQuickFilter(quickFilter === 'chot_thang_nay' ? '' : 'chot_thang_nay')} />
       </div>
+      <p className="px-8 pt-2 text-xs text-ink-400">
+        {isAdmin ? 'Số liệu toàn team · bấm vào thẻ để lọc danh sách' : 'Số liệu khách của bạn · bấm vào thẻ để lọc danh sách'}
+      </p>
 
       <div className="mx-8 mt-6 space-y-3 rounded-2xl bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
@@ -152,9 +186,9 @@ export default function CustomerList({ currentProfile, onChotDon }) {
             <span>đến</span>
             <Input type="date" value={denNgay} onChange={(e) => setDenNgay(e.target.value)} className="w-40" />
           </div>
-          {(search || filterLoai || filterTrangThai || filterSale || filterDichVu || tuNgay || denNgay) && (
+          {(search || filterLoai || filterTrangThai || filterSale || filterDichVu || tuNgay || denNgay || quickFilter) && (
             <button
-              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setTuNgay(''); setDenNgay('') }}
+              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setTuNgay(''); setDenNgay(''); setQuickFilter('') }}
               className="text-sm text-ink-600 hover:text-coral-500">
               Xoá bộ lọc
             </button>
@@ -285,7 +319,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   )
 }
 
-function StatCard({ label, value, accent = 'navy' }) {
+function StatCard({ label, value, accent = 'navy', active = false, onClick }) {
   const accents = {
     navy: 'text-navy-900',
     coral: 'text-coral-500',
@@ -293,9 +327,15 @@ function StatCard({ label, value, accent = 'navy' }) {
     emerald: 'text-emerald-600',
   }
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-400">{label}</p>
-      <p className={`mt-1 font-display text-2xl font-bold ${accents[accent]}`}>{value}</p>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-2xl p-4 text-left shadow-sm transition ${
+        active ? 'bg-navy-900 ring-2 ring-coral-500' : 'bg-white hover:shadow-md'
+      }`}
+    >
+      <p className={`text-xs font-medium uppercase tracking-wide ${active ? 'text-white/60' : 'text-ink-400'}`}>{label}</p>
+      <p className={`mt-1 font-display text-2xl font-bold ${active ? 'text-white' : accents[accent]}`}>{value}</p>
+    </button>
   )
 }
