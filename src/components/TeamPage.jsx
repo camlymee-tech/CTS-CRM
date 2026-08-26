@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, ShieldCheck, Lock, Unlock, Pencil, Link2 } from 'lucide-react'
+import { UserPlus, Lock, Unlock, Pencil, Link2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { supabaseSignUp } from '../lib/signupClient'
 import { Button, Input, Select, Badge, Modal } from './ui'
@@ -30,6 +30,22 @@ export default function TeamPage({ currentProfile }) {
     if (error) { setMessage('Lỗi: ' + error.message); return }
     setMessage('')
     load()
+  }
+
+  // Đổi vai trò, có chặn trường hợp hệ thống không còn quản trị viên nào
+  async function changeRole(p, newRole) {
+    const soAdmin = profiles.filter((x) => x.role === 'admin').length
+    if (p.role === 'admin' && newRole === 'sale' && soAdmin <= 1) {
+      setMessage('Không thể hạ vai trò: hệ thống cần ít nhất một quản trị viên. Hãy nâng người khác lên Quản trị trước.')
+      return
+    }
+    if (p.id === currentProfile.id && newRole === 'sale') {
+      const ok = window.confirm(
+        'Bạn đang tự hạ mình xuống vai trò Sale. Sau khi lưu, bạn sẽ mất quyền vào trang Nhân sự và chỉ thấy khách hàng của mình. Tiếp tục?'
+      )
+      if (!ok) return
+    }
+    updateProfile(p.id, { role: newRole })
   }
 
   if (currentProfile?.role !== 'admin') {
@@ -93,16 +109,10 @@ export default function TeamPage({ currentProfile }) {
                   </td>
                   <td className="px-5 py-3 text-ink-600">{p.ngay_vao_cty || '—'}</td>
                   <td className="px-5 py-3">
-                    {isMe ? (
-                      <Badge className="bg-navy-900 text-white">
-                        <ShieldCheck size={12} className="mr-1" /> Quản trị
-                      </Badge>
-                    ) : (
-                      <Select value={p.role} onChange={(e) => updateProfile(p.id, { role: e.target.value })} className="w-32">
-                        <option value="sale">Sale</option>
-                        <option value="admin">Quản trị</option>
-                      </Select>
-                    )}
+                    <Select value={p.role} onChange={(e) => changeRole(p, e.target.value)} className="w-32">
+                      <option value="sale">Sale</option>
+                      <option value="admin">Quản trị</option>
+                    </Select>
                   </td>
                   <td className="px-5 py-3">
                     <Badge className={p.active === false ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700'}>
@@ -286,14 +296,17 @@ function EditProfileForm({ profile, isMe, onClose, onSaved }) {
 
         <ProfileFields form={form} setForm={setForm} />
 
-        {!isMe && (
-          <div className="col-span-2">
-            <Select label="Vai trò" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-              <option value="sale">Sale — chỉ thấy khách của mình</option>
-              <option value="admin">Quản trị — thấy toàn bộ team</option>
-            </Select>
-          </div>
-        )}
+        <div className="col-span-2">
+          <Select label="Vai trò" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            <option value="sale">Sale — chỉ thấy khách của mình</option>
+            <option value="admin">Quản trị — thấy toàn bộ team</option>
+          </Select>
+          {isMe && form.role === 'sale' && profile.role === 'admin' && (
+            <p className="mt-1 text-xs text-orange-600">
+              Bạn đang tự hạ vai trò của mình. Sau khi lưu sẽ mất quyền vào trang Nhân sự.
+            </p>
+          )}
+        </div>
 
         {error && <p className="col-span-2 text-sm text-rose-600">{error}</p>}
 
