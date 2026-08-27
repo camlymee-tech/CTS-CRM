@@ -10,12 +10,13 @@ import NotificationsPage from './components/NotificationsPage'
 import OrdersPage from './components/OrdersPage'
 import ReportsPage from './components/ReportsPage'
 import ContractsPage from './components/ContractsPage'
+import ChecklistPage from './components/ChecklistPage'
 import AnalyticsPage from './components/AnalyticsPage'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState(null)
-  const [page, setPage] = useState('customers')
+  const [page, setPage] = useState('checklist')
   const [recovering, setRecovering] = useState(false)
   const [unread, setUnread] = useState(0)
   const [chotDonCustomer, setChotDonCustomer] = useState(null)
@@ -92,6 +93,7 @@ export default function App() {
         unreadCount={unread}
         onChangePassword={() => setRecovering(true)}
       />
+      {page === 'checklist' && <ChecklistPage currentProfile={profile} />}
       {page === 'customers' && (
         <CustomerList
           currentProfile={profile}

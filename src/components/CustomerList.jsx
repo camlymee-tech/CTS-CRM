@@ -30,13 +30,6 @@ function laKhachChung(c) {
 
 const chiSo = (s) => (s || '').replace(/\D/g, '')
 
-function gonTien(n) {
-  const v = Number(n) || 0
-  if (v >= 1_000_000_000) return (v / 1_000_000_000).toFixed(1).replace('.', ',') + ' tỷ'
-  if (v >= 1_000_000) return (v / 1_000_000).toFixed(1).replace('.', ',') + ' tr'
-  if (v >= 1_000) return Math.round(v / 1_000) + 'k'
-  return String(v)
-}
 
 export default function CustomerList({ currentProfile, onChotDon }) {
   const [customers, setCustomers] = useState([])
@@ -49,7 +42,6 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   const [filterSale, setFilterSale] = useState('')
   const [filterDichVu, setFilterDichVu] = useState('')
   const [filterNguon, setFilterNguon] = useState('')
-  const [quickFilter, setQuickFilter] = useState('')
   const [locTheoNgay, setLocTheoNgay] = useState('lien_he')
   const [tuNgay, setTuNgay] = useState('')
   const [denNgay, setDenNgay] = useState('')
@@ -57,14 +49,10 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   const [editingCustomer, setEditingCustomer] = useState(null)
   const [viewingCustomer, setViewingCustomer] = useState(null)
 
-  const [doanhSoThang, setDoanhSoThang] = useState(null)
-  const [doanhSoTruoc, setDoanhSoTruoc] = useState(0)
-  const [khachChotThang, setKhachChotThang] = useState(new Set())
 
   useEffect(() => {
     loadProfiles()
     loadCustomers()
-    loadDoanhSo()
   }, [])
 
   async function xoaKhach(c) {
@@ -79,26 +67,6 @@ export default function CustomerList({ currentProfile, onChotDon }) {
     loadCustomers()
   }
 
-  async function loadDoanhSo() {
-    const nay = new Date(); nay.setDate(1)
-    const mocNay = nay.toISOString().slice(0, 10)
-    const truoc = new Date(); truoc.setDate(1); truoc.setMonth(truoc.getMonth() - 1)
-    const mocTruoc = truoc.toISOString().slice(0, 10)
-
-    const { data } = await supabase.from('orders')
-      .select('gia_tri, ngay_chot, customer_id').neq('trang_thai', 'huy').gte('ngay_chot', mocTruoc)
-
-    let a = 0, b = 0
-    const ids = new Set()
-    for (const o of data || []) {
-      const tien = Number(o.gia_tri) || 0
-      if (o.ngay_chot >= mocNay) { a += tien; if (o.customer_id) ids.add(o.customer_id) }
-      else b += tien
-    }
-    setDoanhSoThang(a)
-    setDoanhSoTruoc(b)
-    setKhachChotThang(ids)
-  }
 
   // Gõ đủ số điện thoại -> tra cứu được cả khách của sale khác
   useEffect(() => {
@@ -125,15 +93,6 @@ export default function CustomerList({ currentProfile, onChotDon }) {
 
   const isAdmin = currentProfile?.role === 'admin'
 
-  // Sale xem số của mình, admin xem số toàn team
-  const phamVi = useMemo(
-    () => (isAdmin ? customers : customers.filter((c) => c.sale_id === currentProfile?.id)),
-    [customers, isAdmin, currentProfile?.id]
-  )
-
-  const homNay = new Date().toISOString().slice(0, 10)
-  const dauThang = homNay.slice(0, 8) + '01'
-
   // Gộp kết quả tra cứu SĐT vào danh sách, không trùng lặp
   const nguon = useMemo(() => {
     const map = new Map(customers.map((c) => [c.id, c]))
@@ -146,14 +105,6 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       if (search && !`${c.ten_khach} ${c.ma_khach} ${c.sdt || ''} ${c.nganh_hang || ''}`.toLowerCase().includes(search.toLowerCase())) {
         if (!c._tuTraCuu) return false
       }
-      if (quickFilter) {
-        if (!isAdmin && c.sale_id !== currentProfile?.id) return false
-        if (quickFilter === 'can_cham_soc' && !(c.ngay_cham_soc_tiep_theo && c.ngay_cham_soc_tiep_theo <= homNay
-          && !TT_DA_KY.includes(c.trang_thai_cham_soc))) return false
-        if (quickFilter === 'chua_lien_he' && c.trang_thai_cham_soc !== 'chua_lien_he') return false
-        if (quickFilter === 'dang_tu_van' && c.trang_thai_cham_soc !== 'dang_tu_van') return false
-        if (quickFilter === 'chot_thang_nay' && !khachChotThang.has(c.id)) return false
-      }
       if (filterLoai && c.loai_khach !== filterLoai) return false
       if (filterTrangThai && c.trang_thai_cham_soc !== filterTrangThai) return false
       if (filterSale && c.sale_id !== filterSale) return false
@@ -164,15 +115,32 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       if (denNgay && (!ngayLoc || ngayLoc > denNgay)) return false
       return true
     })
-  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, locTheoNgay, tuNgay, denNgay, quickFilter, khachChotThang, isAdmin, currentProfile?.id, homNay, dauThang])
+  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, locTheoNgay, tuNgay, denNgay, isAdmin, currentProfile?.id])
 
-  const stats = useMemo(() => ({
-    canChamSoc: phamVi.filter((c) => c.ngay_cham_soc_tiep_theo && c.ngay_cham_soc_tiep_theo <= homNay
-      && !TT_DA_KY.includes(c.trang_thai_cham_soc)).length,
-    chuaLienHe: phamVi.filter((c) => c.trang_thai_cham_soc === 'chua_lien_he').length,
-    dangTuVan: phamVi.filter((c) => c.trang_thai_cham_soc === 'dang_tu_van').length,
-    chotThangNay: phamVi.filter((c) => khachChotThang.has(c.id)).length,
-  }), [phamVi, homNay, dauThang, khachChotThang])
+  // Danh sách áp dụng mọi bộ lọc TRỪ bộ lọc trạng thái,
+  // để mỗi thẻ trạng thái vẫn hiện đúng số khi đang chọn một trạng thái
+  const nenDem = useMemo(() => nguon.filter((c) => {
+    if (!isAdmin && c.sale_id !== currentProfile?.id) return false
+    if (search && !`${c.ten_khach} ${c.ma_khach} ${c.sdt || ''} ${c.nganh_hang || ''}`.toLowerCase().includes(search.toLowerCase())) {
+      if (!c._tuTraCuu) return false
+    }
+    if (filterLoai && c.loai_khach !== filterLoai) return false
+    if (filterSale && c.sale_id !== filterSale) return false
+    if (filterDichVu && !(c.dich_vu || []).includes(filterDichVu)) return false
+    if (filterNguon && c.nguon_khach !== filterNguon) return false
+    const ngayLoc = locTheoNgay === 'tao' ? (c.created_at || '').slice(0, 10) : c.ngay_lien_he_gan_nhat
+    if (tuNgay && (!ngayLoc || ngayLoc < tuNgay)) return false
+    if (denNgay && (!ngayLoc || ngayLoc > denNgay)) return false
+    return true
+  }), [nguon, isAdmin, currentProfile?.id, search, filterLoai, filterSale, filterDichVu, filterNguon, locTheoNgay, tuNgay, denNgay])
+
+  const demTheoTrangThai = useMemo(() => {
+    const m = {}
+    for (const o of TRANG_THAI_OPTIONS) m[o.value] = 0
+    for (const c of nenDem) if (m[c.trang_thai_cham_soc] !== undefined) m[c.trang_thai_cham_soc] += 1
+    return m
+  }, [nenDem])
+
 
   const profileName = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
@@ -188,33 +156,19 @@ export default function CustomerList({ currentProfile, onChotDon }) {
         </Button>
       </header>
 
-      <div className="grid grid-cols-5 gap-4 px-8 pt-6">
-        <StatCard label="Cần chăm sóc hôm nay" value={stats.canChamSoc} accent="coral"
-          phamVi="Đến hạn tính đến hôm nay"
-          active={quickFilter === 'can_cham_soc'}
-          onClick={() => setQuickFilter(quickFilter === 'can_cham_soc' ? '' : 'can_cham_soc')} />
-        <StatCard label="Chưa liên hệ" value={stats.chuaLienHe}
-          phamVi="Tất cả thời gian"
-          active={quickFilter === 'chua_lien_he'}
-          onClick={() => setQuickFilter(quickFilter === 'chua_lien_he' ? '' : 'chua_lien_he')} />
-        <StatCard label="Đang tư vấn" value={stats.dangTuVan} accent="teal"
-          phamVi="Tất cả thời gian"
-          active={quickFilter === 'dang_tu_van'}
-          onClick={() => setQuickFilter(quickFilter === 'dang_tu_van' ? '' : 'dang_tu_van')} />
-        <StatCard label="Chốt tháng này" value={stats.chotThangNay} accent="emerald"
-          phamVi={`Đơn chốt trong tháng ${new Date().getMonth() + 1}`}
-          active={quickFilter === 'chot_thang_nay'}
-          onClick={() => setQuickFilter(quickFilter === 'chot_thang_nay' ? '' : 'chot_thang_nay')} />
-        <StatCard label={`Doanh số tháng ${new Date().getMonth() + 1}`}
-          value={doanhSoThang === null ? '...' : gonTien(doanhSoThang)} accent="coral"
-          phamVi={`Đơn chốt trong tháng ${new Date().getMonth() + 1}`}
-          note={doanhSoTruoc > 0 && doanhSoThang !== null
-            ? `${doanhSoThang >= doanhSoTruoc ? '▲' : '▼'} ${Math.abs(Math.round(((doanhSoThang - doanhSoTruoc) / doanhSoTruoc) * 100))}% so tháng trước`
-            : null}
-          noteUp={doanhSoThang >= doanhSoTruoc} />
+      <div className="grid grid-cols-7 gap-3 px-8 pt-6">
+        {TRANG_THAI_OPTIONS.map((o) => (
+          <StatCard
+            key={o.value}
+            label={o.label}
+            value={demTheoTrangThai[o.value] || 0}
+            active={filterTrangThai === o.value}
+            onClick={() => setFilterTrangThai(filterTrangThai === o.value ? '' : o.value)}
+          />
+        ))}
       </div>
       <p className="px-8 pt-2 text-xs text-ink-400">
-        {isAdmin ? 'Số liệu toàn team' : 'Số liệu khách của bạn'} · không phụ thuộc bộ lọc bên dưới · bấm vào thẻ để lọc danh sách
+        Tổng khách theo từng trạng thái · {isAdmin ? 'toàn team' : 'khách của bạn'} · thay đổi theo bộ lọc bên dưới · bấm vào thẻ để lọc
       </p>
 
       <div className="mx-8 mt-6 space-y-3 rounded-2xl bg-white p-4 shadow-sm">
@@ -256,9 +210,9 @@ export default function CustomerList({ currentProfile, onChotDon }) {
             <span>đến</span>
             <Input type="date" value={denNgay} onChange={(e) => setDenNgay(e.target.value)} className="w-40" />
           </div>
-          {(search || filterLoai || filterTrangThai || filterSale || filterDichVu || filterNguon || tuNgay || denNgay || quickFilter) && (
+          {(search || filterLoai || filterTrangThai || filterSale || filterDichVu || filterNguon || tuNgay || denNgay) && (
             <button
-              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setFilterNguon(''); setLocTheoNgay('lien_he'); setTuNgay(''); setDenNgay(''); setQuickFilter('') }}
+              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setFilterNguon(''); setLocTheoNgay('lien_he'); setTuNgay(''); setDenNgay('') }}
               className="text-sm text-ink-600 hover:text-coral-500">
               Xoá bộ lọc
             </button>
@@ -398,29 +352,17 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   )
 }
 
-function StatCard({ label, value, accent = 'navy', active = false, onClick, note, noteUp, phamVi }) {
-  const accents = {
-    navy: 'text-navy-900',
-    coral: 'text-coral-500',
-    teal: 'text-teal-500',
-    emerald: 'text-emerald-600',
-  }
+function StatCard({ label, value, active = false, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-2xl p-4 text-left shadow-sm transition ${
+      className={`rounded-xl px-3 py-3 text-left shadow-sm transition ${
         active ? 'bg-navy-900 ring-2 ring-coral-500' : 'bg-white hover:shadow-md'
       }`}
     >
-      <p className={`text-xs font-medium uppercase tracking-wide ${active ? 'text-white/60' : 'text-ink-400'}`}>{label}</p>
-      <p className={`mt-1 font-display text-2xl font-bold ${active ? 'text-white' : accents[accent]}`}>{value}</p>
-      {phamVi && (
-        <p className={`mt-0.5 text-[11px] ${active ? 'text-white/50' : 'text-ink-400'}`}>{phamVi}</p>
-      )}
-      {note && (
-        <p className={`mt-0.5 text-[11px] font-medium ${noteUp ? 'text-emerald-600' : 'text-rose-500'}`}>{note}</p>
-      )}
+      <p className={`text-[11px] font-medium leading-tight ${active ? 'text-white/60' : 'text-ink-400'}`}>{label}</p>
+      <p className={`mt-1 font-display text-xl font-bold ${active ? 'text-white' : 'text-navy-900'}`}>{value}</p>
     </button>
   )
 }

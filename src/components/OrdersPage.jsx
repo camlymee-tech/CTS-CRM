@@ -68,6 +68,22 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
     return customers.filter((c) => c.trang_thai_cham_soc === 'da_ky' && !coDon.has(c.id))
   }, [customers, orders])
 
+  // Doanh số tháng này và so sánh tháng trước (trên toàn bộ đơn, không phụ thuộc bộ lọc)
+  const doanhSoThang = useMemo(() => {
+    const d = new Date(); d.setDate(1)
+    const mocNay = d.toISOString().slice(0, 10)
+    const t = new Date(); t.setDate(1); t.setMonth(t.getMonth() - 1)
+    const mocTruoc = t.toISOString().slice(0, 10)
+    let nay = 0, truoc = 0, soDon = 0
+    for (const o of orders) {
+      if (o.trang_thai === 'huy' || !o.ngay_chot) continue
+      const tien = Number(o.gia_tri) || 0
+      if (o.ngay_chot >= mocNay) { nay += tien; soDon += 1 }
+      else if (o.ngay_chot >= mocTruoc) truoc += tien
+    }
+    return { nay, truoc, soDon }
+  }, [orders])
+
   const tongDoanhSo = filtered
     .filter((o) => o.trang_thai !== 'huy')
     .reduce((s, o) => s + (Number(o.gia_tri) || 0), 0)
@@ -91,12 +107,21 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
         </Button>
       </header>
 
-      <div className="grid grid-cols-3 gap-4 px-8 pt-6">
-        <StatCard label="Số đơn" value={filtered.length} />
-        <StatCard label="Tổng giá trị (trừ đơn huỷ)" value={formatVnd(tongDoanhSo)} accent="coral" />
+      <div className="grid grid-cols-4 gap-4 px-8 pt-6">
+        <StatCard
+          label={`Doanh số tháng ${new Date().getMonth() + 1}`}
+          value={formatVnd(doanhSoThang.nay)}
+          accent="coral"
+          note={doanhSoThang.truoc > 0
+            ? `${doanhSoThang.nay >= doanhSoThang.truoc ? '▲' : '▼'} ${Math.abs(Math.round(((doanhSoThang.nay - doanhSoThang.truoc) / doanhSoThang.truoc) * 100))}% so tháng trước`
+            : null}
+          noteUp={doanhSoThang.nay >= doanhSoThang.truoc}
+          phamVi={`${doanhSoThang.soDon} đơn trong tháng`} />
+        <StatCard label="Số đơn" value={filtered.length} phamVi="Theo bộ lọc" />
+        <StatCard label="Tổng giá trị (trừ đơn huỷ)" value={formatVnd(tongDoanhSo)} phamVi="Theo bộ lọc" />
         <StatCard label="Đơn đang triển khai"
           value={filtered.filter((o) => khachCua(o.customer_id)?.trang_thai_cham_soc === 'dang_trien_khai').length}
-          accent="teal" />
+          accent="teal" phamVi="Theo bộ lọc" />
       </div>
 
       {chuaCoDon.length > 0 && (
@@ -243,12 +268,16 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
   )
 }
 
-function StatCard({ label, value, accent = 'navy' }) {
+function StatCard({ label, value, accent = 'navy', note, noteUp, phamVi }) {
   const accents = { navy: 'text-navy-900', coral: 'text-coral-500', teal: 'text-teal-500' }
   return (
     <div className="rounded-2xl bg-white p-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-ink-400">{label}</p>
       <p className={`mt-1 font-display text-2xl font-bold ${accents[accent]}`}>{value}</p>
+      {note && (
+        <p className={`mt-0.5 text-[11px] font-medium ${noteUp ? 'text-emerald-600' : 'text-rose-500'}`}>{note}</p>
+      )}
+      {phamVi && <p className="mt-0.5 text-[11px] text-ink-400">{phamVi}</p>}
     </div>
   )
 }
