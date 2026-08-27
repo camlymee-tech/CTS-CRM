@@ -19,11 +19,13 @@ import {
 function laKhachChung(c) {
   const moc = c.ngay_lien_he_gan_nhat || (c.created_at || '').slice(0, 10)
   const soNgay = moc ? Math.floor((Date.now() - new Date(moc).getTime()) / 86400000) : 999
-  if (c.trang_thai_cham_soc === 'chua_lien_he') return true
-  if (c.trang_thai_cham_soc === 'tu_choi') return true
-  if (c.trang_thai_cham_soc === 'khong_nghe_may') return soNgay >= 5
-  if (c.trang_thai_cham_soc === 'dang_tu_van') return soNgay >= 30
-  return false
+  switch (c.trang_thai_cham_soc) {
+    case 'hoan_thanh': return true            // hoàn thành dịch vụ -> mở cho cả team
+    case 'khong_nghe_may': return soNgay >= 5
+    case 'dang_tu_van': return soNgay >= 30
+    case 'tu_choi': return soNgay >= 15
+    default: return false                     // chưa liên hệ, chốt HĐ, đang triển khai -> riêng
+  }
 }
 
 const chiSo = (s) => (s || '').replace(/\D/g, '')

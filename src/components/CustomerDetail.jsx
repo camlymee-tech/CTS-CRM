@@ -8,7 +8,7 @@ import { Button, Textarea, Select, Badge, Input } from './ui'
 import {
   LOAI_TUONG_TAC_OPTIONS, TRANG_THAI_OPTIONS, NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, LOAI_KHACH_OPTIONS,
-  TRANG_THAI_DON_OPTIONS, TRANG_THAI_HD_OPTIONS,
+  TRANG_THAI_HD_OPTIONS,
   classOf, labelOf, formatVnd,
 } from '../lib/constants'
 
@@ -17,11 +17,13 @@ const ICONS = { goi_dien: Phone, nhan_tin: MessageCircle, gap_mat: UsersIcon, kh
 function laKhachChung(c) {
   const moc = c.ngay_lien_he_gan_nhat || (c.created_at || '').slice(0, 10)
   const soNgay = moc ? Math.floor((Date.now() - new Date(moc).getTime()) / 86400000) : 999
-  if (c.trang_thai_cham_soc === 'chua_lien_he') return true
-  if (c.trang_thai_cham_soc === 'tu_choi') return true
-  if (c.trang_thai_cham_soc === 'khong_nghe_may') return soNgay >= 5
-  if (c.trang_thai_cham_soc === 'dang_tu_van') return soNgay >= 30
-  return false
+  switch (c.trang_thai_cham_soc) {
+    case 'hoan_thanh': return true            // hoàn thành dịch vụ -> mở cho cả team
+    case 'khong_nghe_may': return soNgay >= 5
+    case 'dang_tu_van': return soNgay >= 30
+    case 'tu_choi': return soNgay >= 15
+    default: return false                     // chưa liên hệ, chốt HĐ, đang triển khai -> riêng
+  }
 }
 
 export default function CustomerDetail({ customer: khachBanDau, currentProfile, onClose, onChanged, onEdit, onChotDon }) {
@@ -229,9 +231,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                                 <div className="flex items-center gap-2">
                                   <ShoppingBag size={14} className="text-coral-500" />
                                   <p className="font-medium text-navy-900">{o.ma_don}</p>
-                                  <Badge className={classOf(TRANG_THAI_DON_OPTIONS, o.trang_thai)}>
-                                    {labelOf(TRANG_THAI_DON_OPTIONS, o.trang_thai)}
-                                  </Badge>
                                 </div>
                                 <div className="mt-1.5 flex flex-wrap gap-1">
                                   {(dvTheoDon[o.id] || []).map((i) => (
