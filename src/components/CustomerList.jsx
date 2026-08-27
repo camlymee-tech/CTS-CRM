@@ -50,6 +50,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   const [filterDichVu, setFilterDichVu] = useState('')
   const [filterNguon, setFilterNguon] = useState('')
   const [quickFilter, setQuickFilter] = useState('')
+  const [locTheoNgay, setLocTheoNgay] = useState('lien_he')
   const [tuNgay, setTuNgay] = useState('')
   const [denNgay, setDenNgay] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -158,11 +159,12 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       if (filterSale && c.sale_id !== filterSale) return false
       if (filterDichVu && !(c.dich_vu || []).includes(filterDichVu)) return false
       if (filterNguon && c.nguon_khach !== filterNguon) return false
-      if (tuNgay && (!c.ngay_lien_he_gan_nhat || c.ngay_lien_he_gan_nhat < tuNgay)) return false
-      if (denNgay && (!c.ngay_lien_he_gan_nhat || c.ngay_lien_he_gan_nhat > denNgay)) return false
+      const ngayLoc = locTheoNgay === 'tao' ? (c.created_at || '').slice(0, 10) : c.ngay_lien_he_gan_nhat
+      if (tuNgay && (!ngayLoc || ngayLoc < tuNgay)) return false
+      if (denNgay && (!ngayLoc || ngayLoc > denNgay)) return false
       return true
     })
-  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay, quickFilter, khachChotThang, isAdmin, currentProfile?.id, homNay, dauThang])
+  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, locTheoNgay, tuNgay, denNgay, quickFilter, khachChotThang, isAdmin, currentProfile?.id, homNay, dauThang])
 
   const stats = useMemo(() => ({
     canChamSoc: phamVi.filter((c) => c.ngay_cham_soc_tiep_theo && c.ngay_cham_soc_tiep_theo <= homNay
@@ -188,26 +190,31 @@ export default function CustomerList({ currentProfile, onChotDon }) {
 
       <div className="grid grid-cols-5 gap-4 px-8 pt-6">
         <StatCard label="Cần chăm sóc hôm nay" value={stats.canChamSoc} accent="coral"
+          phamVi="Đến hạn tính đến hôm nay"
           active={quickFilter === 'can_cham_soc'}
           onClick={() => setQuickFilter(quickFilter === 'can_cham_soc' ? '' : 'can_cham_soc')} />
         <StatCard label="Chưa liên hệ" value={stats.chuaLienHe}
+          phamVi="Tất cả thời gian"
           active={quickFilter === 'chua_lien_he'}
           onClick={() => setQuickFilter(quickFilter === 'chua_lien_he' ? '' : 'chua_lien_he')} />
         <StatCard label="Đang tư vấn" value={stats.dangTuVan} accent="teal"
+          phamVi="Tất cả thời gian"
           active={quickFilter === 'dang_tu_van'}
           onClick={() => setQuickFilter(quickFilter === 'dang_tu_van' ? '' : 'dang_tu_van')} />
         <StatCard label="Chốt tháng này" value={stats.chotThangNay} accent="emerald"
+          phamVi={`Đơn chốt trong tháng ${new Date().getMonth() + 1}`}
           active={quickFilter === 'chot_thang_nay'}
           onClick={() => setQuickFilter(quickFilter === 'chot_thang_nay' ? '' : 'chot_thang_nay')} />
         <StatCard label={`Doanh số tháng ${new Date().getMonth() + 1}`}
           value={doanhSoThang === null ? '...' : gonTien(doanhSoThang)} accent="coral"
+          phamVi={`Đơn chốt trong tháng ${new Date().getMonth() + 1}`}
           note={doanhSoTruoc > 0 && doanhSoThang !== null
             ? `${doanhSoThang >= doanhSoTruoc ? '▲' : '▼'} ${Math.abs(Math.round(((doanhSoThang - doanhSoTruoc) / doanhSoTruoc) * 100))}% so tháng trước`
             : null}
           noteUp={doanhSoThang >= doanhSoTruoc} />
       </div>
       <p className="px-8 pt-2 text-xs text-ink-400">
-        {isAdmin ? 'Số liệu toàn team · bấm vào thẻ để lọc danh sách' : 'Số liệu khách của bạn · bấm vào thẻ để lọc danh sách'}
+        {isAdmin ? 'Số liệu toàn team' : 'Số liệu khách của bạn'} · không phụ thuộc bộ lọc bên dưới · bấm vào thẻ để lọc danh sách
       </p>
 
       <div className="mx-8 mt-6 space-y-3 rounded-2xl bg-white p-4 shadow-sm">
@@ -240,14 +247,18 @@ export default function CustomerList({ currentProfile, onChotDon }) {
             {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </Select>
           <div className="flex items-center gap-2 text-sm text-ink-600">
-            <span className="whitespace-nowrap">Liên hệ từ</span>
+            <Select value={locTheoNgay} onChange={(e) => setLocTheoNgay(e.target.value)} className="w-36">
+              <option value="lien_he">Ngày liên hệ</option>
+              <option value="tao">Ngày tạo data</option>
+            </Select>
+            <span>từ</span>
             <Input type="date" value={tuNgay} onChange={(e) => setTuNgay(e.target.value)} className="w-40" />
             <span>đến</span>
             <Input type="date" value={denNgay} onChange={(e) => setDenNgay(e.target.value)} className="w-40" />
           </div>
           {(search || filterLoai || filterTrangThai || filterSale || filterDichVu || filterNguon || tuNgay || denNgay || quickFilter) && (
             <button
-              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setFilterNguon(''); setTuNgay(''); setDenNgay(''); setQuickFilter('') }}
+              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setFilterNguon(''); setLocTheoNgay('lien_he'); setTuNgay(''); setDenNgay(''); setQuickFilter('') }}
               className="text-sm text-ink-600 hover:text-coral-500">
               Xoá bộ lọc
             </button>
@@ -256,7 +267,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       </div>
 
       <div className="mx-8 my-6 overflow-x-auto rounded-2xl bg-white shadow-sm">
-        <table className="w-full min-w-[1100px] text-sm">
+        <table className="w-full min-w-[1220px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
               <th className="px-4 py-3 w-12">STT</th>
@@ -268,15 +279,16 @@ export default function CustomerList({ currentProfile, onChotDon }) {
               <th className="px-4 py-3">Loại</th>
               <th className="px-4 py-3">Trạng thái</th>
               <th className="px-4 py-3">Sale phụ trách</th>
+              <th className="px-4 py-3">Ngày tạo data</th>
               <th className="px-4 py-3">Liên hệ gần nhất</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={11} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
+              <tr><td colSpan={12} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={11} className="px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
+              <tr><td colSpan={12} className="px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
             ) : filtered.map((c, idx) => {
               const chung = laKhachChung(c)
               const cuaMinh = c.sale_id === currentProfile?.id
@@ -337,6 +349,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-ink-600">{profileName(c.sale_id)}</td>
+                  <td className="px-4 py-3 text-ink-600">{(c.created_at || '').slice(0, 10) || '—'}</td>
                   <td className="px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     <a href={c.sdt ? `tel:${c.sdt}` : undefined} onClick={(e) => e.stopPropagation()}
@@ -385,7 +398,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   )
 }
 
-function StatCard({ label, value, accent = 'navy', active = false, onClick, note, noteUp }) {
+function StatCard({ label, value, accent = 'navy', active = false, onClick, note, noteUp, phamVi }) {
   const accents = {
     navy: 'text-navy-900',
     coral: 'text-coral-500',
@@ -402,6 +415,9 @@ function StatCard({ label, value, accent = 'navy', active = false, onClick, note
     >
       <p className={`text-xs font-medium uppercase tracking-wide ${active ? 'text-white/60' : 'text-ink-400'}`}>{label}</p>
       <p className={`mt-1 font-display text-2xl font-bold ${active ? 'text-white' : accents[accent]}`}>{value}</p>
+      {phamVi && (
+        <p className={`mt-0.5 text-[11px] ${active ? 'text-white/50' : 'text-ink-400'}`}>{phamVi}</p>
+      )}
       {note && (
         <p className={`mt-0.5 text-[11px] font-medium ${noteUp ? 'text-emerald-600' : 'text-rose-500'}`}>{note}</p>
       )}
