@@ -3,7 +3,8 @@ import { Plus, Search, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import OrderForm from './OrderForm'
-import { TRANG_THAI_DON_OPTIONS, DICH_VU_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
+import CustomerDetail from './CustomerDetail'
+import { TRANG_THAI_OPTIONS, DICH_VU_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
 
 export default function OrdersPage({ currentProfile, pendingCustomer, onPendingHandled }) {
   const [orders, setOrders] = useState([])
@@ -17,6 +18,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
   const [showForm, setShowForm] = useState(!!pendingCustomer)
   const [editing, setEditing] = useState(null)
   const [khachTuChon, setKhachTuChon] = useState(null)
+  const [xemKhach, setXemKhach] = useState(null)
 
   useEffect(() => { load() }, [])
   useEffect(() => { if (pendingCustomer) setShowForm(true) }, [pendingCustomer])
@@ -26,7 +28,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
     const [{ data: ords }, { data: its }, { data: custs }, { data: profs }] = await Promise.all([
       supabase.from('orders').select('*').order('ngay_chot', { ascending: false }),
       supabase.from('order_items').select('*'),
-      supabase.from('customers').select('id, ten_khach, ma_khach, sale_id, trang_thai_cham_soc, dich_vu').order('ten_khach'),
+      supabase.from('customers').select('*').order('ten_khach'),
       supabase.from('profiles').select('id, full_name').order('full_name'),
     ])
     setOrders(ords || [])
@@ -47,9 +49,10 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
   }
 
   const nameOf = (id, list, key) => list.find((x) => x.id === id)?.[key] || '—'
+  const khachCua = (id) => customers.find((c) => c.id === id)
 
   const filtered = useMemo(() => orders.filter((o) => {
-    if (filterTT && o.trang_thai !== filterTT) return false
+    if (filterTT && khachCua(o.customer_id)?.trang_thai_cham_soc !== filterTT) return false
     if (filterSale && o.sale_id !== filterSale) return false
     if (search) {
       const tenKhach = nameOf(o.customer_id, customers, 'ten_khach')
@@ -92,7 +95,8 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
         <StatCard label="Số đơn" value={filtered.length} />
         <StatCard label="Tổng giá trị (trừ đơn huỷ)" value={formatVnd(tongDoanhSo)} accent="coral" />
         <StatCard label="Đơn đang triển khai"
-          value={filtered.filter((o) => o.trang_thai === 'dang_xu_ly').length} accent="teal" />
+          value={filtered.filter((o) => khachCua(o.customer_id)?.trang_thai_cham_soc === 'dang_trien_khai').length}
+          accent="teal" />
       </div>
 
       {chuaCoDon.length > 0 && (
@@ -110,7 +114,9 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
         </div>
         <Select value={filterTT} onChange={(e) => setFilterTT(e.target.value)} className="w-44">
           <option value="">Tất cả trạng thái</option>
-          {TRANG_THAI_DON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          {TRANG_THAI_OPTIONS
+            .filter((o) => TT_DA_KY.includes(o.value) || o.value === 'tu_choi')
+            .map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </Select>
         <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
           <option value="">Tất cả sale</option>
@@ -135,7 +141,9 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
           <tbody>
             {/* Khách đã chốt nhưng chưa lên đơn — nằm ngay đầu danh sách để không bị bỏ sót */}
             {!loading && chuaCoDon.map((c) => (
-              <tr key={`cho-${c.id}`} className="border-b border-slate-50 bg-amber-50/60 last:border-0">
+              <tr key={`cho-${c.id}`}
+                onClick={() => setXemKhach(c)}
+                className="cursor-pointer border-b border-slate-50 bg-amber-50/60 last:border-0 hover:bg-amber-100/60">
                 <td className="px-5 py-3">
                   <span className="text-ink-400">—</span>
                 </td>
@@ -158,7 +166,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
                 </td>
                 <td className="whitespace-nowrap px-5 py-3 text-right">
                   <button
-                    onClick={() => { setEditing(null); setKhachTuChon(c); setShowForm(true) }}
+                    onClick={(e) => { e.stopPropagation(); setEditing(null); setKhachTuChon(c); setShowForm(true) }}
                     className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600">
                     <Plus size={13} /> Tạo đơn
                   </button>
@@ -173,7 +181,9 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
                 {orders.length === 0 ? 'Chưa có đơn dịch vụ nào.' : 'Không tìm thấy đơn phù hợp.'}
               </td></tr>
             ) : filtered.map((o) => (
-              <tr key={o.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
+              <tr key={o.id}
+                onClick={() => { const k = khachCua(o.customer_id); if (k) setXemKhach(k) }}
+                className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50">
                 <td className="px-5 py-3 font-medium text-navy-900">{o.ma_don}</td>
                 <td className="px-5 py-3">
                   <p className="text-navy-900">{nameOf(o.customer_id, customers, 'ten_khach')}</p>
@@ -190,21 +200,33 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
                 <td className="px-5 py-3 text-ink-600">{o.ngay_chot || '—'}</td>
                 <td className="px-5 py-3 text-ink-600">{nameOf(o.sale_id, profiles, 'full_name')}</td>
                 <td className="px-5 py-3">
-                  <Badge className={classOf(TRANG_THAI_DON_OPTIONS, o.trang_thai)}>
-                    {labelOf(TRANG_THAI_DON_OPTIONS, o.trang_thai)}
-                  </Badge>
+                  {(() => {
+                    const tt = khachCua(o.customer_id)?.trang_thai_cham_soc
+                    return tt ? (
+                      <Badge className={classOf(TRANG_THAI_OPTIONS, tt)}>{labelOf(TRANG_THAI_OPTIONS, tt)}</Badge>
+                    ) : <span className="text-ink-400">—</span>
+                  })()}
                 </td>
                 <td className="whitespace-nowrap px-5 py-3 text-right">
-                  <button onClick={() => { setEditing(o); setShowForm(true) }}
-                    className="mr-3 text-ink-400 hover:text-coral-500"><Pencil size={14} /></button>
-                  <button onClick={() => remove(o)}
-                    className="text-ink-400 hover:text-rose-500"><Trash2 size={14} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); setEditing(o); setShowForm(true) }}
+                    className="mr-3 text-ink-400 hover:text-coral-500" title="Sửa đơn"><Pencil size={14} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); remove(o) }}
+                    className="text-ink-400 hover:text-rose-500" title="Xoá đơn"><Trash2 size={14} /></button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {xemKhach && (
+        <CustomerDetail
+          customer={xemKhach}
+          currentProfile={currentProfile}
+          onClose={() => setXemKhach(null)}
+          onChanged={load}
+        />
+      )}
 
       {showForm && (
         <OrderForm

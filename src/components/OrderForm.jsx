@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Modal, Input, Select, Textarea, Button } from './ui'
-import { TRANG_THAI_DON_OPTIONS, formatVnd } from '../lib/constants'
+import { formatVnd } from '../lib/constants'
 
 export default function OrderForm({ order, customer, customers = [], profiles = [], currentProfile, onClose, onSaved }) {
   const isEdit = !!order
@@ -12,7 +12,6 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
     sale_id: order?.sale_id || customer?.sale_id || currentProfile?.id || '',
     ngay_chot: order?.ngay_chot || new Date().toISOString().slice(0, 10),
     so_thang: order?.so_thang || '',
-    trang_thai: order?.trang_thai || 'moi',
     ghi_chu: order?.ghi_chu || '',
   })
   const [items, setItems] = useState([{ service_id: '', ten_dich_vu: '', gia: '' }])
@@ -53,7 +52,6 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
       sale_id: form.sale_id || null,
       ngay_chot: form.ngay_chot || null,
       so_thang: form.so_thang ? Number(form.so_thang) : null,
-      trang_thai: form.trang_thai,
       ghi_chu: form.ghi_chu || null,
       gia_tri: tongTien,
     }
@@ -149,15 +147,16 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
         <Input label="Thời hạn (tháng)" type="number" min="0" value={form.so_thang}
           onChange={(e) => setForm({ ...form, so_thang: e.target.value })} placeholder="VD: 3" />
 
-        <Select label="Trạng thái đơn" value={form.trang_thai}
-          onChange={(e) => setForm({ ...form, trang_thai: e.target.value })}>
-          {TRANG_THAI_DON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </Select>
-        <Select label="Sale phụ trách" value={form.sale_id}
-          onChange={(e) => setForm({ ...form, sale_id: e.target.value })}>
-          <option value="">-- Chưa gán --</option>
-          {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-        </Select>
+        <div className="col-span-2">
+          <Select label="Sale phụ trách" value={form.sale_id}
+            onChange={(e) => setForm({ ...form, sale_id: e.target.value })}>
+            <option value="">-- Chưa gán --</option>
+            {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+          </Select>
+          <p className="mt-1 text-xs text-ink-400">
+            Trạng thái đơn bám theo trạng thái khách hàng, đổi ở trang Khách hàng.
+          </p>
+        </div>
 
         <div className="col-span-2">
           <Textarea label="Ghi chú" rows={2} value={form.ghi_chu}
