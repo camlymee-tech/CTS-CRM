@@ -135,40 +135,42 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
               const goiDangChon = packages.find((p) => p.id === it.package_id)
               return (
                 <div key={idx} className="rounded-xl border border-slate-200 p-3">
-                  <div className="flex gap-2">
-                    <select
-                      value={it.service_id}
-                      onChange={(e) => pickService(idx, e.target.value)}
-                      className="w-44 flex-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500"
-                    >
-                      <option value="">-- Chọn dịch vụ --</option>
-                      {services.map((s) => <option key={s.id} value={s.id}>{s.ten_dich_vu}</option>)}
-                    </select>
+                  <div className="flex items-start gap-2">
+                    <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,9rem)]">
+                      <select
+                        value={it.service_id}
+                        onChange={(e) => pickService(idx, e.target.value)}
+                        className="w-full min-w-0 truncate rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500"
+                      >
+                        <option value="">-- Chọn dịch vụ --</option>
+                        {services.map((s) => <option key={s.id} value={s.id}>{s.ten_dich_vu}</option>)}
+                      </select>
 
-                    <select
-                      value={it.package_id}
-                      disabled={!it.service_id}
-                      onChange={(e) => pickPackage(idx, e.target.value)}
-                      className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500 disabled:bg-slate-50 disabled:text-ink-400"
-                    >
-                      <option value="">{it.service_id ? '-- Chọn gói --' : 'Chọn dịch vụ trước'}</option>
-                      {dsGoi.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.ten_goi} — {formatVnd(p.gia)}
-                        </option>
-                      ))}
-                    </select>
+                      <select
+                        value={it.package_id}
+                        disabled={!it.service_id}
+                        onChange={(e) => pickPackage(idx, e.target.value)}
+                        className="w-full min-w-0 truncate rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500 disabled:bg-slate-50 disabled:text-ink-400"
+                      >
+                        <option value="">{it.service_id ? '-- Chọn gói --' : 'Chọn dịch vụ trước'}</option>
+                        {dsGoi.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.ten_goi} — {formatVnd(p.gia)}
+                          </option>
+                        ))}
+                      </select>
 
-                    <input
-                      type="number" min="0" step="1000" placeholder="Giá (đ)"
-                      value={it.gia}
-                      onChange={(e) => setItem(idx, { gia: e.target.value })}
-                      className="w-36 flex-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500"
-                    />
+                      <input
+                        type="text" inputMode="numeric" placeholder="Giá (đ)"
+                        value={it.gia === '' ? '' : Number(it.gia).toLocaleString('vi-VN')}
+                        onChange={(e) => setItem(idx, { gia: e.target.value.replace(/\D/g, '') })}
+                        className="w-full min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-right text-sm outline-none focus:border-coral-500"
+                      />
+                    </div>
 
                     {items.length > 1 && (
                       <button type="button" onClick={() => setItems(items.filter((_, i) => i !== idx))}
-                        className="flex-none rounded-lg px-1 text-ink-400 hover:text-rose-500">
+                        className="mt-2 flex-none text-ink-400 hover:text-rose-500">
                         <Trash2 size={16} />
                       </button>
                     )}
