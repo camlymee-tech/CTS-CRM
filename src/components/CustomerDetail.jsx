@@ -235,7 +235,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                                 <div className="mt-1.5 flex flex-wrap gap-1">
                                   {(dvTheoDon[o.id] || []).map((i) => (
                                     <Badge key={i.id} className="bg-slate-100 text-slate-600">
-                                      {i.ten_dich_vu} · {formatVnd(i.gia)}
+                                      {i.ten_dich_vu}{i.ten_goi ? ` · ${i.ten_goi}` : ''} · {formatVnd(i.gia)}
                                     </Badge>
                                   ))}
                                 </div>

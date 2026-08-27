@@ -7,6 +7,7 @@ import { formatVnd } from '../lib/constants'
 export default function OrderForm({ order, customer, customers = [], profiles = [], currentProfile, onClose, onSaved }) {
   const isEdit = !!order
   const [services, setServices] = useState([])
+  const [packages, setPackages] = useState([])
   const [form, setForm] = useState({
     customer_id: order?.customer_id || customer?.id || '',
     sale_id: order?.sale_id || customer?.sale_id || currentProfile?.id || '',
@@ -14,17 +15,23 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
     so_thang: order?.so_thang || '',
     ghi_chu: order?.ghi_chu || '',
   })
-  const [items, setItems] = useState([{ service_id: '', ten_dich_vu: '', gia: '' }])
+  const [items, setItems] = useState([{ service_id: '', package_id: '', ten_dich_vu: '', ten_goi: '', gia: '', so_thang: '' }])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     supabase.from('services').select('*').eq('active', true).order('ten_dich_vu')
       .then(({ data }) => setServices(data || []))
+    supabase.from('service_packages').select('*').eq('active', true).order('thu_tu')
+      .then(({ data }) => setPackages(data || []))
     if (isEdit) {
       supabase.from('order_items').select('*').eq('order_id', order.id)
         .then(({ data }) => {
-          if (data?.length) setItems(data.map((i) => ({ service_id: i.service_id || '', ten_dich_vu: i.ten_dich_vu, gia: i.gia })))
+          if (data?.length) setItems(data.map((i) => ({
+            service_id: i.service_id || '', package_id: i.package_id || '',
+            ten_dich_vu: i.ten_dich_vu, ten_goi: i.ten_goi || '',
+            gia: i.gia, so_thang: i.so_thang || '',
+          })))
         })
     }
   }, [])
@@ -35,8 +42,21 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
 
   function pickService(idx, serviceId) {
     const sv = services.find((s) => s.id === serviceId)
-    setItem(idx, { service_id: serviceId, ten_dich_vu: sv?.ten_dich_vu || '' })
+    // Đổi dịch vụ thì bỏ gói cũ đi
+    setItem(idx, { service_id: serviceId, ten_dich_vu: sv?.ten_dich_vu || '', package_id: '', ten_goi: '', gia: '', so_thang: '' })
   }
+
+  function pickPackage(idx, packageId) {
+    const pk = packages.find((p) => p.id === packageId)
+    setItem(idx, {
+      package_id: packageId,
+      ten_goi: pk?.ten_goi || '',
+      gia: pk ? String(pk.gia) : '',
+      so_thang: pk?.so_thang || '',
+    })
+  }
+
+  const goiCua = (serviceId) => packages.filter((p) => p.service_id === serviceId)
 
   const tongTien = items.reduce((s, it) => s + (Number(it.gia) || 0), 0)
 
@@ -51,7 +71,8 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
       customer_id: form.customer_id || null,
       sale_id: form.sale_id || null,
       ngay_chot: form.ngay_chot || null,
-      so_thang: form.so_thang ? Number(form.so_thang) : null,
+      so_thang: form.so_thang ? Number(form.so_thang)
+        : (Math.max(0, ...hopLe.map((it) => Number(it.so_thang) || 0)) || null),
       ghi_chu: form.ghi_chu || null,
       gia_tri: tongTien,
     }
@@ -71,7 +92,10 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
       hopLe.map((it) => ({
         order_id: orderId,
         service_id: it.service_id || null,
+        package_id: it.package_id || null,
         ten_dich_vu: it.ten_dich_vu,
+        ten_goi: it.ten_goi || null,
+        so_thang: it.so_thang ? Number(it.so_thang) : null,
         gia: Number(it.gia) || 0,
       }))
     )
@@ -106,32 +130,66 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
         <div className="col-span-2">
           <p className="mb-2 text-sm font-medium text-navy-900">Dịch vụ khách mua *</p>
           <div className="space-y-2">
-            {items.map((it, idx) => (
-              <div key={idx} className="flex gap-2">
-                <select
-                  value={it.service_id}
-                  onChange={(e) => pickService(idx, e.target.value)}
-                  className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500"
-                >
-                  <option value="">-- Chọn dịch vụ --</option>
-                  {services.map((s) => <option key={s.id} value={s.id}>{s.ten_dich_vu}</option>)}
-                </select>
-                <input
-                  type="number" min="0" step="1000" placeholder="Giá trị (đ)"
-                  value={it.gia}
-                  onChange={(e) => setItem(idx, { gia: e.target.value })}
-                  className="w-44 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500"
-                />
-                {items.length > 1 && (
-                  <button type="button" onClick={() => setItems(items.filter((_, i) => i !== idx))}
-                    className="rounded-lg px-2 text-ink-400 hover:text-rose-500">
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
-            ))}
+            {items.map((it, idx) => {
+              const dsGoi = goiCua(it.service_id)
+              const goiDangChon = packages.find((p) => p.id === it.package_id)
+              return (
+                <div key={idx} className="rounded-xl border border-slate-200 p-3">
+                  <div className="flex gap-2">
+                    <select
+                      value={it.service_id}
+                      onChange={(e) => pickService(idx, e.target.value)}
+                      className="w-44 flex-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500"
+                    >
+                      <option value="">-- Chọn dịch vụ --</option>
+                      {services.map((s) => <option key={s.id} value={s.id}>{s.ten_dich_vu}</option>)}
+                    </select>
+
+                    <select
+                      value={it.package_id}
+                      disabled={!it.service_id}
+                      onChange={(e) => pickPackage(idx, e.target.value)}
+                      className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500 disabled:bg-slate-50 disabled:text-ink-400"
+                    >
+                      <option value="">{it.service_id ? '-- Chọn gói --' : 'Chọn dịch vụ trước'}</option>
+                      {dsGoi.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.ten_goi} — {formatVnd(p.gia)}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="number" min="0" step="1000" placeholder="Giá (đ)"
+                      value={it.gia}
+                      onChange={(e) => setItem(idx, { gia: e.target.value })}
+                      className="w-36 flex-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500"
+                    />
+
+                    {items.length > 1 && (
+                      <button type="button" onClick={() => setItems(items.filter((_, i) => i !== idx))}
+                        className="flex-none rounded-lg px-1 text-ink-400 hover:text-rose-500">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {goiDangChon && (
+                    <p className="mt-2 text-xs text-ink-600">
+                      {goiDangChon.so_thang ? <b className="text-navy-900">{goiDangChon.so_thang} tháng · </b> : null}
+                      {goiDangChon.mo_ta}
+                    </p>
+                  )}
+                  {it.package_id && Number(it.gia) !== Number(goiDangChon?.gia) && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      Giá đã sửa khác bảng giá gốc ({formatVnd(goiDangChon?.gia)})
+                    </p>
+                  )}
+                </div>
+              )
+            })}
           </div>
-          <button type="button" onClick={() => setItems([...items, { service_id: '', ten_dich_vu: '', gia: '' }])}
+          <button type="button" onClick={() => setItems([...items, { service_id: '', package_id: '', ten_dich_vu: '', ten_goi: '', gia: '', so_thang: '' }])}
             className="mt-2 inline-flex items-center gap-1 text-sm text-ink-600 hover:text-coral-500">
             <Plus size={14} /> Thêm dịch vụ
           </button>
@@ -145,7 +203,8 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
         <Input label="Ngày chốt đơn" type="date" value={form.ngay_chot || ''}
           onChange={(e) => setForm({ ...form, ngay_chot: e.target.value })} />
         <Input label="Thời hạn (tháng)" type="number" min="0" value={form.so_thang}
-          onChange={(e) => setForm({ ...form, so_thang: e.target.value })} placeholder="VD: 3" />
+          onChange={(e) => setForm({ ...form, so_thang: e.target.value })}
+          placeholder="Để trống sẽ lấy theo gói" />
 
         <div className="col-span-2">
           <Select label="Sale phụ trách" value={form.sale_id}

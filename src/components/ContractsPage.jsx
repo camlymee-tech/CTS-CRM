@@ -137,7 +137,9 @@ export default function ContractsPage({ currentProfile }) {
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-1">
                       {(items[c.order_id] || []).map((i) => (
-                        <Badge key={i.id} className="bg-slate-100 text-slate-600">{i.ten_dich_vu}</Badge>
+                        <Badge key={i.id} className="bg-slate-100 text-slate-600">
+                          {i.ten_dich_vu}{i.ten_goi ? ` · ${i.ten_goi}` : ''}
+                        </Badge>
                       ))}
                     </div>
                   </td>

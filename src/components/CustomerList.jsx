@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Phone, Link2, Store, Users2, Trash2 } from 'lucide-react'
+import { Plus, Search, Link2, Store, Users2, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import CustomerForm from './CustomerForm'
@@ -306,10 +306,6 @@ export default function CustomerList({ currentProfile, onChotDon }) {
                   <td className="px-4 py-3 text-ink-600">{(c.created_at || '').slice(0, 10) || '—'}</td>
                   <td className="px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
-                    <a href={c.sdt ? `tel:${c.sdt}` : undefined} onClick={(e) => e.stopPropagation()}
-                      className={`mr-3 inline-flex items-center gap-1 text-xs ${c.sdt ? 'text-teal-500 hover:underline' : 'text-ink-400'}`}>
-                      <Phone size={13} /> Gọi
-                    </a>
                     {(isAdmin || cuaMinh) && (
                       <button onClick={(e) => { e.stopPropagation(); xoaKhach(c) }}
                         className="text-ink-400 hover:text-rose-500" title="Xoá khách hàng">

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Pencil, Trash2, AlertTriangle } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, AlertTriangle, Tags } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import OrderForm from './OrderForm'
 import CustomerDetail from './CustomerDetail'
+import PackagesModal from './PackagesModal'
 import { TRANG_THAI_OPTIONS, DICH_VU_OPTIONS, TT_DA_KY, classOf, labelOf, formatVnd } from '../lib/constants'
 
 export default function OrdersPage({ currentProfile, pendingCustomer, onPendingHandled }) {
@@ -19,6 +20,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
   const [editing, setEditing] = useState(null)
   const [khachTuChon, setKhachTuChon] = useState(null)
   const [xemKhach, setXemKhach] = useState(null)
+  const [xemGoi, setXemGoi] = useState(false)
 
   useEffect(() => { load() }, [])
   useEffect(() => { if (pendingCustomer) setShowForm(true) }, [pendingCustomer])
@@ -102,9 +104,16 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
           <h1 className="font-display text-xl font-bold text-navy-900">Đơn dịch vụ</h1>
           <p className="text-sm text-ink-600">Đơn đã chốt, dịch vụ khách mua và giá trị hợp đồng</p>
         </div>
-        <Button onClick={() => { setEditing(null); setShowForm(true) }}>
-          <Plus size={16} /> Tạo đơn dịch vụ
-        </Button>
+        <div className="flex gap-2">
+          {currentProfile?.role === 'admin' && (
+            <Button variant="secondary" onClick={() => setXemGoi(true)}>
+              <Tags size={16} /> Bảng giá
+            </Button>
+          )}
+          <Button onClick={() => { setEditing(null); setShowForm(true) }}>
+            <Plus size={16} /> Tạo đơn dịch vụ
+          </Button>
+        </div>
       </header>
 
       <div className="grid grid-cols-4 gap-4 px-8 pt-6">
@@ -217,7 +226,9 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
                 <td className="px-5 py-3">
                   <div className="flex flex-wrap gap-1">
                     {(items[o.id] || []).map((i) => (
-                      <Badge key={i.id} className="bg-slate-100 text-slate-600">{i.ten_dich_vu}</Badge>
+                      <Badge key={i.id} className="bg-slate-100 text-slate-600">
+                        {i.ten_dich_vu}{i.ten_goi ? ` · ${i.ten_goi}` : ''}
+                      </Badge>
                     ))}
                   </div>
                 </td>
@@ -243,6 +254,8 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
           </tbody>
         </table>
       </div>
+
+      {xemGoi && <PackagesModal onClose={() => setXemGoi(false)} />}
 
       {xemKhach && (
         <CustomerDetail
