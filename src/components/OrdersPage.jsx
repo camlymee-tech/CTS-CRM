@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import OrderForm from './OrderForm'
 import CustomerDetail from './CustomerDetail'
-import { TRANG_THAI_OPTIONS, DICH_VU_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
+import { TRANG_THAI_OPTIONS, DICH_VU_OPTIONS, TT_DA_KY, classOf, labelOf, formatVnd } from '../lib/constants'
 
 export default function OrdersPage({ currentProfile, pendingCustomer, onPendingHandled }) {
   const [orders, setOrders] = useState([])
