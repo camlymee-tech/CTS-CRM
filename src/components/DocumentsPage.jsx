@@ -47,6 +47,17 @@ export default function DocumentsPage({ currentProfile }) {
     return true
   }), [docs, search, filterDM])
 
+  // Gom theo danh mục, trong mỗi nhóm xếp theo số thứ tự trong tiêu đề
+  const nhom = useMemo(() => {
+    const sapXep = (a, b) => {
+      if (!!b.ghim !== !!a.ghim) return b.ghim ? 1 : -1
+      return a.tieu_de.localeCompare(b.tieu_de, 'vi', { numeric: true, sensitivity: 'base' })
+    }
+    return DANH_MUC
+      .map((dm) => ({ ...dm, ds: filtered.filter((d) => d.danh_muc === dm.value).sort(sapXep) }))
+      .filter((g) => g.ds.length > 0)
+  }, [filtered])
+
   if (viewing) {
     return (
       <div className="flex-1 overflow-y-auto">
@@ -124,37 +135,55 @@ export default function DocumentsPage({ currentProfile }) {
         </Select>
       </div>
 
-      <div className="mx-8 my-6 grid grid-cols-2 gap-4">
+      <div className="mx-8 my-6 space-y-6">
         {loading ? (
-          <p className="col-span-2 py-8 text-center text-ink-400">Đang tải...</p>
-        ) : filtered.length === 0 ? (
-          <p className="col-span-2 py-8 text-center text-ink-400">
+          <p className="py-8 text-center text-ink-400">Đang tải...</p>
+        ) : nhom.length === 0 ? (
+          <p className="py-8 text-center text-ink-400">
             {docs.length === 0 ? 'Chưa có tài liệu nào.' : 'Không tìm thấy tài liệu phù hợp.'}
           </p>
-        ) : filtered.map((d) => (
-          <div key={d.id}
-            onClick={() => setViewing(d)}
-            className="cursor-pointer rounded-2xl bg-white p-5 shadow-sm transition hover:shadow-md">
-            <div className="mb-2 flex items-start justify-between gap-2">
-              <Badge className={classDM(d.danh_muc)}>{labelDM(d.danh_muc)}</Badge>
-              <div className="flex items-center gap-2">
-                {d.ghim && <Pin size={14} className="text-coral-500" />}
-                {isAdmin && (
-                  <>
-                    <button onClick={(e) => { e.stopPropagation(); setEditing(d); setShowForm(true) }}
-                      className="text-ink-400 hover:text-coral-500"><Pencil size={14} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); remove(d) }}
-                      className="text-ink-400 hover:text-rose-500"><Trash2 size={14} /></button>
-                  </>
-                )}
-              </div>
+        ) : nhom.map((g) => (
+          <section key={g.value}>
+            <div className="mb-2 flex items-center gap-2">
+              <Badge className={g.className}>{g.label}</Badge>
+              <span className="text-xs text-ink-400">{g.ds.length} tài liệu</span>
             </div>
-            <h3 className="font-display font-semibold text-navy-900">{d.tieu_de}</h3>
-            {d.mo_ta && <p className="mt-1 line-clamp-2 text-sm text-ink-600">{d.mo_ta}</p>}
-            <p className="mt-3 text-xs text-ink-400">
-              {new Date(d.updated_at || d.created_at).toLocaleDateString('vi-VN')}
-            </p>
-          </div>
+
+            <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+              {g.ds.map((d, idx) => (
+                <div key={d.id}
+                  onClick={() => setViewing(d)}
+                  className={`flex cursor-pointer items-center gap-4 px-5 py-3.5 transition hover:bg-slate-50 ${
+                    idx > 0 ? 'border-t border-slate-50' : ''
+                  }`}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      {d.ghim && <Pin size={13} className="flex-none text-coral-500" />}
+                      <p className="truncate font-medium text-navy-900">{d.tieu_de}</p>
+                    </div>
+                    {d.mo_ta && <p className="mt-0.5 truncate text-sm text-ink-600">{d.mo_ta}</p>}
+                  </div>
+
+                  {d.link_ngoai && (
+                    <ExternalLink size={14} className="flex-none text-teal-500" />
+                  )}
+
+                  <span className="hidden flex-none text-xs text-ink-400 sm:block">
+                    {new Date(d.updated_at || d.created_at).toLocaleDateString('vi-VN')}
+                  </span>
+
+                  {isAdmin && (
+                    <div className="flex flex-none gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); setEditing(d); setShowForm(true) }}
+                        className="text-ink-400 hover:text-coral-500"><Pencil size={14} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); remove(d) }}
+                        className="text-ink-400 hover:text-rose-500"><Trash2 size={14} /></button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
         ))}
       </div>
 
