@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Pin, Pencil, Trash2, ExternalLink, ArrowLeft } from 'lucide-react'
+import { Plus, Search, Pin, Pencil, Trash2, ExternalLink, ArrowLeft, Paperclip } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Textarea, Badge, Modal } from './ui'
+import DocumentFiles from './DocumentFiles'
 
 export const DANH_MUC = [
   { value: 'tai_lieu_cong_viec', label: 'Tài liệu công việc', className: 'bg-slate-100 text-slate-600' },
@@ -16,6 +17,7 @@ const classDM = (v) => DANH_MUC.find((d) => d.value === v)?.className ?? 'bg-sla
 
 export default function DocumentsPage({ currentProfile }) {
   const [docs, setDocs] = useState([])
+  const [soFile, setSoFile] = useState({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterDM, setFilterDM] = useState('')
@@ -29,9 +31,15 @@ export default function DocumentsPage({ currentProfile }) {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase.from('documents').select('*')
-      .order('ghim', { ascending: false }).order('created_at', { ascending: false })
+    const [{ data }, { data: fl }] = await Promise.all([
+      supabase.from('documents').select('*')
+        .order('ghim', { ascending: false }).order('created_at', { ascending: false }),
+      supabase.from('document_files').select('document_id'),
+    ])
     setDocs(data || [])
+    const dem = {}
+    for (const f of fl || []) dem[f.document_id] = (dem[f.document_id] || 0) + 1
+    setSoFile(dem)
     setLoading(false)
   }
 
@@ -92,6 +100,10 @@ export default function DocumentsPage({ currentProfile }) {
           )}
           <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-navy-900">
             {viewing.noi_dung || 'Tài liệu này chưa có nội dung chi tiết.'}
+          </div>
+
+          <div className="mt-6 border-t border-slate-100 pt-5">
+            <DocumentFiles documentId={viewing.id} isAdmin={isAdmin} onChanged={load} />
           </div>
         </div>
 
@@ -164,6 +176,11 @@ export default function DocumentsPage({ currentProfile }) {
                     {d.mo_ta && <p className="mt-0.5 truncate text-sm text-ink-600">{d.mo_ta}</p>}
                   </div>
 
+                  {soFile[d.id] > 0 && (
+                    <span className="flex-none inline-flex items-center gap-1 text-xs text-ink-500">
+                      <Paperclip size={13} /> {soFile[d.id]}
+                    </span>
+                  )}
                   {d.link_ngoai && (
                     <ExternalLink size={14} className="flex-none text-teal-500" />
                   )}
@@ -247,9 +264,19 @@ function DocumentForm({ doc, currentProfile, onClose, onSaved }) {
           onChange={(e) => setForm({ ...form, noi_dung: e.target.value })}
           placeholder="Gõ hoặc dán nội dung tài liệu vào đây..." />
 
-        <Input label="Link file đính kèm" value={form.link_ngoai}
+        <Input label="Link ngoài (tuỳ chọn)" value={form.link_ngoai}
           onChange={(e) => setForm({ ...form, link_ngoai: e.target.value })}
-          placeholder="Link Google Drive, Google Docs..." />
+          placeholder="Link Google Drive, Google Docs... nếu có" />
+
+        {isEdit ? (
+          <div className="rounded-xl border border-slate-200 p-4">
+            <DocumentFiles documentId={doc.id} isAdmin onChanged={() => {}} />
+          </div>
+        ) : (
+          <p className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-ink-600">
+            Lưu tài liệu xong, mở lại để tải file PDF, slide, Word, Excel hoặc ảnh lên.
+          </p>
+        )}
 
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.ghim}
