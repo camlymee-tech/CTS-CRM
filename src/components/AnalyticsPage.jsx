@@ -2,11 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Select, Badge } from './ui'
-import {
-  NGUON_KHACH_OPTIONS, TRANG_THAI_OPTIONS,
-  PHEU_BUOC, PHEU_ROI, TT_DA_KY, laDataDuocChia,
-  labelOf, classOf, formatVnd,
-} from '../lib/constants'
+import { NGUON_KHACH_OPTIONS, laDataDuocChia, labelOf, formatVnd } from '../lib/constants'
+import { useTrangThai } from '../lib/StatusContext'
 
 const NGAY_BO_QUEN = 7
 
@@ -26,6 +23,7 @@ function tinhMoc(ky) {
 }
 
 export default function AnalyticsPage() {
+  const { options: TRANG_THAI, tenTrangThai, classTrangThai, maDaChot } = useTrangThai()
   const [customers, setCustomers] = useState([])
   const [orders, setOrders] = useState([])
   const [interactions, setInteractions] = useState([])
@@ -58,13 +56,12 @@ export default function AnalyticsPage() {
 
   // ===== Phễu: mỗi khách chỉ nằm ở ĐÚNG MỘT bước theo trạng thái hiện tại =====
   const pheu = useMemo(() => {
-    const buoc = PHEU_BUOC.map((b) => ({
-      ...b,
-      so: khachTrongKy.filter((c) => c.trang_thai_cham_soc === b.value).length,
+    const buoc = TRANG_THAI.map((b) => ({
+      value: b.ma, label: b.ten, mau: b.mau,
+      so: khachTrongKy.filter((c) => c.trang_thai_cham_soc === b.ma).length,
     }))
-    const roi = khachTrongKy.filter((c) => c.trang_thai_cham_soc === PHEU_ROI).length
-    return { buoc, roi, tong: khachTrongKy.length }
-  }, [khachTrongKy])
+    return { buoc, tong: khachTrongKy.length }
+  }, [khachTrongKy, TRANG_THAI])
 
   // ===== Chỉ số theo sale trong kỳ =====
   const theoSale = useMemo(() => {
@@ -79,7 +76,7 @@ export default function AnalyticsPage() {
         if (laDataDuocChia(c)) {
           m[c.sale_id].dataChia += 1
           // Chỉ số chuyển đổi chỉ tính trên data được chia, cho khách quan
-          if (c.trang_thai_cham_soc === 'dang_tu_van' || TT_DA_KY.includes(c.trang_thai_cham_soc)) {
+          if (c.trang_thai_cham_soc === 'dang_tu_van' || maDaChot.includes(c.trang_thai_cham_soc)) {
             m[c.sale_id].tuVan += 1
           }
         } else {
@@ -102,7 +99,7 @@ export default function AnalyticsPage() {
         tiLe: v.dataChia ? Math.round((v.tuVan / v.dataChia) * 100) : null,
       }))
       .sort((a, b) => b.doanhSo - a.doanhSo || b.chot - a.chot)
-  }, [customers, interactions, orders, profiles, moc])
+  }, [customers, interactions, orders, profiles, moc, maDaChot])
 
   // ===== Ma trận nguồn × sale =====
   const maTran = useMemo(() => {
@@ -113,7 +110,7 @@ export default function AnalyticsPage() {
       const o = { id: sid, ten: tenSale(sid), cot: {}, tong: 0, tongChot: 0 }
       for (const n of nguons) {
         const ds = khachChia.filter((c) => c.sale_id === sid && (c.nguon_khach || 'khac') === n)
-        const chot = ds.filter((c) => TT_DA_KY.includes(c.trang_thai_cham_soc)).length
+        const chot = ds.filter((c) => maDaChot.includes(c.trang_thai_cham_soc)).length
         o.cot[n] = { tong: ds.length, chot }
         o.tong += ds.length
         o.tongChot += chot
@@ -121,7 +118,7 @@ export default function AnalyticsPage() {
       return o
     }).filter((r) => r.tong > 0).sort((a, b) => b.tong - a.tong)
     return { nguons, bang }
-  }, [khachTrongKy, profiles])
+  }, [khachTrongKy, profiles, maDaChot])
 
   // ===== Khách bị bỏ quên =====
   const boQuen = useMemo(() => {
@@ -150,7 +147,7 @@ export default function AnalyticsPage() {
     return ds.length ? Math.round(ds.reduce((a, b) => a + b, 0) / ds.length) : null
   }, [orders, customers])
 
-  const maxPheu = Math.max(...pheu.buoc.map((b) => b.so), pheu.roi, 1)
+  const maxPheu = Math.max(...pheu.buoc.map((b) => b.so), 1)
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -198,21 +195,6 @@ export default function AnalyticsPage() {
                 )
               })}
 
-              <div className="border-t border-slate-100 pt-3">
-                <div className="mb-1 flex items-baseline justify-between text-sm">
-                  <span className="font-medium text-rose-600">Từ chối / Ngừng</span>
-                  <span className="text-ink-600">
-                    <b className="text-rose-600">{pheu.roi}</b>
-                    <span className="ml-2 text-ink-400">
-                      ({pheu.tong ? Math.round((pheu.roi / pheu.tong) * 100) : 0}%)
-                    </span>
-                  </span>
-                </div>
-                <div className="h-7 overflow-hidden rounded-lg bg-slate-100">
-                  <div className="h-full rounded-lg bg-rose-400 transition-all"
-                    style={{ width: `${pheu.roi ? Math.max((pheu.roi / maxPheu) * 100, 4) : 0}%` }} />
-                </div>
-              </div>
             </div>
             <p className="mt-3 text-xs text-ink-400">
               Mỗi khách chỉ nằm ở đúng một bước theo trạng thái hiện tại, không cộng dồn — tổng các bước bằng số data vào.
@@ -333,8 +315,8 @@ export default function AnalyticsPage() {
                           <p className="text-xs text-ink-400">{c.ma_khach}</p>
                         </td>
                         <td className="py-2.5">
-                          <Badge className={classOf(TRANG_THAI_OPTIONS, c.trang_thai_cham_soc)}>
-                            {labelOf(TRANG_THAI_OPTIONS, c.trang_thai_cham_soc)}
+                          <Badge className={classTrangThai(c.trang_thai_cham_soc)}>
+                            {tenTrangThai(c.trang_thai_cham_soc)}
                           </Badge>
                         </td>
                         <td className="py-2.5 text-ink-600">{tenSale(c.sale_id)}</td>

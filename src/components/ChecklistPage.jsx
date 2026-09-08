@@ -4,12 +4,11 @@ import { supabase } from '../supabaseClient'
 import { Select, Badge } from './ui'
 import CustomerDetail from './CustomerDetail'
 import ChecklistTasks from './ChecklistTasks'
-import {
-  TRANG_THAI_OPTIONS, DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, TT_DA_KY,
-  classOf, labelOf,
-} from '../lib/constants'
+import { DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, classOf, labelOf } from '../lib/constants'
+import { useTrangThai } from '../lib/StatusContext'
 
 export default function ChecklistPage({ currentProfile }) {
+  const { tenTrangThai, classTrangThai, maDaChot } = useTrangThai()
   const [customers, setCustomers] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -37,11 +36,11 @@ export default function ChecklistPage({ currentProfile }) {
   const canLam = useMemo(() => customers.filter((c) => {
     if (!c.ngay_cham_soc_tiep_theo) return false
     if (c.ngay_cham_soc_tiep_theo > homNay) return false
-    if (TT_DA_KY.includes(c.trang_thai_cham_soc)) return false
+    if (maDaChot.includes(c.trang_thai_cham_soc)) return false
     if (!isAdmin && c.sale_id !== currentProfile?.id) return false
     if (filterSale && c.sale_id !== filterSale) return false
     return true
-  }), [customers, homNay, isAdmin, currentProfile?.id, filterSale])
+  }), [customers, homNay, isAdmin, currentProfile?.id, filterSale, maDaChot])
 
   const quaHan = canLam.filter((c) => c.ngay_cham_soc_tiep_theo < homNay)
   const dungHomNay = canLam.filter((c) => c.ngay_cham_soc_tiep_theo === homNay)
@@ -53,12 +52,12 @@ export default function ChecklistPage({ currentProfile }) {
     return customers.filter((c) => {
       if (!c.ngay_cham_soc_tiep_theo) return false
       if (c.ngay_cham_soc_tiep_theo <= homNay || c.ngay_cham_soc_tiep_theo > h) return false
-      if (TT_DA_KY.includes(c.trang_thai_cham_soc)) return false
+      if (maDaChot.includes(c.trang_thai_cham_soc)) return false
       if (!isAdmin && c.sale_id !== currentProfile?.id) return false
       if (filterSale && c.sale_id !== filterSale) return false
       return true
     })
-  }, [customers, homNay, isAdmin, currentProfile?.id, filterSale])
+  }, [customers, homNay, isAdmin, currentProfile?.id, filterSale, maDaChot])
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -100,6 +99,7 @@ export default function ChecklistPage({ currentProfile }) {
                   tieuDe={`Quá hạn (${quaHan.length})`}
                   moTa="Đã trễ so với lịch hẹn — nên gọi trước"
                   ds={quaHan} homNay={homNay} tenSale={tenSale} onOpen={setXemKhach}
+                  tenTrangThai={tenTrangThai} classTrangThai={classTrangThai}
                 />
               )}
               {dungHomNay.length > 0 && (
@@ -108,6 +108,7 @@ export default function ChecklistPage({ currentProfile }) {
                   tieuDe={`Hôm nay (${dungHomNay.length})`}
                   moTa="Đúng lịch hẹn hôm nay"
                   ds={dungHomNay} homNay={homNay} tenSale={tenSale} onOpen={setXemKhach}
+                  tenTrangThai={tenTrangThai} classTrangThai={classTrangThai}
                 />
               )}
             </>
@@ -119,6 +120,7 @@ export default function ChecklistPage({ currentProfile }) {
               tieuDe={`Sắp tới trong 3 ngày (${sapToi.length})`}
               moTa="Chưa đến hạn, xem trước để chuẩn bị"
               ds={sapToi} homNay={homNay} tenSale={tenSale} onOpen={setXemKhach}
+              tenTrangThai={tenTrangThai} classTrangThai={classTrangThai}
             />
           )}
         </div>
@@ -136,7 +138,7 @@ export default function ChecklistPage({ currentProfile }) {
   )
 }
 
-function Nhom({ icon: Icon, mau, tieuDe, moTa, ds, homNay, tenSale, onOpen }) {
+function Nhom({ icon: Icon, mau, tieuDe, moTa, ds, homNay, tenSale, onOpen, tenTrangThai, classTrangThai }) {
   const mauSac = {
     rose: 'text-rose-500',
     coral: 'text-coral-500',
@@ -180,8 +182,8 @@ function Nhom({ icon: Icon, mau, tieuDe, moTa, ds, homNay, tenSale, onOpen }) {
                 ))}
               </div>
 
-              <Badge className={classOf(TRANG_THAI_OPTIONS, c.trang_thai_cham_soc)}>
-                {labelOf(TRANG_THAI_OPTIONS, c.trang_thai_cham_soc)}
+              <Badge className={classTrangThai(c.trang_thai_cham_soc)}>
+                {tenTrangThai(c.trang_thai_cham_soc)}
               </Badge>
 
               <span className="w-24 flex-none text-right text-xs text-ink-600">

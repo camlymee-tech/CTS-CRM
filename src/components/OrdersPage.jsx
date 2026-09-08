@@ -5,9 +5,11 @@ import { Button, Input, Select, Badge } from './ui'
 import OrderForm from './OrderForm'
 import CustomerDetail from './CustomerDetail'
 import PackagesModal from './PackagesModal'
-import { TRANG_THAI_OPTIONS, DICH_VU_OPTIONS, TT_DA_KY, classOf, labelOf, formatVnd } from '../lib/constants'
+import { DICH_VU_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
+import { useTrangThai } from '../lib/StatusContext'
 
 export default function OrdersPage({ currentProfile, pendingCustomer, onPendingHandled }) {
+  const { options: TRANG_THAI, tenTrangThai, classTrangThai, maDaChot, maTaoDon } = useTrangThai()
   const [orders, setOrders] = useState([])
   const [items, setItems] = useState({})
   const [customers, setCustomers] = useState([])
@@ -67,8 +69,8 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
   // Khách đã chuyển sang "Chốt hợp đồng" nhưng chưa có đơn dịch vụ nào
   const chuaCoDon = useMemo(() => {
     const coDon = new Set(orders.map((o) => o.customer_id))
-    return customers.filter((c) => c.trang_thai_cham_soc === 'da_ky' && !coDon.has(c.id))
-  }, [customers, orders])
+    return customers.filter((c) => maTaoDon.includes(c.trang_thai_cham_soc) && !coDon.has(c.id))
+  }, [customers, orders, maTaoDon])
 
   // Doanh số tháng này và so sánh tháng trước (trên toàn bộ đơn, không phụ thuộc bộ lọc)
   const doanhSoThang = useMemo(() => {
@@ -148,9 +150,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
         </div>
         <Select value={filterTT} onChange={(e) => setFilterTT(e.target.value)} className="w-44">
           <option value="">Tất cả trạng thái</option>
-          {TRANG_THAI_OPTIONS
-            .filter((o) => TT_DA_KY.includes(o.value) || o.value === 'tu_choi')
-            .map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
         </Select>
         <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
           <option value="">Tất cả sale</option>
@@ -239,7 +239,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
                   {(() => {
                     const tt = khachCua(o.customer_id)?.trang_thai_cham_soc
                     return tt ? (
-                      <Badge className={classOf(TRANG_THAI_OPTIONS, tt)}>{labelOf(TRANG_THAI_OPTIONS, tt)}</Badge>
+                      <Badge className={classTrangThai(tt)}>{tenTrangThai(tt)}</Badge>
                     ) : <span className="text-ink-400">—</span>
                   })()}
                 </td>

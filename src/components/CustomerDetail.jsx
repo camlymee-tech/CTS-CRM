@@ -5,8 +5,9 @@ import {
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Textarea, Select, Badge, Input } from './ui'
+import { useTrangThai } from '../lib/StatusContext'
 import {
-  LOAI_TUONG_TAC_OPTIONS, TRANG_THAI_OPTIONS, NEN_TANG_OPTIONS,
+  LOAI_TUONG_TAC_OPTIONS, NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, LOAI_KHACH_OPTIONS,
   TRANG_THAI_HD_OPTIONS,
   classOf, labelOf, formatVnd,
@@ -14,19 +15,10 @@ import {
 
 const ICONS = { goi_dien: Phone, nhan_tin: MessageCircle, gap_mat: UsersIcon, khac: MoreHorizontal }
 
-function laKhachChung(c) {
-  const moc = c.ngay_lien_he_gan_nhat || (c.created_at || '').slice(0, 10)
-  const soNgay = moc ? Math.floor((Date.now() - new Date(moc).getTime()) / 86400000) : 999
-  switch (c.trang_thai_cham_soc) {
-    case 'hoan_thanh': return true            // hoàn thành dịch vụ -> mở cho cả team
-    case 'khong_nghe_may': return soNgay >= 5
-    case 'dang_tu_van': return soNgay >= 30
-    case 'tu_choi': return soNgay >= 15
-    default: return false                     // chưa liên hệ, chốt HĐ, đang triển khai -> riêng
-  }
-}
+
 
 export default function CustomerDetail({ customer: khachBanDau, currentProfile, onClose, onChanged, onEdit, onChotDon }) {
+  const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung, maTaoDon } = useTrangThai()
   const [customer, setCustomer] = useState(khachBanDau)
   const [tab, setTab] = useState('thong_tin')
   const [interactions, setInteractions] = useState([])
@@ -101,7 +93,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     load(); onChanged?.()
 
     // Vừa chuyển sang Chốt hợp đồng -> sang tạo đơn dịch vụ luôn
-    if (tt === 'da_ky' && truoc !== 'da_ky') {
+    if (maTaoDon.includes(tt) && !maTaoDon.includes(truoc)) {
       onChotDon?.(moi)
     }
   }
@@ -160,11 +152,11 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
             {suaDuoc ? (
               <Select value={customer.trang_thai_cham_soc} onChange={(e) => doiTrangThai(e.target.value)}
                 className="h-8 w-44 py-1 text-xs">
-                {TRANG_THAI_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
               </Select>
             ) : (
-              <Badge className={classOf(TRANG_THAI_OPTIONS, customer.trang_thai_cham_soc)}>
-                {labelOf(TRANG_THAI_OPTIONS, customer.trang_thai_cham_soc)}
+              <Badge className={classTrangThai(customer.trang_thai_cham_soc)}>
+                {tenTrangThai(customer.trang_thai_cham_soc)}
               </Badge>
             )}
           </div>

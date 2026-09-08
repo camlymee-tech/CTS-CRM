@@ -2,16 +2,17 @@ import { useEffect, useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Modal, Input, Select, Textarea, Button, Badge } from './ui'
+import { useTrangThai } from '../lib/StatusContext'
 import {
   NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS,
   LOAI_KHACH_OPTIONS,
   NGUON_KHACH_OPTIONS,
-  TRANG_THAI_OPTIONS,
-  classOf, labelOf,
+  labelOf,
 } from '../lib/constants'
 
 export default function CustomerForm({ customer, profiles, currentProfile, onClose, onSaved }) {
+  const { options: TRANG_THAI, tenTrangThai, classTrangThai, maTaoDon } = useTrangThai()
   const isEdit = !!customer
   const trangThaiCu = customer?.trang_thai_cham_soc || null
   const [form, setForm] = useState({
@@ -91,11 +92,11 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
     }
 
     // Vừa chuyển sang "Đã ký hợp đồng" -> mời tạo đơn dịch vụ ngay
-    const vuaChotDon = form.trang_thai_cham_soc === 'da_ky' && trangThaiCu !== 'da_ky'
+    const vuaChotDon = maTaoDon.includes(form.trang_thai_cham_soc) && !maTaoDon.includes(trangThaiCu)
     onSaved(vuaChotDon ? data : null)
   }
 
-  const chotDon = form.trang_thai_cham_soc === 'da_ky' && trangThaiCu !== 'da_ky'
+  const chotDon = maTaoDon.includes(form.trang_thai_cham_soc) && !maTaoDon.includes(trangThaiCu)
 
   return (
     <Modal title={isEdit ? 'Sửa thông tin khách hàng' : 'Thêm khách hàng mới'} onClose={onClose} wide>
@@ -130,8 +131,8 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
                   <p className="font-display font-semibold text-navy-900">{khachTrung.ten_khach}</p>
                   <p className="text-xs text-ink-400">{khachTrung.ma_khach} · {khachTrung.sdt}</p>
                 </div>
-                <Badge className={classOf(TRANG_THAI_OPTIONS, khachTrung.trang_thai_cham_soc)}>
-                  {labelOf(TRANG_THAI_OPTIONS, khachTrung.trang_thai_cham_soc)}
+                <Badge className={classTrangThai(khachTrung.trang_thai_cham_soc)}>
+                  {tenTrangThai(khachTrung.trang_thai_cham_soc)}
                 </Badge>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink-600">
@@ -186,7 +187,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
 
         <Select label="Trạng thái chăm sóc" value={form.trang_thai_cham_soc}
           onChange={(e) => setForm({ ...form, trang_thai_cham_soc: e.target.value })}>
-          {TRANG_THAI_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
         </Select>
         <Select label="Sale phụ trách" value={form.sale_id}
           onChange={(e) => setForm({ ...form, sale_id: e.target.value })}>

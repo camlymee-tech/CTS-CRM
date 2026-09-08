@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import { StatusProvider } from './lib/StatusContext'
 import Login from './components/Login'
 import ResetPassword from './components/ResetPassword'
 import Sidebar from './components/Sidebar'
@@ -85,6 +86,7 @@ export default function App() {
   }
 
   return (
+    <StatusProvider>
     <div className="flex min-h-screen bg-bg">
       <Sidebar
         current={page}
@@ -116,5 +118,6 @@ export default function App() {
         <NotificationsPage currentProfile={profile} onRead={loadUnread} />
       )}
     </div>
+    </StatusProvider>
   )
 }

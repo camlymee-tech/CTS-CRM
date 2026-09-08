@@ -1,37 +1,29 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Link2, Store, Users2, Trash2 } from 'lucide-react'
+import { Plus, Search, Link2, Store, Users2, Trash2, Settings2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import CustomerForm from './CustomerForm'
 import CustomerDetail from './CustomerDetail'
+import StatusesModal from './StatusesModal'
+import { useTrangThai } from '../lib/StatusContext'
 import {
   NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS,
   LOAI_KHACH_OPTIONS,
   NGUON_KHACH_OPTIONS,
-  TRANG_THAI_OPTIONS,
-  TT_DA_KY,
   classOf,
   labelOf,
 } from '../lib/constants'
 
 // Khách "chung" — cả team đều xem được (khớp với hàm la_khach_chung trong database)
-function laKhachChung(c) {
-  const moc = c.ngay_lien_he_gan_nhat || (c.created_at || '').slice(0, 10)
-  const soNgay = moc ? Math.floor((Date.now() - new Date(moc).getTime()) / 86400000) : 999
-  switch (c.trang_thai_cham_soc) {
-    case 'hoan_thanh': return true            // hoàn thành dịch vụ -> mở cho cả team
-    case 'khong_nghe_may': return soNgay >= 5
-    case 'dang_tu_van': return soNgay >= 30
-    case 'tu_choi': return soNgay >= 15
-    default: return false                     // chưa liên hệ, chốt HĐ, đang triển khai -> riêng
-  }
-}
+
 
 const chiSo = (s) => (s || '').replace(/\D/g, '')
 
 
 export default function CustomerList({ currentProfile, onChotDon }) {
+  const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung } = useTrangThai()
+  const [quanLyTT, setQuanLyTT] = useState(false)
   const [customers, setCustomers] = useState([])
   const [phoneHits, setPhoneHits] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -136,10 +128,10 @@ export default function CustomerList({ currentProfile, onChotDon }) {
 
   const demTheoTrangThai = useMemo(() => {
     const m = {}
-    for (const o of TRANG_THAI_OPTIONS) m[o.value] = 0
+    for (const o of TRANG_THAI) m[o.ma] = 0
     for (const c of nenDem) if (m[c.trang_thai_cham_soc] !== undefined) m[c.trang_thai_cham_soc] += 1
     return m
-  }, [nenDem])
+  }, [nenDem, TRANG_THAI])
 
 
   const profileName = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
@@ -151,19 +143,26 @@ export default function CustomerList({ currentProfile, onChotDon }) {
           <h1 className="font-display text-xl font-bold text-navy-900">Khách hàng</h1>
           <p className="text-sm text-ink-600">Quản lý & phân loại toàn bộ khách hàng của team sale</p>
         </div>
-        <Button onClick={() => { setEditingCustomer(null); setShowForm(true) }}>
-          <Plus size={16} /> Thêm khách hàng
-        </Button>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Button variant="secondary" onClick={() => setQuanLyTT(true)}>
+              <Settings2 size={16} /> Trạng thái
+            </Button>
+          )}
+          <Button onClick={() => { setEditingCustomer(null); setShowForm(true) }}>
+            <Plus size={16} /> Thêm khách hàng
+          </Button>
+        </div>
       </header>
 
-      <div className="grid grid-cols-7 gap-3 px-8 pt-6">
-        {TRANG_THAI_OPTIONS.map((o) => (
+      <div className="grid gap-3 px-8 pt-6" style={{ gridTemplateColumns: `repeat(${Math.min(TRANG_THAI.length, 7)}, minmax(0, 1fr))` }}>
+        {TRANG_THAI.map((o) => (
           <StatCard
-            key={o.value}
-            label={o.label}
-            value={demTheoTrangThai[o.value] || 0}
-            active={filterTrangThai === o.value}
-            onClick={() => setFilterTrangThai(filterTrangThai === o.value ? '' : o.value)}
+            key={o.ma}
+            label={o.ten}
+            value={demTheoTrangThai[o.ma] || 0}
+            active={filterTrangThai === o.ma}
+            onClick={() => setFilterTrangThai(filterTrangThai === o.ma ? '' : o.ma)}
           />
         ))}
       </div>
@@ -184,7 +183,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
           </Select>
           <Select value={filterTrangThai} onChange={(e) => setFilterTrangThai(e.target.value)} className="w-48">
             <option value="">Tất cả trạng thái</option>
-            {TRANG_THAI_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
           </Select>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -298,8 +297,8 @@ export default function CustomerList({ currentProfile, onChotDon }) {
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge className={classOf(TRANG_THAI_OPTIONS, c.trang_thai_cham_soc)}>
-                      {labelOf(TRANG_THAI_OPTIONS, c.trang_thai_cham_soc)}
+                    <Badge className={classTrangThai(c.trang_thai_cham_soc)}>
+                      {tenTrangThai(c.trang_thai_cham_soc)}
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-ink-600">{profileName(c.sale_id)}</td>
@@ -319,6 +318,8 @@ export default function CustomerList({ currentProfile, onChotDon }) {
           </tbody>
         </table>
       </div>
+
+      {quanLyTT && <StatusesModal onClose={() => setQuanLyTT(false)} />}
 
       {showForm && (
         <CustomerForm
