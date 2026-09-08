@@ -3,6 +3,7 @@ import { Phone, CalendarCheck, CalendarClock, CircleAlert, CircleCheck } from 'l
 import { supabase } from '../supabaseClient'
 import { Select, Badge } from './ui'
 import CustomerDetail from './CustomerDetail'
+import ChecklistTasks from './ChecklistTasks'
 import {
   TRANG_THAI_OPTIONS, DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, TT_DA_KY,
   classOf, labelOf,
@@ -81,12 +82,14 @@ export default function ChecklistPage({ currentProfile }) {
         <p className="py-16 text-center text-ink-400">Đang tải...</p>
       ) : (
         <div className="space-y-4 p-8">
+          <ChecklistTasks currentProfile={currentProfile} />
+
           {canLam.length === 0 ? (
             <div className="rounded-2xl bg-white p-10 text-center shadow-sm">
               <CircleCheck size={40} className="mx-auto text-emerald-500" />
-              <p className="mt-3 font-display text-lg font-semibold text-navy-900">Hết việc hôm nay</p>
+              <p className="mt-3 font-display text-lg font-semibold text-navy-900">Không có khách đến hạn</p>
               <p className="mt-1 text-sm text-ink-600">
-                Không có khách nào đến hạn chăm sóc. Nhớ đặt lịch hẹn khi ghi lịch sử chăm sóc để không bỏ sót khách.
+                Nhớ đặt lịch hẹn khi ghi lịch sử chăm sóc để không bỏ sót khách.
               </p>
             </div>
           ) : (
