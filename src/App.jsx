@@ -12,6 +12,7 @@ import OrdersPage from './components/OrdersPage'
 import ReportsPage from './components/ReportsPage'
 import ContractsPage from './components/ContractsPage'
 import ChecklistPage from './components/ChecklistPage'
+import PricingPage from './components/PricingPage'
 import AnalyticsPage from './components/AnalyticsPage'
 
 export default function App() {
@@ -113,6 +114,7 @@ export default function App() {
       {page === 'reports' && <ReportsPage />}
       {page === 'analytics' && <AnalyticsPage />}
       {page === 'team' && <TeamPage currentProfile={profile} />}
+      {page === 'pricing' && <PricingPage currentProfile={profile} />}
       {page === 'documents' && <DocumentsPage currentProfile={profile} />}
       {page === 'notifications' && profile && (
         <NotificationsPage currentProfile={profile} onRead={loadUnread} />

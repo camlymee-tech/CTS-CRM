@@ -1,31 +1,34 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeftRight, Settings2, Plus, Trash2, Pencil, TriangleAlert, Tag } from 'lucide-react'
+import { Calculator, ArrowLeftRight, Settings2, Plus, Trash2, Pencil } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Modal } from './ui'
 import { formatVnd } from '../lib/constants'
-import { tinhToan, timGiaBan, timGiaHoaVon, so } from '../lib/pricing'
-import FeesImportModal from './FeesImportModal'
 
+const so = (v) => Number(String(v).replace(/[^\d.-]/g, '')) || 0
 const nhap = (v) => (v === '' || v === null || v === undefined ? '' : Number(v).toLocaleString('vi-VN'))
 
 export default function PricingPage({ currentProfile }) {
   const [fees, setFees] = useState([])
-  const [cfg, setCfg] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [moBangPhi, setMoBangPhi] = useState(false)
+  const [quanLyPhi, setQuanLyPhi] = useState(false)
+
+  // Chế độ: 'tu_gia_ban' = biết giá bán, tính lợi nhuận | 'tu_loi_nhuan' = muốn lãi bao nhiêu, tính giá bán
   const [cheDo, setCheDo] = useState('tu_gia_ban')
 
   const [nganh1, setNganh1] = useState('')
   const [nganh2, setNganh2] = useState('')
-  const [khoangPhi, setKhoangPhi] = useState(null)
   const [f, setF] = useState({
-    giaNiemYet: '', giamGiaPct: 0, voucherShop: '',
-    giaVon: '', dongGoi: '', chiPhiKhac: '',
-    phiCoDinhPct: '', quangCaoPct: 10, affiliatePct: 0,
-    phiNguoiBanMoi: '',
-    voucherXtra: false, maUuDai: '', freeshipXtra: false, piship: false,
-    coThue: true, nguoiBanMoi: false,
-    bienMongMuon: 20,
+    giaVon: '',
+    dongGoi: '',
+    chiPhiKhac: '',
+    phiSan: '',          // % tự điền theo ngành, sửa được
+    freeshipXtra: false,
+    voucherXtra: false,
+    phiFreeship: 6,
+    phiVoucher: 3,
+    quangCao: 10,        // % trên doanh thu
+    giaBan: '',
+    bienLoiNhuan: 20,    // % mong muốn
   })
 
   const isAdmin = currentProfile?.role === 'admin'
@@ -34,12 +37,9 @@ export default function PricingPage({ currentProfile }) {
 
   async function load() {
     setLoading(true)
-    const [{ data: fs }, { data: st }] = await Promise.all([
-      supabase.from('shopee_fees').select('*').eq('active', true).order('nganh_1').order('nganh_2'),
-      supabase.from('shopee_settings').select('*').eq('id', 1).single(),
-    ])
-    setFees(fs || [])
-    setCfg(st || null)
+    const { data } = await supabase.from('shopee_fees').select('*')
+      .eq('active', true).order('nganh_1').order('nganh_2')
+    setFees(data || [])
     setLoading(false)
   }
 
@@ -49,52 +49,51 @@ export default function PricingPage({ currentProfile }) {
   function chonNganh2(ten) {
     setNganh2(ten)
     const item = fees.find((x) => x.nganh_1 === nganh1 && x.nganh_2 === ten)
-    if (item) {
-      setF((o) => ({
-        ...o,
-        phiCoDinhPct: String(item.phi_phan_tram),
-        phiNguoiBanMoi: item.phi_nguoi_ban_moi != null ? String(item.phi_nguoi_ban_moi) : '',
-      }))
-      const coKhoang = item.phi_min != null && item.phi_max != null && item.phi_min !== item.phi_max
-      setKhoangPhi(coKhoang ? { min: item.phi_min, max: item.phi_max } : null)
-    }
+    if (item) setF((old) => ({ ...old, phiSan: String(item.phi_phan_tram) }))
   }
 
-  // Gom dữ liệu cho hàm tính
-  const duLieu = useMemo(() => ({
-    ...f,
-    phiXuLyPct: cfg?.phi_xu_ly ?? 6,
-    phiHaTang: cfg?.phi_ha_tang ?? 3000,
-    vxPct: cfg?.voucher_xtra_pct ?? 4,
-    vxCap: cfg?.voucher_xtra_cap ?? 50000,
-    fsPct: cfg?.freeship_xtra_pct ?? 6,
-    dtdPct: cfg?.dong_tai_tro_pct ?? 30,
-    dtdCap: cfg?.dong_tai_tro_cap ?? 50000,
-    thuePct: cfg?.thue_pct ?? 1.5,
-    pishipPhi: cfg?.piship_phi ?? 2700,
-  }), [f, cfg])
+  // ===== Tính toán =====
+  const kq = useMemo(() => {
+    const giaVon = so(f.giaVon)
+    const dongGoi = so(f.dongGoi)
+    const khac = so(f.chiPhiKhac)
+    const chiPhiCoDinh = giaVon + dongGoi + khac
 
-  const giaDeXuat = useMemo(
-    () => (cheDo === 'tu_loi_nhuan' ? timGiaBan(duLieu, so(f.bienMongMuon)) : 0),
-    [duLieu, cheDo, f.bienMongMuon]
-  )
+    const pctSan = so(f.phiSan)
+    const pctFs = f.freeshipXtra ? so(f.phiFreeship) : 0
+    const pctVc = f.voucherXtra ? so(f.phiVoucher) : 0
+    const pctAds = so(f.quangCao)
+    const tongPct = pctSan + pctFs + pctVc + pctAds   // % tính trên giá bán
 
-  const kq = useMemo(
-    () => tinhToan(cheDo === 'tu_loi_nhuan' ? { ...duLieu, giaNiemYet: giaDeXuat } : duLieu),
-    [duLieu, cheDo, giaDeXuat]
-  )
+    let giaBan = so(f.giaBan)
+    if (cheDo === 'tu_loi_nhuan') {
+      const pctLai = so(f.bienLoiNhuan)
+      const conLai = 100 - tongPct - pctLai
+      giaBan = conLai > 0 ? (chiPhiCoDinh * 100) / conLai : 0
+    }
 
-  const hoaVon = useMemo(() => timGiaHoaVon(duLieu), [duLieu])
+    const tienSan = (giaBan * pctSan) / 100
+    const tienFs = (giaBan * pctFs) / 100
+    const tienVc = (giaBan * pctVc) / 100
+    const tienAds = (giaBan * pctAds) / 100
+    const tongPhi = tienSan + tienFs + tienVc + tienAds
 
-  // So sánh với trường hợp không khuyến mãi
-  const khongSale = useMemo(
-    () => tinhToan({ ...duLieu, giaNiemYet: kq.giaNiemYet, giamGiaPct: 0, voucherShop: 0 }),
-    [duLieu, kq.giaNiemYet]
-  )
-  const coSale = so(f.giamGiaPct) > 0 || so(f.voucherShop) > 0
+    const loiNhuan = giaBan - chiPhiCoDinh - tongPhi
+    const bien = giaBan > 0 ? (loiNhuan / giaBan) * 100 : 0
+    const tyLeVon = giaVon > 0 ? (loiNhuan / giaVon) * 100 : 0
+    // Giá hoà vốn: bán dưới mức này là lỗ
+    const hoaVon = tongPct < 100 ? (chiPhiCoDinh * 100) / (100 - tongPct) : 0
 
-  const chuaDu = kq.giaSauGiam <= 0 || kq.chiPhiThat <= 0
+    return {
+      giaVon, dongGoi, khac, chiPhiCoDinh,
+      pctSan, pctFs, pctVc, pctAds, tongPct,
+      giaBan, tienSan, tienFs, tienVc, tienAds, tongPhi,
+      loiNhuan, bien, tyLeVon, hoaVon,
+    }
+  }, [f, cheDo])
+
   const lo = kq.loiNhuan < 0
+  const chuaDu = kq.giaBan <= 0 || kq.chiPhiCoDinh <= 0
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -102,11 +101,11 @@ export default function PricingPage({ currentProfile }) {
         <div>
           <h1 className="font-display text-xl font-bold text-navy-900">Tính giá bán Shopee</h1>
           <p className="text-sm text-ink-600">
-            Tính lợi nhuận thực nhận sau phí sàn, khuyến mãi, quảng cáo và thuế
+            Tính lợi nhuận thực nhận sau khi trừ phí sàn, quảng cáo và chi phí vận hành
           </p>
         </div>
         {isAdmin && (
-          <Button variant="secondary" onClick={() => setMoBangPhi(true)}>
+          <Button variant="secondary" onClick={() => setQuanLyPhi(true)}>
             <Settings2 size={16} /> Bảng phí sàn
           </Button>
         )}
@@ -116,144 +115,62 @@ export default function PricingPage({ currentProfile }) {
         <p className="py-16 text-center text-ink-400">Đang tải...</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 p-8 lg:grid-cols-2">
-          {/* ===== NHẬP LIỆU ===== */}
+          {/* ===== CỘT NHẬP LIỆU ===== */}
           <div className="space-y-4">
             <Panel title="Ngành hàng">
               <div className="grid grid-cols-2 gap-3">
-                <Select label="Cấp 1" value={nganh1}
+                <Select label="Ngành hàng cấp 1" value={nganh1}
                   onChange={(e) => { setNganh1(e.target.value); setNganh2('') }}>
                   <option value="">-- Chọn --</option>
                   {nganhCap1.map((n) => <option key={n} value={n}>{n}</option>)}
                 </Select>
-                <Select label="Cấp 2" value={nganh2} disabled={!nganh1}
+                <Select label="Ngành hàng cấp 2" value={nganh2} disabled={!nganh1}
                   onChange={(e) => chonNganh2(e.target.value)}>
                   <option value="">{nganh1 ? '-- Chọn --' : 'Chọn cấp 1 trước'}</option>
-                  {nganhCap2.map((n) => (
-                    <option key={n.id} value={n.nganh_2}>{n.nganh_2} — {n.phi_phan_tram}%</option>
-                  ))}
+                  {nganhCap2.map((n) => <option key={n.id} value={n.nganh_2}>{n.nganh_2} — {n.phi_phan_tram}%</option>)}
                 </Select>
               </div>
             </Panel>
 
-            <Panel title="Chi phí thật của sản phẩm">
+            <Panel title="Chi phí sản phẩm">
               <div className="space-y-3">
-                <OTien label="Giá vốn / giá nhập" value={f.giaVon} onChange={(v) => setF({ ...f, giaVon: v })} />
-                <OTien label="Đóng gói, nhân công" value={f.dongGoi} onChange={(v) => setF({ ...f, dongGoi: v })} />
-                <OTien label="Chi phí khác" value={f.chiPhiKhac} onChange={(v) => setF({ ...f, chiPhiKhac: v })}
-                  goiY="Kho bãi, hàng hỏng, dự phòng đổi trả..." />
+                <OTien label="Giá vốn / giá nhập" value={f.giaVon}
+                  onChange={(v) => setF({ ...f, giaVon: v })} />
+                <OTien label="Đóng gói, nhân công" value={f.dongGoi}
+                  onChange={(v) => setF({ ...f, dongGoi: v })} />
+                <OTien label="Chi phí khác" value={f.chiPhiKhac}
+                  onChange={(v) => setF({ ...f, chiPhiKhac: v })}
+                  goiY="Kho bãi, đổi trả, hàng hỏng..." />
               </div>
             </Panel>
 
-            <Panel title={
-              <span className="inline-flex items-center gap-2">
-                <Tag size={15} className="text-coral-500" /> Khuyến mãi đang chạy
-              </span>
-            }>
+            <Panel title="Phí trên doanh thu">
               <div className="space-y-3">
-                <div>
-                  <div className="mb-1.5 flex items-baseline justify-between text-sm">
-                    <span className="font-medium text-navy-900">Giảm giá chương trình</span>
-                    <span className="font-display font-bold text-coral-500">{so(f.giamGiaPct)}%</span>
-                  </div>
-                  <input type="range" min="0" max="70" step="1" value={f.giamGiaPct}
-                    onChange={(e) => setF({ ...f, giamGiaPct: e.target.value })}
-                    className="w-full accent-coral-500" />
-                  <div className="mt-1 flex gap-1.5">
-                    {[0, 10, 20, 30, 50].map((p) => (
-                      <button key={p} type="button" onClick={() => setF({ ...f, giamGiaPct: p })}
-                        className={`rounded-md px-2 py-0.5 text-xs transition ${
-                          so(f.giamGiaPct) === p ? 'bg-coral-500 text-white' : 'bg-slate-100 text-ink-600 hover:bg-slate-200'
-                        }`}>
-                        {p === 0 ? 'Ngày thường' : `-${p}%`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <OPhanTram label="Phí cố định sàn" value={f.phiSan}
+                  onChange={(v) => setF({ ...f, phiSan: v })}
+                  goiY={nganh2 ? 'Tự điền theo ngành hàng, sửa được' : 'Chọn ngành hàng để tự điền'} />
+                <OPhanTram label="Chi phí quảng cáo" value={f.quangCao}
+                  onChange={(v) => setF({ ...f, quangCao: v })}
+                  goiY="Ước tính ads chiếm bao nhiêu % doanh thu" />
 
-                <OTien label="Mã giảm giá của shop" value={f.voucherShop}
-                  onChange={(v) => setF({ ...f, voucherShop: v })}
-                  goiY="Số tiền shop tự giảm thêm cho khách" />
-              </div>
-            </Panel>
-
-            <Panel title="Phí sàn & dịch vụ">
-              <div className="space-y-3">
-                <OPhanTram label="Phí cố định ngành hàng" value={f.phiCoDinhPct}
-                  onChange={(v) => setF({ ...f, phiCoDinhPct: v })}
-                  goiY={khoangPhi
-                    ? `Shopee công bố khoảng ${khoangPhi.min}% – ${khoangPhi.max}%. Đang lấy mức cao nhất cho an toàn, sửa được.`
-                    : nganh2 ? 'Tự điền theo ngành hàng, sửa được' : 'Chọn ngành hàng để tự điền'} />
-
-                <label className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm">
-                  <input type="checkbox" checked={f.nguoiBanMoi} className="mt-0.5 h-4 w-4 rounded border-slate-300"
-                    onChange={(e) => setF({ ...f, nguoiBanMoi: e.target.checked })} />
-                  <span className="flex-1">
-                    <b className="text-navy-900">Ưu đãi người bán mới</b>
-                    <span className="block text-xs text-emerald-800">
-                      Đăng sản phẩm đầu 01/01–31/05/2026 · áp dụng 01/06–31/08/2026.
-                      Áp mức Shopee công bố riêng cho từng ngành hàng.
-                      {kq.phiCoDinhPct !== kq.phiCoDinhGoc &&
-                        ` Đang tính ${kq.phiCoDinhPct}% thay vì ${kq.phiCoDinhGoc}%.`}
-                    </span>
-                  </span>
-                </label>
-
-                <div className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-ink-600">
-                  Phí xử lý giao dịch <b className="text-navy-900">{duLieu.phiXuLyPct}%</b> và
-                  phí hạ tầng <b className="text-navy-900">{formatVnd(duLieu.phiHaTang)}/đơn</b> luôn được tính tự động.
-                </div>
-
-                <label className="flex items-start gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm">
-                  <input type="checkbox" checked={f.voucherXtra} className="mt-0.5 h-4 w-4 rounded border-slate-300"
-                    onChange={(e) => setF({ ...f, voucherXtra: e.target.checked })} />
-                  <span className="flex-1">
-                    <b className="text-navy-900">Gói Voucher Xtra</b>
-                    <span className="block text-xs text-ink-600">
-                      {duLieu.vxPct}% giá trị sản phẩm, tối đa {formatVnd(duLieu.vxCap)}
-                    </span>
-                  </span>
-                </label>
-
-                {!f.voucherXtra && (
-                  <OTien label="Mã ưu đãi Shopee áp lên sản phẩm" value={f.maUuDai}
-                    onChange={(v) => setF({ ...f, maUuDai: v })}
-                    goiY={`Không tham gia Voucher Xtra thì shop đồng tài trợ ${duLieu.dtdPct}% giá trị mã, tối đa ${formatVnd(duLieu.dtdCap)}`} />
-                )}
-
-                <label className="flex items-start gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm">
-                  <input type="checkbox" checked={f.freeshipXtra} className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5">
+                  <input type="checkbox" checked={f.freeshipXtra} className="h-4 w-4 rounded border-slate-300"
                     onChange={(e) => setF({ ...f, freeshipXtra: e.target.checked })} />
-                  <span className="flex-1">
-                    <b className="text-navy-900">Freeship Xtra</b>
-                    <span className="block text-xs text-ink-600">{duLieu.fsPct}% giá trị sản phẩm</span>
-                  </span>
+                  <span className="flex-1 text-sm text-navy-900">Freeship Xtra</span>
+                  <input type="number" step="0.1" value={f.phiFreeship} disabled={!f.freeshipXtra}
+                    onChange={(e) => setF({ ...f, phiFreeship: e.target.value })}
+                    className="w-16 rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50" />
+                  <span className="text-sm text-ink-400">%</span>
                 </label>
 
-                <label className="flex items-start gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm">
-                  <input type="checkbox" checked={f.piship} className="mt-0.5 h-4 w-4 rounded border-slate-300"
-                    onChange={(e) => setF({ ...f, piship: e.target.checked })} />
-                  <span className="flex-1">
-                    <b className="text-navy-900">Gói PiShip</b>
-                    <span className="block text-xs text-ink-600">
-                      Tiết kiệm vận chuyển · {formatVnd(duLieu.pishipPhi)}/đơn
-                    </span>
-                  </span>
-                </label>
-
-                <OPhanTram label="Hoa hồng tiếp thị liên kết" value={f.affiliatePct}
-                  onChange={(v) => setF({ ...f, affiliatePct: v })} goiY="Affiliate / KOC, để 0 nếu không chạy" />
-                <OPhanTram label="Ngân sách quảng cáo" value={f.quangCaoPct}
-                  onChange={(v) => setF({ ...f, quangCaoPct: v })} goiY="Ads chiếm bao nhiêu % doanh thu" />
-
-                <label className="flex items-start gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm">
-                  <input type="checkbox" checked={f.coThue} className="mt-0.5 h-4 w-4 rounded border-slate-300"
-                    onChange={(e) => setF({ ...f, coThue: e.target.checked })} />
-                  <span className="flex-1">
-                    <b className="text-navy-900">Trừ thuế</b>
-                    <span className="block text-xs text-ink-600">
-                      {duLieu.thuePct}% doanh thu (hộ kinh doanh: 1% GTGT + 0,5% TNCN)
-                    </span>
-                  </span>
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5">
+                  <input type="checkbox" checked={f.voucherXtra} className="h-4 w-4 rounded border-slate-300"
+                    onChange={(e) => setF({ ...f, voucherXtra: e.target.checked })} />
+                  <span className="flex-1 text-sm text-navy-900">Voucher Xtra</span>
+                  <input type="number" step="0.1" value={f.phiVoucher} disabled={!f.voucherXtra}
+                    onChange={(e) => setF({ ...f, phiVoucher: e.target.value })}
+                    className="w-16 rounded border border-slate-200 px-2 py-1 text-right text-sm disabled:bg-slate-50" />
+                  <span className="text-sm text-ink-400">%</span>
                 </label>
               </div>
             </Panel>
@@ -266,103 +183,71 @@ export default function PricingPage({ currentProfile }) {
               </button>
             }>
               {cheDo === 'tu_gia_ban' ? (
-                <OTien label="Giá niêm yết trên sàn" value={f.giaNiemYet}
-                  onChange={(v) => setF({ ...f, giaNiemYet: v })}
-                  goiY="Giá gốc trước khi áp khuyến mãi" />
+                <OTien label="Giá bán trên sàn" value={f.giaBan}
+                  onChange={(v) => setF({ ...f, giaBan: v })} />
               ) : (
-                <OPhanTram label="Biên lợi nhuận mong muốn" value={f.bienMongMuon}
-                  onChange={(v) => setF({ ...f, bienMongMuon: v })}
-                  goiY="Tính trên số tiền khách thực trả" />
+                <OPhanTram label="Biên lợi nhuận mong muốn" value={f.bienLoiNhuan}
+                  onChange={(v) => setF({ ...f, bienLoiNhuan: v })}
+                  goiY="Lợi nhuận chiếm bao nhiêu % giá bán" />
               )}
             </Panel>
           </div>
 
-          {/* ===== KẾT QUẢ ===== */}
+          {/* ===== CỘT KẾT QUẢ ===== */}
           <div className="space-y-4">
             <div className={`rounded-2xl p-6 shadow-sm ${lo && !chuaDu ? 'bg-rose-50' : 'bg-navy-950'}`}>
               <p className={`text-xs font-medium uppercase tracking-wide ${lo && !chuaDu ? 'text-rose-600' : 'text-white/50'}`}>
-                {cheDo === 'tu_loi_nhuan' ? 'Giá niêm yết cần đặt' : 'Lợi nhuận một đơn'}
+                {cheDo === 'tu_loi_nhuan' ? 'Giá bán cần đặt' : 'Lợi nhuận một đơn'}
               </p>
               <p className={`mt-1 font-display text-3xl font-bold ${
                 chuaDu ? 'text-white/40' : lo ? 'text-rose-600' : 'text-white'
               }`}>
-                {chuaDu ? '—' : formatVnd(cheDo === 'tu_loi_nhuan' ? kq.giaNiemYet : kq.loiNhuan)}
+                {chuaDu ? '—' : formatVnd(cheDo === 'tu_loi_nhuan' ? kq.giaBan : kq.loiNhuan)}
               </p>
 
               {!chuaDu && (
-                <div className="mt-4 grid grid-cols-3 gap-3 border-t pt-4"
+                <div className="mt-4 grid grid-cols-2 gap-4 border-t pt-4"
                   style={{ borderColor: lo ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.12)' }}>
-                  <O nhan="Khách trả" gtri={formatVnd(kq.giaSauGiam)} lo={lo} />
-                  <O nhan={cheDo === 'tu_loi_nhuan' ? 'Lợi nhuận' : 'Biên lợi nhuận'}
-                    gtri={cheDo === 'tu_loi_nhuan' ? formatVnd(kq.loiNhuan) : kq.bien.toFixed(1).replace('.', ',') + '%'} lo={lo} />
-                  <O nhan="Lãi trên vốn" gtri={kq.tyLeVon.toFixed(1).replace('.', ',') + '%'} lo={lo} />
+                  <div>
+                    <p className={`text-xs ${lo ? 'text-rose-500' : 'text-white/50'}`}>
+                      {cheDo === 'tu_loi_nhuan' ? 'Lợi nhuận' : 'Biên lợi nhuận'}
+                    </p>
+                    <p className={`font-display text-lg font-bold ${lo ? 'text-rose-600' : 'text-white'}`}>
+                      {cheDo === 'tu_loi_nhuan' ? formatVnd(kq.loiNhuan) : kq.bien.toFixed(1).replace('.', ',') + '%'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className={`text-xs ${lo ? 'text-rose-500' : 'text-white/50'}`}>Lãi trên vốn</p>
+                    <p className={`font-display text-lg font-bold ${lo ? 'text-rose-600' : 'text-white'}`}>
+                      {kq.tyLeVon.toFixed(1).replace('.', ',')}%
+                    </p>
+                  </div>
                 </div>
               )}
 
               {lo && !chuaDu && (
                 <p className="mt-3 text-sm text-rose-700">
-                  Đang lỗ. Giá niêm yết tối thiểu để hoà vốn với mức khuyến mãi này là <b>{formatVnd(hoaVon)}</b>.
+                  Đang lỗ. Giá bán tối thiểu để hoà vốn là <b>{formatVnd(kq.hoaVon)}</b>.
                 </p>
               )}
             </div>
 
-            {coSale && !chuaDu && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                <div className="mb-2 flex items-center gap-2 text-amber-900">
-                  <TriangleAlert size={16} />
-                  <p className="font-display font-semibold">Ngày sale so với ngày thường</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-amber-700">Ngày thường (không giảm)</p>
-                    <p className="font-display text-lg font-bold text-navy-900">{formatVnd(khongSale.loiNhuan)}</p>
-                    <p className="text-xs text-amber-700">biên {khongSale.bien.toFixed(1).replace('.', ',')}%</p>
-                  </div>
-                  <div>
-                    <p className="text-amber-700">Ngày sale hiện tại</p>
-                    <p className={`font-display text-lg font-bold ${lo ? 'text-rose-600' : 'text-navy-900'}`}>
-                      {formatVnd(kq.loiNhuan)}
-                    </p>
-                    <p className="text-xs text-amber-700">biên {kq.bien.toFixed(1).replace('.', ',')}%</p>
-                  </div>
-                </div>
-                <p className="mt-3 text-xs text-amber-800">
-                  Chạy khuyến mãi làm lợi nhuận giảm <b>{formatVnd(khongSale.loiNhuan - kq.loiNhuan)}</b> mỗi đơn.
-                  Cần bán thêm bao nhiêu đơn để bù thì lấy tổng lợi nhuận mục tiêu chia cho con số ngày sale.
-                </p>
-              </div>
-            )}
-
             <Panel title="Chi tiết dòng tiền">
               {chuaDu ? (
                 <p className="py-6 text-center text-sm text-ink-400">
-                  Nhập giá vốn và {cheDo === 'tu_gia_ban' ? 'giá niêm yết' : 'biên lợi nhuận'} để xem chi tiết.
+                  Nhập giá vốn và {cheDo === 'tu_gia_ban' ? 'giá bán' : 'biên lợi nhuận'} để xem chi tiết.
                 </p>
               ) : (
                 <table className="w-full text-sm">
                   <tbody>
-                    <Dong nhan="Giá niêm yết" tien={kq.giaNiemYet} dam />
-                    {kq.giamGia > 0 && <Dong nhan={`Giảm giá chương trình (${so(f.giamGiaPct)}%)`} tien={-kq.giamGia} />}
-                    {kq.voucherShop > 0 && <Dong nhan="Mã giảm của shop" tien={-kq.voucherShop} />}
-                    <tr className="border-t border-slate-100 bg-slate-50">
-                      <td className="py-2 pl-2 font-medium text-navy-900">Khách thực trả</td>
-                      <td className="py-2 pr-2 text-right font-medium text-navy-900">{formatVnd(kq.giaSauGiam)}</td>
-                    </tr>
+                    <Dong nhan="Giá bán" tien={kq.giaBan} dam />
                     <Dong nhan="Giá vốn" tien={-kq.giaVon} />
                     {kq.dongGoi > 0 && <Dong nhan="Đóng gói, nhân công" tien={-kq.dongGoi} />}
-                    {kq.chiPhiKhac > 0 && <Dong nhan="Chi phí khác" tien={-kq.chiPhiKhac} />}
-                    <Dong nhan={`Phí cố định (${kq.phiCoDinhPct}%${
-                      kq.phiCoDinhPct !== kq.phiCoDinhGoc ? ` — ưu đãi từ ${kq.phiCoDinhGoc}%` : ''
-                    })`} tien={-kq.phiCoDinh} />
-                    <Dong nhan={`Phí xử lý giao dịch (${duLieu.phiXuLyPct}%)`} tien={-kq.phiXuLy} />
-                    <Dong nhan="Phí hạ tầng" tien={-kq.phiHaTang} />
-                    {kq.phiVoucherXtra > 0 && <Dong nhan="Voucher Xtra" tien={-kq.phiVoucherXtra} />}
-                    {kq.phiDongTaiTro > 0 && <Dong nhan="Đồng tài trợ mã ưu đãi" tien={-kq.phiDongTaiTro} />}
-                    {kq.phiFreeship > 0 && <Dong nhan="Freeship Xtra" tien={-kq.phiFreeship} />}
-                    {kq.phiPiShip > 0 && <Dong nhan="Gói PiShip" tien={-kq.phiPiShip} />}
-                    {kq.phiAffiliate > 0 && <Dong nhan={`Tiếp thị liên kết (${so(f.affiliatePct)}%)`} tien={-kq.phiAffiliate} />}
-                    {kq.phiQuangCao > 0 && <Dong nhan={`Quảng cáo (${so(f.quangCaoPct)}%)`} tien={-kq.phiQuangCao} />}
-                    {kq.thue > 0 && <Dong nhan={`Thuế (${duLieu.thuePct}%)`} tien={-kq.thue} />}
+                    {kq.khac > 0 && <Dong nhan="Chi phí khác" tien={-kq.khac} />}
+                    <Dong nhan={`Phí cố định sàn (${kq.pctSan}%)`} tien={-kq.tienSan} />
+                    {kq.pctFs > 0 && <Dong nhan={`Freeship Xtra (${kq.pctFs}%)`} tien={-kq.tienFs} />}
+                    {kq.pctVc > 0 && <Dong nhan={`Voucher Xtra (${kq.pctVc}%)`} tien={-kq.tienVc} />}
+                    {kq.pctAds > 0 && <Dong nhan={`Quảng cáo (${kq.pctAds}%)`} tien={-kq.tienAds} />}
                     <tr className="border-t-2 border-slate-200">
                       <td className="py-2.5 font-semibold text-navy-900">Còn lại</td>
                       <td className={`py-2.5 text-right font-display font-bold ${lo ? 'text-rose-600' : 'text-emerald-600'}`}>
@@ -375,36 +260,25 @@ export default function PricingPage({ currentProfile }) {
             </Panel>
 
             {!chuaDu && (
-              <Panel title="Giá niêm yết theo mức lãi mong muốn">
-                <p className="mb-2 text-xs text-ink-400">
-                  Đã tính sẵn mức khuyến mãi {so(f.giamGiaPct)}% đang chọn.
-                </p>
+              <Panel title="Mốc giá tham khảo">
                 <div className="space-y-2 text-sm">
-                  <MocGia nhan="Hoà vốn" tien={hoaVon} />
-                  {[10, 20, 30].map((p) => (
-                    <MocGia key={p} nhan={`Lãi ${p}%`} tien={timGiaBan(duLieu, p)} />
-                  ))}
+                  <MocGia nhan="Hoà vốn (không lãi không lỗ)" tien={kq.hoaVon} />
+                  {[10, 20, 30].map((p) => {
+                    const g = 100 - kq.tongPct - p > 0 ? (kq.chiPhiCoDinh * 100) / (100 - kq.tongPct - p) : 0
+                    return <MocGia key={p} nhan={`Lãi ${p}% giá bán`} tien={g} />
+                  })}
                 </div>
+                <p className="mt-3 text-xs text-ink-400">
+                  Tổng phí đang tính: {kq.tongPct.toFixed(2).replace('.', ',')}% doanh thu.
+                  Phần trăm phí càng cao thì giá bán cần đặt càng xa giá vốn.
+                </p>
               </Panel>
-            )}
-
-            {cfg?.ghi_chu && (
-              <p className="px-1 text-xs text-ink-400">{cfg.ghi_chu}</p>
             )}
           </div>
         </div>
       )}
 
-      {moBangPhi && <FeesModal cfg={cfg} onClose={() => { setMoBangPhi(false); load() }} />}
-    </div>
-  )
-}
-
-function O({ nhan, gtri, lo }) {
-  return (
-    <div>
-      <p className={`text-xs ${lo ? 'text-rose-500' : 'text-white/50'}`}>{nhan}</p>
-      <p className={`font-display text-base font-bold ${lo ? 'text-rose-600' : 'text-white'}`}>{gtri}</p>
+      {quanLyPhi && <FeesModal onClose={() => { setQuanLyPhi(false); load() }} />}
     </div>
   )
 }
@@ -422,7 +296,7 @@ function Dong({ nhan, tien, dam }) {
   return (
     <tr className="border-t border-slate-50">
       <td className={`py-2 ${dam ? 'font-medium text-navy-900' : 'text-ink-600'}`}>{nhan}</td>
-      <td className={`py-2 text-right ${dam ? 'font-medium text-navy-900' : 'text-ink-600'}`}>
+      <td className={`py-2 text-right ${dam ? 'font-medium text-navy-900' : tien < 0 ? 'text-ink-600' : 'text-navy-900'}`}>
         {tien < 0 ? '− ' : ''}{formatVnd(Math.abs(tien))}
       </td>
     </tr>
@@ -443,8 +317,9 @@ function OTien({ label, value, onChange, goiY }) {
     <label className="flex flex-col gap-1.5 text-sm">
       <span className="font-medium text-navy-900">{label}</span>
       <div className="relative">
-        <input type="text" inputMode="numeric" value={nhap(value)} placeholder="0"
+        <input type="text" inputMode="numeric" value={nhap(value)}
           onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+          placeholder="0"
           className="w-full rounded-lg border border-slate-200 px-3 py-2 pr-8 text-right text-sm outline-none focus:border-coral-500" />
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">đ</span>
       </div>
@@ -458,8 +333,9 @@ function OPhanTram({ label, value, onChange, goiY }) {
     <label className="flex flex-col gap-1.5 text-sm">
       <span className="font-medium text-navy-900">{label}</span>
       <div className="relative">
-        <input type="number" step="0.01" value={value} placeholder="0"
+        <input type="number" step="0.01" value={value}
           onChange={(e) => onChange(e.target.value)}
+          placeholder="0"
           className="w-full rounded-lg border border-slate-200 px-3 py-2 pr-8 text-right text-sm outline-none focus:border-coral-500" />
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">%</span>
       </div>
@@ -468,13 +344,12 @@ function OPhanTram({ label, value, onChange, goiY }) {
   )
 }
 
-// ===================== QUẢN LÝ BẢNG PHÍ =====================
-function FeesModal({ cfg, onClose }) {
-  const [tab, setTab] = useState('chung')
+function FeesModal({ onClose }) {
   const [fees, setFees] = useState([])
   const [loading, setLoading] = useState(true)
   const [tim, setTim] = useState('')
   const [editing, setEditing] = useState(null)
+  const [msg, setMsg] = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -491,138 +366,60 @@ function FeesModal({ cfg, onClose }) {
     load()
   }
 
-  const loc = fees.filter((x) => !tim || `${x.nganh_1} ${x.nganh_2}`.toLowerCase().includes(tim.toLowerCase()))
+  const loc = fees.filter((x) =>
+    !tim || `${x.nganh_1} ${x.nganh_2}`.toLowerCase().includes(tim.toLowerCase()))
 
   return (
-    <Modal title="Bảng phí sàn Shopee" onClose={onClose} wide>
-      <div className="mb-4 flex gap-1 border-b border-slate-100">
-        {[['chung', 'Phí chung'], ['nganh', `Phí theo ngành hàng (${fees.length})`], ['nhap', 'Nhập từ file']].map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${
-              tab === k ? 'border-coral-500 font-medium text-navy-900' : 'border-transparent text-ink-600'
-            }`}>{l}</button>
-        ))}
-      </div>
-
-      {tab === 'chung' ? (
-        <SettingsForm cfg={cfg} onSaved={onClose} />
-      ) : tab === 'nhap' ? (
-        <FeesImportModal onXong={onClose} />
-      ) : (
-        <>
-          <div className="mb-3 flex gap-2">
-            <Input placeholder="Tìm ngành hàng..." value={tim} onChange={(e) => setTim(e.target.value)} className="flex-1" />
-            <Button type="button" variant="secondary" className="flex-none"
-              onClick={() => setEditing({ nganh_1: '', nganh_2: '', phi_phan_tram: '', ap_dung_tu: '' })}>
-              <Plus size={15} /> Thêm
-            </Button>
-          </div>
-
-          {loading ? <p className="text-sm text-ink-400">Đang tải...</p> : (
-            <div className="max-h-[45vh] space-y-1 overflow-y-auto">
-              {loc.map((x) => (
-                <div key={x.id} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-navy-900">{x.nganh_2}</p>
-                    <p className="text-xs text-ink-400">
-                      {x.nganh_1}{x.ap_dung_tu ? ` · áp dụng từ ${x.ap_dung_tu}` : ''}
-                    </p>
-                  </div>
-                  <Badge className="bg-coral-50 text-coral-600">{x.phi_phan_tram}%</Badge>
-                  <button onClick={() => setEditing(x)} className="text-ink-400 hover:text-coral-500"><Pencil size={14} /></button>
-                  <button onClick={() => xoa(x)} className="text-ink-400 hover:text-rose-500"><Trash2 size={14} /></button>
-                </div>
-              ))}
-              {loc.length === 0 && <p className="py-6 text-center text-sm text-ink-400">Không tìm thấy ngành hàng.</p>}
-            </div>
-          )}
-
-          {editing && (
-            <FeeForm phi={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />
-          )}
-        </>
-      )}
-    </Modal>
-  )
-}
-
-function SettingsForm({ cfg, onSaved }) {
-  const [form, setForm] = useState({
-    phi_xu_ly: cfg?.phi_xu_ly ?? 6,
-    phi_ha_tang: cfg?.phi_ha_tang ?? 3000,
-    voucher_xtra_pct: cfg?.voucher_xtra_pct ?? 4,
-    voucher_xtra_cap: cfg?.voucher_xtra_cap ?? 50000,
-    freeship_xtra_pct: cfg?.freeship_xtra_pct ?? 6,
-    dong_tai_tro_pct: cfg?.dong_tai_tro_pct ?? 30,
-    dong_tai_tro_cap: cfg?.dong_tai_tro_cap ?? 50000,
-    thue_pct: cfg?.thue_pct ?? 1.5,
-    piship_phi: cfg?.piship_phi ?? 2700,
-    ghi_chu: cfg?.ghi_chu ?? '',
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  async function submit(e) {
-    e.preventDefault()
-    setSaving(true); setError('')
-    const { error } = await supabase.from('shopee_settings')
-      .update({ ...form, cap_nhat_luc: new Date().toISOString() }).eq('id', 1)
-    setSaving(false)
-    if (error) { setError(error.message); return }
-    onSaved()
-  }
-
-  const O = ({ nhan, khoa, don = '%', step = '0.01' }) => (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium text-navy-900">{nhan}</span>
-      <div className="relative">
-        <input type="number" step={step} value={form[khoa]}
-          onChange={(e) => setForm({ ...form, [khoa]: e.target.value })}
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 pr-9 text-right text-sm outline-none focus:border-coral-500" />
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">{don}</span>
-      </div>
-    </label>
-  )
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-3">
-      <p className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-ink-600">
-        Shopee đổi biểu phí theo từng đợt. Khi có thông báo mới, chị cập nhật ở đây là toàn bộ bảng tính chạy theo.
+    <Modal title="Bảng phí cố định theo ngành hàng" onClose={onClose} wide>
+      <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-ink-600">
+        Shopee thay đổi biểu phí theo từng đợt. Khi có bảng phí mới, chị sửa trực tiếp ở đây.
       </p>
 
-      <div className="grid grid-cols-2 gap-3">
-        <O nhan="Phí xử lý giao dịch" khoa="phi_xu_ly" />
-        <O nhan="Phí hạ tầng mỗi đơn" khoa="phi_ha_tang" don="đ" step="500" />
-        <O nhan="Voucher Xtra" khoa="voucher_xtra_pct" />
-        <O nhan="Voucher Xtra tối đa" khoa="voucher_xtra_cap" don="đ" step="1000" />
-        <O nhan="Freeship Xtra" khoa="freeship_xtra_pct" />
-        <O nhan="Shop đồng tài trợ mã" khoa="dong_tai_tro_pct" />
-        <O nhan="Đồng tài trợ tối đa" khoa="dong_tai_tro_cap" don="đ" step="1000" />
-        <O nhan="Thuế trên doanh thu" khoa="thue_pct" />
-        <O nhan="Gói PiShip mỗi đơn" khoa="piship_phi" don="đ" step="100" />
+      {msg && <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600">{msg}</p>}
+
+      <div className="mb-3 flex gap-2">
+        <Input placeholder="Tìm ngành hàng..." value={tim} onChange={(e) => setTim(e.target.value)} className="flex-1" />
+        <Button type="button" variant="secondary" className="flex-none"
+          onClick={() => setEditing({ nganh_1: '', nganh_2: '', phi_phan_tram: '' })}>
+          <Plus size={15} /> Thêm
+        </Button>
       </div>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-navy-900">Ghi chú hiệu lực</span>
-        <textarea rows={3} value={form.ghi_chu}
-          onChange={(e) => setForm({ ...form, ghi_chu: e.target.value })}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500" />
-      </label>
+      {loading ? <p className="text-sm text-ink-400">Đang tải...</p> : (
+        <div className="max-h-[45vh] space-y-1 overflow-y-auto">
+          {loc.map((x) => (
+            <div key={x.id} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-navy-900">{x.nganh_2}</p>
+                <p className="text-xs text-ink-400">{x.nganh_1}</p>
+              </div>
+              <Badge className="bg-coral-50 text-coral-600">{x.phi_phan_tram}%</Badge>
+              <button onClick={() => setEditing(x)} className="text-ink-400 hover:text-coral-500">
+                <Pencil size={14} />
+              </button>
+              <button onClick={() => xoa(x)} className="text-ink-400 hover:text-rose-500">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          {loc.length === 0 && <p className="py-6 text-center text-sm text-ink-400">Không tìm thấy ngành hàng.</p>}
+        </div>
+      )}
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
-
-      <div className="flex justify-end">
-        <Button type="submit" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu tham số phí'}</Button>
-      </div>
-    </form>
+      {editing && (
+        <FeeForm phi={editing} onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load() }} />
+      )}
+    </Modal>
   )
 }
 
 function FeeForm({ phi, onClose, onSaved }) {
   const isEdit = !!phi.id
   const [form, setForm] = useState({
-    nganh_1: phi.nganh_1 || '', nganh_2: phi.nganh_2 || '',
-    phi_phan_tram: phi.phi_phan_tram ?? '', ap_dung_tu: phi.ap_dung_tu || '',
+    nganh_1: phi.nganh_1 || '',
+    nganh_2: phi.nganh_2 || '',
+    phi_phan_tram: phi.phi_phan_tram ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -631,9 +428,9 @@ function FeeForm({ phi, onClose, onSaved }) {
     e.preventDefault()
     setSaving(true); setError('')
     const payload = {
-      nganh_1: form.nganh_1.trim(), nganh_2: form.nganh_2.trim(),
+      nganh_1: form.nganh_1.trim(),
+      nganh_2: form.nganh_2.trim(),
       phi_phan_tram: Number(form.phi_phan_tram) || 0,
-      ap_dung_tu: form.ap_dung_tu.trim() || null,
     }
     const { error } = isEdit
       ? await supabase.from('shopee_fees').update(payload).eq('id', phi.id)
@@ -655,8 +452,6 @@ function FeeForm({ phi, onClose, onSaved }) {
           onChange={(e) => setForm({ ...form, nganh_2: e.target.value })} placeholder="VD: Áo thun" />
         <Input label="Phí cố định (%) *" type="number" step="0.01" required value={form.phi_phan_tram}
           onChange={(e) => setForm({ ...form, phi_phan_tram: e.target.value })} placeholder="VD: 11.78" />
-        <Input label="Áp dụng từ" value={form.ap_dung_tu}
-          onChange={(e) => setForm({ ...form, ap_dung_tu: e.target.value })} placeholder="VD: 23/05/2026" />
 
         {error && <p className="text-sm text-rose-600">{error}</p>}
 

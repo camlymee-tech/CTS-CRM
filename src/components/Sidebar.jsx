@@ -1,4 +1,4 @@
-import { Users, FileText, ShoppingBag, BarChart3, LogOut, UserCog, KeyRound, BookOpen, Bell, PieChart, ListChecks } from 'lucide-react'
+import { Users, FileText, ShoppingBag, BarChart3, LogOut, UserCog, KeyRound, BookOpen, Bell, PieChart, ListChecks, Calculator } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 
 const NAV = [
@@ -8,6 +8,7 @@ const NAV = [
   { key: 'contracts', label: 'Hợp đồng', icon: FileText, ready: true },
   { key: 'reports', label: 'Tổng kết doanh số', icon: BarChart3, ready: true },
   { key: 'analytics', label: 'Báo cáo', icon: PieChart, ready: true },
+  { key: 'pricing', label: 'Tính giá bán', icon: Calculator, ready: true },
   { key: 'documents', label: 'Tài liệu', icon: BookOpen, ready: true },
   { key: 'notifications', label: 'Thông báo', icon: Bell, ready: true },
   { key: 'team', label: 'Nhân sự', icon: UserCog, ready: true, adminOnly: true },
