@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Modal } from './ui'
 import { formatVnd } from '../lib/constants'
 import { tinhToan, timGiaBan, timGiaHoaVon, so } from '../lib/pricing'
+import FeesImportModal from './FeesImportModal'
 
 const nhap = (v) => (v === '' || v === null || v === undefined ? '' : Number(v).toLocaleString('vi-VN'))
 
@@ -16,11 +17,14 @@ export default function PricingPage({ currentProfile }) {
 
   const [nganh1, setNganh1] = useState('')
   const [nganh2, setNganh2] = useState('')
+  const [khoangPhi, setKhoangPhi] = useState(null)
   const [f, setF] = useState({
     giaNiemYet: '', giamGiaPct: 0, voucherShop: '',
     giaVon: '', dongGoi: '', chiPhiKhac: '',
     phiCoDinhPct: '', quangCaoPct: 10, affiliatePct: 0,
-    voucherXtra: false, maUuDai: '', freeshipXtra: false, coThue: true,
+    phiNguoiBanMoi: '',
+    voucherXtra: false, maUuDai: '', freeshipXtra: false, piship: false,
+    coThue: true, nguoiBanMoi: false,
     bienMongMuon: 20,
   })
 
@@ -45,7 +49,15 @@ export default function PricingPage({ currentProfile }) {
   function chonNganh2(ten) {
     setNganh2(ten)
     const item = fees.find((x) => x.nganh_1 === nganh1 && x.nganh_2 === ten)
-    if (item) setF((o) => ({ ...o, phiCoDinhPct: String(item.phi_phan_tram) }))
+    if (item) {
+      setF((o) => ({
+        ...o,
+        phiCoDinhPct: String(item.phi_phan_tram),
+        phiNguoiBanMoi: item.phi_nguoi_ban_moi != null ? String(item.phi_nguoi_ban_moi) : '',
+      }))
+      const coKhoang = item.phi_min != null && item.phi_max != null && item.phi_min !== item.phi_max
+      setKhoangPhi(coKhoang ? { min: item.phi_min, max: item.phi_max } : null)
+    }
   }
 
   // Gom dữ liệu cho hàm tính
@@ -59,6 +71,7 @@ export default function PricingPage({ currentProfile }) {
     dtdPct: cfg?.dong_tai_tro_pct ?? 30,
     dtdCap: cfg?.dong_tai_tro_cap ?? 50000,
     thuePct: cfg?.thue_pct ?? 1.5,
+    pishipPhi: cfg?.piship_phi ?? 2700,
   }), [f, cfg])
 
   const giaDeXuat = useMemo(
@@ -167,7 +180,23 @@ export default function PricingPage({ currentProfile }) {
               <div className="space-y-3">
                 <OPhanTram label="Phí cố định ngành hàng" value={f.phiCoDinhPct}
                   onChange={(v) => setF({ ...f, phiCoDinhPct: v })}
-                  goiY={nganh2 ? 'Tự điền theo ngành hàng, sửa được' : 'Chọn ngành hàng để tự điền'} />
+                  goiY={khoangPhi
+                    ? `Shopee công bố khoảng ${khoangPhi.min}% – ${khoangPhi.max}%. Đang lấy mức cao nhất cho an toàn, sửa được.`
+                    : nganh2 ? 'Tự điền theo ngành hàng, sửa được' : 'Chọn ngành hàng để tự điền'} />
+
+                <label className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm">
+                  <input type="checkbox" checked={f.nguoiBanMoi} className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                    onChange={(e) => setF({ ...f, nguoiBanMoi: e.target.checked })} />
+                  <span className="flex-1">
+                    <b className="text-navy-900">Ưu đãi người bán mới</b>
+                    <span className="block text-xs text-emerald-800">
+                      Đăng sản phẩm đầu 01/01–31/05/2026 · áp dụng 01/06–31/08/2026.
+                      Áp mức Shopee công bố riêng cho từng ngành hàng.
+                      {kq.phiCoDinhPct !== kq.phiCoDinhGoc &&
+                        ` Đang tính ${kq.phiCoDinhPct}% thay vì ${kq.phiCoDinhGoc}%.`}
+                    </span>
+                  </span>
+                </label>
 
                 <div className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-ink-600">
                   Phí xử lý giao dịch <b className="text-navy-900">{duLieu.phiXuLyPct}%</b> và
@@ -197,6 +226,17 @@ export default function PricingPage({ currentProfile }) {
                   <span className="flex-1">
                     <b className="text-navy-900">Freeship Xtra</b>
                     <span className="block text-xs text-ink-600">{duLieu.fsPct}% giá trị sản phẩm</span>
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm">
+                  <input type="checkbox" checked={f.piship} className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                    onChange={(e) => setF({ ...f, piship: e.target.checked })} />
+                  <span className="flex-1">
+                    <b className="text-navy-900">Gói PiShip</b>
+                    <span className="block text-xs text-ink-600">
+                      Tiết kiệm vận chuyển · {formatVnd(duLieu.pishipPhi)}/đơn
+                    </span>
                   </span>
                 </label>
 
@@ -311,12 +351,15 @@ export default function PricingPage({ currentProfile }) {
                     <Dong nhan="Giá vốn" tien={-kq.giaVon} />
                     {kq.dongGoi > 0 && <Dong nhan="Đóng gói, nhân công" tien={-kq.dongGoi} />}
                     {kq.chiPhiKhac > 0 && <Dong nhan="Chi phí khác" tien={-kq.chiPhiKhac} />}
-                    <Dong nhan={`Phí cố định (${so(f.phiCoDinhPct)}%)`} tien={-kq.phiCoDinh} />
+                    <Dong nhan={`Phí cố định (${kq.phiCoDinhPct}%${
+                      kq.phiCoDinhPct !== kq.phiCoDinhGoc ? ` — ưu đãi từ ${kq.phiCoDinhGoc}%` : ''
+                    })`} tien={-kq.phiCoDinh} />
                     <Dong nhan={`Phí xử lý giao dịch (${duLieu.phiXuLyPct}%)`} tien={-kq.phiXuLy} />
                     <Dong nhan="Phí hạ tầng" tien={-kq.phiHaTang} />
                     {kq.phiVoucherXtra > 0 && <Dong nhan="Voucher Xtra" tien={-kq.phiVoucherXtra} />}
                     {kq.phiDongTaiTro > 0 && <Dong nhan="Đồng tài trợ mã ưu đãi" tien={-kq.phiDongTaiTro} />}
                     {kq.phiFreeship > 0 && <Dong nhan="Freeship Xtra" tien={-kq.phiFreeship} />}
+                    {kq.phiPiShip > 0 && <Dong nhan="Gói PiShip" tien={-kq.phiPiShip} />}
                     {kq.phiAffiliate > 0 && <Dong nhan={`Tiếp thị liên kết (${so(f.affiliatePct)}%)`} tien={-kq.phiAffiliate} />}
                     {kq.phiQuangCao > 0 && <Dong nhan={`Quảng cáo (${so(f.quangCaoPct)}%)`} tien={-kq.phiQuangCao} />}
                     {kq.thue > 0 && <Dong nhan={`Thuế (${duLieu.thuePct}%)`} tien={-kq.thue} />}
@@ -453,7 +496,7 @@ function FeesModal({ cfg, onClose }) {
   return (
     <Modal title="Bảng phí sàn Shopee" onClose={onClose} wide>
       <div className="mb-4 flex gap-1 border-b border-slate-100">
-        {[['chung', 'Phí chung'], ['nganh', `Phí theo ngành hàng (${fees.length})`]].map(([k, l]) => (
+        {[['chung', 'Phí chung'], ['nganh', `Phí theo ngành hàng (${fees.length})`], ['nhap', 'Nhập từ file']].map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${
               tab === k ? 'border-coral-500 font-medium text-navy-900' : 'border-transparent text-ink-600'
@@ -463,6 +506,8 @@ function FeesModal({ cfg, onClose }) {
 
       {tab === 'chung' ? (
         <SettingsForm cfg={cfg} onSaved={onClose} />
+      ) : tab === 'nhap' ? (
+        <FeesImportModal onXong={onClose} />
       ) : (
         <>
           <div className="mb-3 flex gap-2">
@@ -511,6 +556,7 @@ function SettingsForm({ cfg, onSaved }) {
     dong_tai_tro_pct: cfg?.dong_tai_tro_pct ?? 30,
     dong_tai_tro_cap: cfg?.dong_tai_tro_cap ?? 50000,
     thue_pct: cfg?.thue_pct ?? 1.5,
+    piship_phi: cfg?.piship_phi ?? 2700,
     ghi_chu: cfg?.ghi_chu ?? '',
   })
   const [saving, setSaving] = useState(false)
@@ -553,6 +599,7 @@ function SettingsForm({ cfg, onSaved }) {
         <O nhan="Shop đồng tài trợ mã" khoa="dong_tai_tro_pct" />
         <O nhan="Đồng tài trợ tối đa" khoa="dong_tai_tro_cap" don="đ" step="1000" />
         <O nhan="Thuế trên doanh thu" khoa="thue_pct" />
+        <O nhan="Gói PiShip mỗi đơn" khoa="piship_phi" don="đ" step="100" />
       </div>
 
       <label className="flex flex-col gap-1.5 text-sm">

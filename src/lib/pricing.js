@@ -18,6 +18,8 @@ export const so = (v) => Number(String(v ?? '').replace(/[^\d.-]/g, '')) || 0
  *  phiHaTang      Số tiền cố định mỗi đơn
  *  voucherXtra    bool — tham gia gói Voucher Xtra
  *  vxPct, vxCap   % và mức trần Voucher Xtra
+ *  piship, pishipPhi   Gói tiết kiệm vận chuyển PiShip (số tiền mỗi đơn)
+ *  nguoiBanMoi    bool — áp ưu đãi phí cố định cho người bán mới
  *  maUuDai        Giá trị mã ưu đãi Shopee áp lên sản phẩm (số tiền)
  *  dtdPct, dtdCap % shop đồng tài trợ và mức trần
  *  freeshipXtra   bool
@@ -40,7 +42,20 @@ export function tinhToan(d) {
   const chiPhiKhac = so(d.chiPhiKhac)
   const chiPhiThat = giaVon + dongGoi + chiPhiKhac
 
-  const phiCoDinh = (giaSauGiam * so(d.phiCoDinhPct)) / 100
+  // Ưu đãi người bán mới (01/06–31/08/2026).
+  // Ưu tiên mức Shopee công bố sẵn cho từng ngành; nếu không có thì suy ra:
+  //   ngành phí < 6%  -> giảm một nửa
+  //   ngành phí >= 6% -> giảm 3 điểm phần trăm
+  const phiCoDinhGoc = so(d.phiCoDinhPct)
+  const phiUuDaiCongBo = d.phiNguoiBanMoi === '' || d.phiNguoiBanMoi === null || d.phiNguoiBanMoi === undefined
+    ? null : Number(d.phiNguoiBanMoi)
+  const phiCoDinhPct = d.nguoiBanMoi
+    ? (phiUuDaiCongBo !== null
+        ? phiUuDaiCongBo
+        : (phiCoDinhGoc < 6 ? phiCoDinhGoc / 2 : Math.max(phiCoDinhGoc - 3, 0)))
+    : phiCoDinhGoc
+
+  const phiCoDinh = (giaSauGiam * phiCoDinhPct) / 100
   const phiXuLy = (giaSauGiam * so(d.phiXuLyPct)) / 100
   const phiHaTang = so(d.phiHaTang)
 
@@ -56,12 +71,13 @@ export function tinhToan(d) {
   }
 
   const phiFreeship = d.freeshipXtra ? (giaSauGiam * so(d.fsPct)) / 100 : 0
+  const phiPiShip = d.piship ? so(d.pishipPhi) : 0
   const phiAffiliate = (giaSauGiam * so(d.affiliatePct)) / 100
   const phiQuangCao = (giaSauGiam * so(d.quangCaoPct)) / 100
   const thue = d.coThue ? (giaSauGiam * so(d.thuePct)) / 100 : 0
 
   const tongPhi = phiCoDinh + phiXuLy + phiHaTang + phiVoucherXtra
-    + phiDongTaiTro + phiFreeship + phiAffiliate + phiQuangCao + thue
+    + phiDongTaiTro + phiFreeship + phiPiShip + phiAffiliate + phiQuangCao + thue
 
   const loiNhuan = giaSauGiam - chiPhiThat - tongPhi
   const bien = giaSauGiam > 0 ? (loiNhuan / giaSauGiam) * 100 : 0
@@ -70,8 +86,9 @@ export function tinhToan(d) {
   return {
     giaNiemYet, giamGia, voucherShop, giaSauGiam,
     giaVon, dongGoi, chiPhiKhac, chiPhiThat,
-    phiCoDinh, phiXuLy, phiHaTang, phiVoucherXtra, phiDongTaiTro,
-    phiFreeship, phiAffiliate, phiQuangCao, thue,
+    phiCoDinhGoc, phiCoDinhPct, phiCoDinh, phiXuLy, phiHaTang,
+    phiVoucherXtra, phiDongTaiTro, phiFreeship, phiPiShip,
+    phiAffiliate, phiQuangCao, thue,
     tongPhi, loiNhuan, bien, tyLeVon,
   }
 }
