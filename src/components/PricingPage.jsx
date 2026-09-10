@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeftRight, Settings2, Plus, Trash2, Pencil, TriangleAlert, Tag } from 'lucide-react'
+import { ArrowLeftRight, Settings2, Plus, Trash2, Pencil, TriangleAlert, Tag, Search, X } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Modal } from './ui'
 import { formatVnd } from '../lib/constants'
@@ -18,6 +18,8 @@ export default function PricingPage({ currentProfile }) {
   const [nganh1, setNganh1] = useState('')
   const [nganh2, setNganh2] = useState('')
   const [khoangPhi, setKhoangPhi] = useState(null)
+  const [timNganh, setTimNganh] = useState('')
+  const [moGoiY, setMoGoiY] = useState(false)
   const [f, setF] = useState({
     giaNiemYet: '', giamGiaPct: 0, voucherShop: '',
     giaVon: '', dongGoi: '', chiPhiKhac: '',
@@ -45,6 +47,33 @@ export default function PricingPage({ currentProfile }) {
 
   const nganhCap1 = useMemo(() => [...new Set(fees.map((x) => x.nganh_1))], [fees])
   const nganhCap2 = useMemo(() => fees.filter((x) => x.nganh_1 === nganh1), [fees, nganh1])
+
+  // Bỏ dấu để tìm kiếm dễ hơn: "sac dep" vẫn ra "Sắc Đẹp"
+  const boDau = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
+
+  const ketQuaTim = useMemo(() => {
+    const tu = boDau(timNganh).trim().split(/\s+/).filter(Boolean)
+    if (!tu.length) return []
+    return fees.filter((x) => {
+      const chuoi = boDau(`${x.nganh_1} ${x.nganh_2}`)
+      return tu.every((t) => chuoi.includes(t))
+    }).slice(0, 40)
+  }, [fees, timNganh])
+
+  function chonTuKetQua(item) {
+    setNganh1(item.nganh_1)
+    setNganh2(item.nganh_2)
+    setF((o) => ({
+      ...o,
+      phiCoDinhPct: String(item.phi_phan_tram),
+      phiNguoiBanMoi: item.phi_nguoi_ban_moi != null ? String(item.phi_nguoi_ban_moi) : '',
+    }))
+    const coKhoang = item.phi_min != null && item.phi_max != null && item.phi_min !== item.phi_max
+    setKhoangPhi(coKhoang ? { min: item.phi_min, max: item.phi_max } : null)
+    setTimNganh('')
+    setMoGoiY(false)
+  }
 
   function chonNganh2(ten) {
     setNganh2(ten)
@@ -119,6 +148,54 @@ export default function PricingPage({ currentProfile }) {
           {/* ===== NHẬP LIỆU ===== */}
           <div className="space-y-4">
             <Panel title="Ngành hàng">
+              <div className="relative mb-3">
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+                <input
+                  value={timNganh}
+                  onChange={(e) => { setTimNganh(e.target.value); setMoGoiY(true) }}
+                  onFocus={() => setMoGoiY(true)}
+                  placeholder="Gõ tên ngành hàng, VD: sua rua mat, ao thun, tai nghe..."
+                  className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-8 text-sm outline-none focus:border-coral-500"
+                />
+                {timNganh && (
+                  <button type="button" onClick={() => { setTimNganh(''); setMoGoiY(false) }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-400 hover:text-navy-900">
+                    <X size={14} />
+                  </button>
+                )}
+
+                {moGoiY && timNganh.trim() && (
+                  <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    {ketQuaTim.length === 0 ? (
+                      <p className="px-3 py-3 text-sm text-ink-400">
+                        Không tìm thấy ngành hàng nào. Thử từ khoá ngắn hơn.
+                      </p>
+                    ) : ketQuaTim.map((x) => (
+                      <button type="button" key={x.id} onClick={() => chonTuKetQua(x)}
+                        className="flex w-full items-center gap-3 border-b border-slate-50 px-3 py-2 text-left last:border-0 hover:bg-slate-50">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm text-navy-900">{x.nganh_2}</p>
+                          <p className="truncate text-xs text-ink-400">{x.nganh_1}</p>
+                        </div>
+                        <span className="flex-none rounded-md bg-coral-50 px-2 py-0.5 text-xs font-medium text-coral-600">
+                          {x.phi_phan_tram}%
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {nganh2 && (
+                <div className="mb-3 flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-navy-900">{nganh2}</p>
+                    <p className="truncate text-xs text-emerald-700">{nganh1} · phí {f.phiCoDinhPct}%</p>
+                  </div>
+                </div>
+              )}
+
+              <p className="mb-2 text-xs text-ink-400">Hoặc chọn theo cấp:</p>
               <div className="grid grid-cols-2 gap-3">
                 <Select label="Cấp 1" value={nganh1}
                   onChange={(e) => { setNganh1(e.target.value); setNganh2('') }}>
@@ -127,7 +204,7 @@ export default function PricingPage({ currentProfile }) {
                 </Select>
                 <Select label="Cấp 2" value={nganh2} disabled={!nganh1}
                   onChange={(e) => chonNganh2(e.target.value)}>
-                  <option value="">{nganh1 ? '-- Chọn --' : 'Chọn cấp 1 trước'}</option>
+                  <option value="">{nganh1 ? `-- Chọn (${nganhCap2.length}) --` : 'Chọn cấp 1 trước'}</option>
                   {nganhCap2.map((n) => (
                     <option key={n.id} value={n.nganh_2}>{n.nganh_2} — {n.phi_phan_tram}%</option>
                   ))}
