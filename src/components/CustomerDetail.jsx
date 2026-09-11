@@ -101,7 +101,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const TABS = [
     { key: 'thong_tin', label: 'Thông tin' },
     { key: 'don_hd', label: `Đơn & HĐ (${donHang.length})` },
-    { key: 'van_de', label: `Vấn đề (${issues.length})` },
     { key: 'cham_soc', label: `Chăm sóc (${interactions.length})` },
     { key: 'nhat_ky', label: 'Nhật ký' },
   ]
@@ -189,6 +188,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
           {loading ? <p className="text-sm text-ink-400">Đang tải...</p> : (
             <>
               {tab === 'thong_tin' && (
+                <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <Field label="Số điện thoại" value={customer.sdt} />
                   <Field label="Ngành hàng" value={customer.nganh_hang} />
@@ -198,12 +198,22 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                   <Field label="Ngày tạo" value={(customer.created_at || '').slice(0, 10)} />
                   <Field label="Liên hệ gần nhất" value={customer.ngay_lien_he_gan_nhat} />
                   <Field label="Chăm sóc tiếp theo" value={customer.ngay_cham_soc_tiep_theo} />
-                  {customer.ghi_chu && (
-                    <div className="col-span-2">
-                      <p className="text-ink-400">Ghi chú</p>
-                      <p className="whitespace-pre-wrap text-navy-900">{customer.ghi_chu}</p>
-                    </div>
-                  )}
+                </div>
+
+                {customer.ghi_chu && (
+                  <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-sm">
+                    <p className="text-xs text-ink-400">Ghi chú chung</p>
+                    <p className="mt-0.5 whitespace-pre-wrap text-navy-900">{customer.ghi_chu}</p>
+                  </div>
+                )}
+
+                <div className="border-t border-slate-100 pt-4">
+                  <p className="mb-3 font-display font-semibold text-navy-900">
+                    Vấn đề &amp; giải pháp {issues.length > 0 && <span className="text-ink-400">({issues.length})</span>}
+                  </p>
+                  <IssuesTab customerId={customer.id} issues={issues} suaDuoc={suaDuoc}
+                    currentProfile={currentProfile} isAdmin={isAdmin} tenNguoi={tenNguoi} onChanged={load} />
+                </div>
                 </div>
               )}
 
@@ -261,11 +271,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                       })}
                     </div>
                   )
-              )}
-
-              {tab === 'van_de' && (
-                <IssuesTab customerId={customer.id} issues={issues} suaDuoc={suaDuoc}
-                  currentProfile={currentProfile} isAdmin={isAdmin} tenNguoi={tenNguoi} onChanged={load} />
               )}
 
               {tab === 'cham_soc' && (
