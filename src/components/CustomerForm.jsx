@@ -200,11 +200,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
         <Input label="Ngày chăm sóc tiếp theo" type="date" value={form.ngay_cham_soc_tiep_theo || ''}
           onChange={(e) => setForm({ ...form, ngay_cham_soc_tiep_theo: e.target.value })} />
 
-        <div className="col-span-2">
-          <Textarea label="Ghi chú chung" rows={3} value={form.ghi_chu}
-            onChange={(e) => setForm({ ...form, ghi_chu: e.target.value })}
-            placeholder="Thông tin chung về khách. Vấn đề cụ thể của khách ghi ở mục Vấn đề & giải pháp trong chi tiết khách hàng." />
-        </div>
+        
 
         {chotDon && (
           <p className="col-span-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">

@@ -22,7 +22,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const [customer, setCustomer] = useState(khachBanDau)
   const [tab, setTab] = useState('thong_tin')
   const [interactions, setInteractions] = useState([])
-  const [issues, setIssues] = useState([])
   const [logs, setLogs] = useState([])
   const [donHang, setDonHang] = useState([])
   const [hopDong, setHopDong] = useState([])
@@ -40,18 +39,16 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   async function load() {
     setLoading(true)
-    const [{ data: it }, { data: iss }, { data: lg }, { data: pf }, { data: od }, { data: ct }] = await Promise.all([
+    const [{ data: it }, { data: lg }, { data: pf }, { data: od }, { data: ct }] = await Promise.all([
       supabase.from('customer_interactions').select('*').eq('customer_id', customer.id)
         .order('ngay_thuc_hien', { ascending: false }),
-      supabase.from('customer_issues').select('*').eq('customer_id', customer.id)
-        .order('created_at', { ascending: false }),
       supabase.from('customer_logs').select('*').eq('customer_id', customer.id)
         .order('created_at', { ascending: false }).limit(50),
       supabase.from('profiles').select('id, full_name'),
       supabase.from('orders').select('*').eq('customer_id', customer.id).order('ngay_chot', { ascending: false }),
       supabase.from('contracts').select('*').eq('customer_id', customer.id).order('ngay_ky', { ascending: false }),
     ])
-    setInteractions(it || []); setIssues(iss || []); setLogs(lg || []); setProfiles(pf || [])
+    setInteractions(it || []); setLogs(lg || []); setProfiles(pf || [])
     setDonHang(od || []); setHopDong(ct || [])
 
     const ids = (od || []).map((o) => o.id)
@@ -200,20 +197,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                   <Field label="Chăm sóc tiếp theo" value={customer.ngay_cham_soc_tiep_theo} />
                 </div>
 
-                {customer.ghi_chu && (
-                  <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-sm">
-                    <p className="text-xs text-ink-400">Ghi chú chung</p>
-                    <p className="mt-0.5 whitespace-pre-wrap text-navy-900">{customer.ghi_chu}</p>
-                  </div>
-                )}
-
-                <div className="border-t border-slate-100 pt-4">
-                  <p className="mb-3 font-display font-semibold text-navy-900">
-                    Vấn đề &amp; giải pháp {issues.length > 0 && <span className="text-ink-400">({issues.length})</span>}
-                  </p>
-                  <IssuesTab customerId={customer.id} issues={issues} suaDuoc={suaDuoc}
-                    currentProfile={currentProfile} isAdmin={isAdmin} tenNguoi={tenNguoi} onChanged={load} />
-                </div>
+                <VanDeGiaiPhap customer={customer} suaDuoc={suaDuoc}
+                  onSaved={(patch) => setCustomer({ ...customer, ...patch })} />
                 </div>
               )}
 
@@ -343,110 +328,78 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   )
 }
 
+function VanDeGiaiPhap({ customer, suaDuoc, onSaved }) {
+  const [vanDe, setVanDe] = useState(customer.van_de || '')
+  const [giaiPhap, setGiaiPhap] = useState(customer.giai_phap || '')
+  const [goiTuVan, setGoiTuVan] = useState(customer.goi_tu_van || '')
+  const [luu, setLuu] = useState('')
+
+  async function ghi(patch) {
+    const { error } = await supabase.from('customers').update(patch).eq('id', customer.id)
+    if (!error) {
+      onSaved(patch)
+      setLuu('Đã lưu')
+      setTimeout(() => setLuu(''), 1500)
+    }
+  }
+
+  if (!suaDuoc) {
+    return (
+      <div className="space-y-3">
+        <O nhan="Vấn đề" giaTri={customer.van_de} />
+        <O nhan="Giải pháp" giaTri={customer.giai_phap} />
+        <O nhan="Gói tư vấn phù hợp" giaTri={customer.goi_tu_van} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="font-display font-semibold text-navy-900">Vấn đề &amp; giải pháp</p>
+        {luu && <span className="text-xs text-emerald-600">{luu}</span>}
+      </div>
+
+      <label className="block">
+        <span className="text-xs font-medium text-ink-400">VẤN ĐỀ</span>
+        <textarea rows={3} defaultValue={vanDe} placeholder="Vấn đề khách đang gặp..."
+          onBlur={(e) => { if (e.target.value !== (customer.van_de || '')) ghi({ van_de: e.target.value || null }) }}
+          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500" />
+      </label>
+
+      <label className="block">
+        <span className="text-xs font-medium text-ink-400">GIẢI PHÁP</span>
+        <textarea rows={5} defaultValue={giaiPhap} placeholder="Giải pháp tư vấn cho khách..."
+          onBlur={(e) => { if (e.target.value !== (customer.giai_phap || '')) ghi({ giai_phap: e.target.value || null }) }}
+          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500" />
+      </label>
+
+      <label className="block">
+        <span className="text-xs font-medium text-ink-400">GÓI TƯ VẤN PHÙ HỢP</span>
+        <textarea rows={2} defaultValue={goiTuVan} placeholder="VD: Gói Chạy quảng cáo Pro 3 tháng + Xây shop VIP 1..."
+          onBlur={(e) => { if (e.target.value !== (customer.goi_tu_van || '')) ghi({ goi_tu_van: e.target.value || null }) }}
+          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500" />
+      </label>
+
+      <p className="text-xs text-ink-400">Tự lưu khi bạn bấm ra ngoài ô.</p>
+    </div>
+  )
+}
+
+function O({ nhan, giaTri }) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-ink-400">{nhan}</p>
+      <p className="mt-0.5 whitespace-pre-wrap text-sm text-navy-900">{giaTri || '—'}</p>
+    </div>
+  )
+}
+
 function Field({ label, value }) {
   return (
     <div>
       <p className="text-ink-400">{label}</p>
       <p className="font-medium text-navy-900">{value || '—'}</p>
-    </div>
-  )
-}
-
-function IssuesTab({ customerId, issues, suaDuoc, currentProfile, isAdmin, tenNguoi, onChanged }) {
-  const [vanDe, setVanDe] = useState('')
-  const [giaiPhap, setGiaiPhap] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  async function them(e) {
-    e.preventDefault()
-    if (!vanDe.trim()) return
-    setSaving(true)
-    await supabase.from('customer_issues').insert({
-      customer_id: customerId,
-      van_de: vanDe.trim(),
-      giai_phap: giaiPhap.trim() || null,
-      created_by: currentProfile.id,
-    })
-    setSaving(false); setVanDe(''); setGiaiPhap(''); onChanged()
-  }
-
-  async function xoa(i) {
-    if (!window.confirm('Xoá vấn đề này cùng giải pháp kèm theo?')) return
-    await supabase.from('customer_issues').delete().eq('id', i.id)
-    onChanged()
-  }
-
-  async function capNhat(id, patch) {
-    await supabase.from('customer_issues')
-      .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
-    onChanged()
-  }
-
-  return (
-    <div className="space-y-4">
-      {issues.length === 0 && <p className="text-sm text-ink-400">Chưa ghi nhận vấn đề nào của khách.</p>}
-
-      {issues.map((i) => (
-        <div key={i.id} className="rounded-xl border border-slate-100 p-4">
-          <div className="flex items-start gap-2">
-            <CircleAlert size={16} className="mt-0.5 flex-none text-orange-500" />
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-400">Vấn đề</p>
-              <p className="text-sm text-navy-900">{i.van_de}</p>
-            </div>
-            {suaDuoc && (
-              <div className="flex flex-none items-center gap-2">
-                <button onClick={() => capNhat(i.id, { trang_thai: i.trang_thai === 'da_giai_quyet' ? 'dang_xu_ly' : 'da_giai_quyet' })}
-                  className={`rounded-lg px-2 py-1 text-xs ${
-                    i.trang_thai === 'da_giai_quyet' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                  {i.trang_thai === 'da_giai_quyet' ? <><Check size={11} className="mr-0.5 inline" />Đã xử lý</> : 'Đang xử lý'}
-                </button>
-                {(i.created_by === currentProfile?.id || isAdmin) && (
-                  <button onClick={() => xoa(i)} className="text-ink-400 hover:text-rose-500" title="Xoá">
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="mt-3 flex items-start gap-2 border-t border-slate-50 pt-3">
-            <CircleCheck size={16} className="mt-0.5 flex-none text-teal-500" />
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-400">Giải pháp</p>
-              {suaDuoc ? (
-                <textarea
-                  defaultValue={i.giai_phap || ''}
-                  placeholder="Nhập giải pháp tư vấn cho khách..."
-                  rows={2}
-                  onBlur={(e) => { if (e.target.value !== (i.giai_phap || '')) capNhat(i.id, { giai_phap: e.target.value || null }) }}
-                  className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-coral-500"
-                />
-              ) : (
-                <p className="text-sm text-navy-900">{i.giai_phap || 'Chưa có giải pháp'}</p>
-              )}
-            </div>
-          </div>
-
-          <p className="mt-2 text-xs text-ink-400">
-            {tenNguoi(i.created_by)} · {new Date(i.created_at).toLocaleDateString('vi-VN')}
-          </p>
-        </div>
-      ))}
-
-      {suaDuoc && (
-        <form onSubmit={them} className="rounded-xl bg-slate-50 p-4">
-          <p className="mb-2 text-sm font-medium text-navy-900">Thêm vấn đề mới</p>
-          <Input placeholder="Vấn đề khách đang gặp..." value={vanDe}
-            onChange={(e) => setVanDe(e.target.value)} className="mb-2 bg-white" />
-          <Textarea placeholder="Giải pháp tư vấn (có thể bổ sung sau)..." rows={2} value={giaiPhap}
-            onChange={(e) => setGiaiPhap(e.target.value)} className="bg-white" />
-          <Button type="submit" disabled={saving} className="mt-2 w-full">
-            <Plus size={15} /> {saving ? 'Đang lưu...' : 'Thêm vấn đề'}
-          </Button>
-        </form>
-      )}
     </div>
   )
 }
