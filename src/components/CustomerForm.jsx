@@ -30,6 +30,9 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
     ngay_lien_he_gan_nhat: customer?.ngay_lien_he_gan_nhat || '',
     ngay_cham_soc_tiep_theo: customer?.ngay_cham_soc_tiep_theo || '',
     ghi_chu: customer?.ghi_chu || '',
+    van_de: customer?.van_de || '',
+    giai_phap: customer?.giai_phap || '',
+    goi_tu_van: customer?.goi_tu_van || '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -76,6 +79,9 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
       ...form,
       ngay_lien_he_gan_nhat: form.ngay_lien_he_gan_nhat || null,
       ngay_cham_soc_tiep_theo: form.ngay_cham_soc_tiep_theo || null,
+      van_de: form.van_de || null,
+      giai_phap: form.giai_phap || null,
+      goi_tu_van: form.goi_tu_van || null,
       sale_id: form.sale_id || null,
       link_fb: form.link_fb || null,
       link_shop: form.link_shop || null,
@@ -199,6 +205,22 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
           onChange={(e) => setForm({ ...form, ngay_lien_he_gan_nhat: e.target.value })} />
         <Input label="Ngày chăm sóc tiếp theo" type="date" value={form.ngay_cham_soc_tiep_theo || ''}
           onChange={(e) => setForm({ ...form, ngay_cham_soc_tiep_theo: e.target.value })} />
+
+        <div className="col-span-2">
+          <Textarea label="Vấn đề" rows={3} value={form.van_de}
+            onChange={(e) => setForm({ ...form, van_de: e.target.value })}
+            placeholder="Vấn đề khách đang gặp..." />
+        </div>
+        <div className="col-span-2">
+          <Textarea label="Giải pháp" rows={4} value={form.giai_phap}
+            onChange={(e) => setForm({ ...form, giai_phap: e.target.value })}
+            placeholder="Giải pháp tư vấn cho khách..." />
+        </div>
+        <div className="col-span-2">
+          <Textarea label="Gói tư vấn phù hợp" rows={2} value={form.goi_tu_van}
+            onChange={(e) => setForm({ ...form, goi_tu_van: e.target.value })}
+            placeholder="VD: Gói Chạy quảng cáo Pro 3 tháng + Xây shop VIP 1..." />
+        </div>
 
         
 
