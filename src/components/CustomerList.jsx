@@ -50,6 +50,16 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   })
   const [moChonCot, setMoChonCot] = useState(false)
   const [nhatKyGanNhat, setNhatKyGanNhat] = useState({})
+  const [doRong, setDoRong] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('tuki_do_rong_cot') || '{}') } catch { return {} }
+  })
+  function luuDoRong(key, px) {
+    setDoRong((cu) => {
+      const moi = { ...cu, [key]: px }
+      try { localStorage.setItem('tuki_do_rong_cot', JSON.stringify(moi)) } catch { /* bo qua */ }
+      return moi
+    })
+  }
   const hien = (k) => cotHien[k] !== false
   function toggleCot(k) {
     const moi = { ...cotHien, [k]: !hien(k) }
@@ -288,23 +298,23 @@ export default function CustomerList({ currentProfile, onChotDon }) {
       </div>
 
       <div className="mx-8 mb-6 mt-2 overflow-x-auto rounded-2xl bg-white shadow-sm">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm" style={{ tableLayout: 'auto' }}>
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
-              {hien('stt') && <th className="px-4 py-3 w-12">STT</th>}
-              <th className="px-4 py-3">Khách hàng</th>
-              {hien('sdt') && <th className="px-4 py-3">Số điện thoại</th>}
-              {hien('nen_tang') && <th className="px-4 py-3">Nền tảng</th>}
-              {hien('dich_vu') && <th className="px-4 py-3">Dịch vụ</th>}
-              {hien('nguon') && <th className="px-4 py-3">Nguồn</th>}
-              {hien('loai') && <th className="px-4 py-3">Loại</th>}
-              {hien('trang_thai') && <th className="px-4 py-3">Trạng thái</th>}
-              {hien('sale') && <th className="px-4 py-3">Sale phụ trách</th>}
-              {hien('ngay_tao') && <th className="px-4 py-3">Ngày tạo data</th>}
-              {hien('lien_he') && <th className="px-4 py-3">Liên hệ gần nhất</th>}
-              {hien('van_de') && <th className="px-4 py-3">Vấn đề</th>}
-              {hien('giai_phap') && <th className="px-4 py-3">Giải pháp</th>}
-              {hien('nhat_ky') && <th className="px-4 py-3">Cập nhật gần nhất</th>}
+              {hien('stt') && <ThResize colKey="stt" doRong={doRong} onResize={luuDoRong}>STT</ThResize>}
+              <ThResize colKey="ten" doRong={doRong} onResize={luuDoRong}>Khách hàng</ThResize>
+              {hien('sdt') && <ThResize colKey="sdt" doRong={doRong} onResize={luuDoRong}>Số điện thoại</ThResize>}
+              {hien('nen_tang') && <ThResize colKey="nen_tang" doRong={doRong} onResize={luuDoRong}>Nền tảng</ThResize>}
+              {hien('dich_vu') && <ThResize colKey="dich_vu" doRong={doRong} onResize={luuDoRong}>Dịch vụ</ThResize>}
+              {hien('nguon') && <ThResize colKey="nguon" doRong={doRong} onResize={luuDoRong}>Nguồn</ThResize>}
+              {hien('loai') && <ThResize colKey="loai" doRong={doRong} onResize={luuDoRong}>Loại</ThResize>}
+              {hien('trang_thai') && <ThResize colKey="trang_thai" doRong={doRong} onResize={luuDoRong}>Trạng thái</ThResize>}
+              {hien('sale') && <ThResize colKey="sale" doRong={doRong} onResize={luuDoRong}>Sale phụ trách</ThResize>}
+              {hien('ngay_tao') && <ThResize colKey="ngay_tao" doRong={doRong} onResize={luuDoRong}>Ngày tạo data</ThResize>}
+              {hien('lien_he') && <ThResize colKey="lien_he" doRong={doRong} onResize={luuDoRong}>Liên hệ gần nhất</ThResize>}
+              {hien('van_de') && <ThResize colKey="van_de" doRong={doRong} onResize={luuDoRong}>Vấn đề</ThResize>}
+              {hien('giai_phap') && <ThResize colKey="giai_phap" doRong={doRong} onResize={luuDoRong}>Giải pháp</ThResize>}
+              {hien('nhat_ky') && <ThResize colKey="nhat_ky" doRong={doRong} onResize={luuDoRong}>Cập nhật gần nhất</ThResize>}
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -321,9 +331,9 @@ export default function CustomerList({ currentProfile, onChotDon }) {
                   className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50"
                   onClick={() => setViewingCustomer(c)}>
                   {hien('stt') && <td className="px-4 py-3 text-ink-400">{idx + 1}</td>}
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" style={doRong.ten ? { maxWidth: doRong.ten } : undefined}>
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-navy-900">{c.ten_khach}</p>
+                      <p className="truncate font-medium text-navy-900">{c.ten_khach}</p>
                       {chung && !cuaMinh && (
                         <span title="Khách chung — cả team đều xem được">
                           <Users2 size={13} className="text-amber-500" />
@@ -380,13 +390,13 @@ export default function CustomerList({ currentProfile, onChotDon }) {
                   {hien('ngay_tao') && <td className="px-4 py-3 text-ink-600">{(c.created_at || '').slice(0, 10) || '—'}</td>}
                   {hien('lien_he') && <td className="px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>}
                   {hien('van_de') && (
-                    <td className="px-4 py-3 text-ink-600">
-                      <p className="line-clamp-2 max-w-[220px] whitespace-pre-wrap">{c.van_de || '—'}</p>
+                    <td className="px-4 py-3 text-ink-600" style={{ maxWidth: doRong.van_de || 220 }}>
+                      <p className="line-clamp-2 whitespace-pre-wrap">{c.van_de || '—'}</p>
                     </td>
                   )}
                   {hien('giai_phap') && (
-                    <td className="px-4 py-3 text-ink-600">
-                      <p className="line-clamp-2 max-w-[220px] whitespace-pre-wrap">{c.giai_phap || '—'}</p>
+                    <td className="px-4 py-3 text-ink-600" style={{ maxWidth: doRong.giai_phap || 220 }}>
+                      <p className="line-clamp-2 whitespace-pre-wrap">{c.giai_phap || '—'}</p>
                     </td>
                   )}
                   {hien('nhat_ky') && (
@@ -395,7 +405,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
                         const l = nhatKyGanNhat[c.id]
                         if (!l) return <span className="text-ink-400">—</span>
                         return (
-                          <div className="max-w-[200px]">
+                          <div style={{ maxWidth: doRong.nhat_ky || 200 }}>
                             <p className="truncate text-navy-900">{l.hanh_dong}</p>
                             <p className="text-xs text-ink-400">
                               {profileName(l.user_id)} · {new Date(l.created_at).toLocaleDateString('vi-VN')}
@@ -447,6 +457,38 @@ export default function CustomerList({ currentProfile, onChotDon }) {
         />
       )}
     </div>
+  )
+}
+
+function ThResize({ colKey, doRong, onResize, children }) {
+  const rong = doRong[colKey]
+  function batDauKeo(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    const th = e.currentTarget.closest('th')
+    const xDau = e.clientX
+    const rongDau = th.offsetWidth
+    function keo(ev) {
+      const moi = Math.max(60, rongDau + (ev.clientX - xDau))
+      th.style.width = moi + 'px'
+      th.style.maxWidth = moi + 'px'
+    }
+    function thoi() {
+      document.removeEventListener('mousemove', keo)
+      document.removeEventListener('mouseup', thoi)
+      onResize(colKey, th.offsetWidth)
+    }
+    document.addEventListener('mousemove', keo)
+    document.addEventListener('mouseup', thoi)
+  }
+  return (
+    <th className="relative select-none px-4 py-3"
+      style={rong ? { width: rong, maxWidth: rong } : undefined}>
+      <span className="block truncate pr-2">{children}</span>
+      <span onMouseDown={batDauKeo}
+        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-coral-500/40"
+        title="Kéo để chỉnh độ rộng" />
+    </th>
   )
 }
 
