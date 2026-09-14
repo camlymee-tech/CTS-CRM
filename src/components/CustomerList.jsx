@@ -37,15 +37,19 @@ export default function CustomerList({ currentProfile, onChotDon }) {
     { key: 'sale', label: 'Sale phụ trách' },
     { key: 'ngay_tao', label: 'Ngày tạo data' },
     { key: 'lien_he', label: 'Liên hệ gần nhất' },
+    { key: 'van_de', label: 'Vấn đề', macDinh: false },
+    { key: 'giai_phap', label: 'Giải pháp', macDinh: false },
+    { key: 'nhat_ky', label: 'Cập nhật gần nhất', macDinh: false },
   ]
   const [cotHien, setCotHien] = useState(() => {
     try {
       const luu = JSON.parse(localStorage.getItem('tuki_cot_khach') || 'null')
       if (luu) return luu
     } catch { /* bo qua */ }
-    return Object.fromEntries(COT.map((c) => [c.key, true]))
+    return Object.fromEntries(COT.map((c) => [c.key, c.macDinh !== false]))
   })
   const [moChonCot, setMoChonCot] = useState(false)
+  const [nhatKyGanNhat, setNhatKyGanNhat] = useState({})
   const hien = (k) => cotHien[k] !== false
   function toggleCot(k) {
     const moi = { ...cotHien, [k]: !hien(k) }
@@ -113,6 +117,14 @@ export default function CustomerList({ currentProfile, onChotDon }) {
     const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false })
     setCustomers(data || [])
     setLoading(false)
+    // Lấy dòng nhật ký mới nhất cho mỗi khách (để hiện cột "Cập nhật gần nhất")
+    const { data: logs } = await supabase.from('customer_logs')
+      .select('customer_id, hanh_dong, user_id, created_at')
+      .order('created_at', { ascending: false })
+      .limit(2000)
+    const map = {}
+    for (const l of logs || []) if (!map[l.customer_id]) map[l.customer_id] = l
+    setNhatKyGanNhat(map)
   }
 
   const isAdmin = currentProfile?.role === 'admin'
@@ -290,6 +302,9 @@ export default function CustomerList({ currentProfile, onChotDon }) {
               {hien('sale') && <th className="px-4 py-3">Sale phụ trách</th>}
               {hien('ngay_tao') && <th className="px-4 py-3">Ngày tạo data</th>}
               {hien('lien_he') && <th className="px-4 py-3">Liên hệ gần nhất</th>}
+              {hien('van_de') && <th className="px-4 py-3">Vấn đề</th>}
+              {hien('giai_phap') && <th className="px-4 py-3">Giải pháp</th>}
+              {hien('nhat_ky') && <th className="px-4 py-3">Cập nhật gần nhất</th>}
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -364,6 +379,32 @@ export default function CustomerList({ currentProfile, onChotDon }) {
                   {hien('sale') && <td className="px-4 py-3 text-ink-600">{profileName(c.sale_id)}</td>}
                   {hien('ngay_tao') && <td className="px-4 py-3 text-ink-600">{(c.created_at || '').slice(0, 10) || '—'}</td>}
                   {hien('lien_he') && <td className="px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>}
+                  {hien('van_de') && (
+                    <td className="px-4 py-3 text-ink-600">
+                      <p className="line-clamp-2 max-w-[220px] whitespace-pre-wrap">{c.van_de || '—'}</p>
+                    </td>
+                  )}
+                  {hien('giai_phap') && (
+                    <td className="px-4 py-3 text-ink-600">
+                      <p className="line-clamp-2 max-w-[220px] whitespace-pre-wrap">{c.giai_phap || '—'}</p>
+                    </td>
+                  )}
+                  {hien('nhat_ky') && (
+                    <td className="px-4 py-3 text-ink-600">
+                      {(() => {
+                        const l = nhatKyGanNhat[c.id]
+                        if (!l) return <span className="text-ink-400">—</span>
+                        return (
+                          <div className="max-w-[200px]">
+                            <p className="truncate text-navy-900">{l.hanh_dong}</p>
+                            <p className="text-xs text-ink-400">
+                              {profileName(l.user_id)} · {new Date(l.created_at).toLocaleDateString('vi-VN')}
+                            </p>
+                          </div>
+                        )
+                      })()}
+                    </td>
+                  )}
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     {(isAdmin || cuaMinh) && (
                       <button onClick={(e) => { e.stopPropagation(); xoaKhach(c) }}
