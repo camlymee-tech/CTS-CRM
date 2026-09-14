@@ -328,7 +328,9 @@ export default function CustomerList({ currentProfile, onChotDon }) {
               const cuaMinh = c.sale_id === currentProfile?.id
               return (
                 <tr key={c.id}
-                  className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50"
+                  className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-coral-50/40 ${
+                    idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'
+                  }`}
                   onClick={() => setViewingCustomer(c)}>
                   {hien('stt') && <td className="px-4 py-3 text-ink-400">{idx + 1}</td>}
                   <td className="px-4 py-3" style={doRong.ten ? { maxWidth: doRong.ten } : undefined}>
