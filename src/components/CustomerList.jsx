@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Link2, Store, Users2, Trash2, Settings2 } from 'lucide-react'
+import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, Columns3 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import CustomerForm from './CustomerForm'
@@ -24,6 +24,35 @@ const chiSo = (s) => (s || '').replace(/\D/g, '')
 export default function CustomerList({ currentProfile, onChotDon }) {
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung } = useTrangThai()
   const [quanLyTT, setQuanLyTT] = useState(false)
+
+  // Các cột có thể bật/tắt (Khách hàng và Thao tác luôn hiển thị)
+  const COT = [
+    { key: 'stt', label: 'STT' },
+    { key: 'sdt', label: 'Số điện thoại' },
+    { key: 'nen_tang', label: 'Nền tảng' },
+    { key: 'dich_vu', label: 'Dịch vụ' },
+    { key: 'nguon', label: 'Nguồn' },
+    { key: 'loai', label: 'Loại' },
+    { key: 'trang_thai', label: 'Trạng thái' },
+    { key: 'sale', label: 'Sale phụ trách' },
+    { key: 'ngay_tao', label: 'Ngày tạo data' },
+    { key: 'lien_he', label: 'Liên hệ gần nhất' },
+  ]
+  const [cotHien, setCotHien] = useState(() => {
+    try {
+      const luu = JSON.parse(localStorage.getItem('tuki_cot_khach') || 'null')
+      if (luu) return luu
+    } catch { /* bo qua */ }
+    return Object.fromEntries(COT.map((c) => [c.key, true]))
+  })
+  const [moChonCot, setMoChonCot] = useState(false)
+  const hien = (k) => cotHien[k] !== false
+  function toggleCot(k) {
+    const moi = { ...cotHien, [k]: !hien(k) }
+    setCotHien(moi)
+    try { localStorage.setItem('tuki_cot_khach', JSON.stringify(moi)) } catch { /* bo qua */ }
+  }
+  const soCot = 2 + COT.filter((c) => hien(c.key)).length  // Khách hàng + Thao tác + cột bật
   const [customers, setCustomers] = useState([])
   const [phoneHits, setPhoneHits] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -48,11 +77,14 @@ export default function CustomerList({ currentProfile, onChotDon }) {
   }, [])
 
   async function xoaKhach(c) {
-    if (!window.confirm(`Xoá khách "${c.ten_khach}"?\n\nToàn bộ lịch sử chăm sóc, vấn đề và nhật ký của khách này cũng bị xoá. Không khôi phục được.`)) return
+    const canhBao = isAdmin
+      ? `Xoá khách "${c.ten_khach}"?\n\nToàn bộ ĐƠN DỊCH VỤ, HỢP ĐỒNG, lịch sử chăm sóc và nhật ký của khách này cũng bị xoá vĩnh viễn. Doanh số từ khách này sẽ không còn trong báo cáo. Không khôi phục được.`
+      : `Xoá khách "${c.ten_khach}"?\n\nToàn bộ lịch sử chăm sóc và nhật ký của khách này cũng bị xoá. Không khôi phục được.`
+    if (!window.confirm(canhBao)) return
     const { error } = await supabase.from('customers').delete().eq('id', c.id)
     if (error) {
-      alert(error.message.includes('đơn dịch vụ')
-        ? `Không thể xoá "${c.ten_khach}".\n\nKhách này đã có đơn dịch vụ / hợp đồng nên dữ liệu phải được giữ lại. Nếu khách dừng hợp tác, hãy đổi trạng thái sang "Từ chối / Ngừng" thay vì xoá.`
+      alert(error.message.includes('KHACH_CO_DON')
+        ? `Khách "${c.ten_khach}" đã có đơn dịch vụ. Chỉ quản trị viên mới xoá được khách này.`
         : 'Không xoá được: ' + error.message)
       return
     }
@@ -219,29 +251,53 @@ export default function CustomerList({ currentProfile, onChotDon }) {
         </div>
       </div>
 
-      <div className="mx-8 my-6 overflow-x-auto rounded-2xl bg-white shadow-sm">
-        <table className="w-full min-w-[1220px] text-sm">
+      <div className="mx-8 mt-4 flex items-center justify-end">
+        <div className="relative">
+          <button onClick={() => setMoChonCot((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-ink-600 hover:border-coral-500 hover:text-coral-500">
+            <Columns3 size={15} /> Cột hiển thị
+          </button>
+          {moChonCot && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMoChonCot(false)} />
+              <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                <p className="px-2 py-1 text-xs text-ink-400">Chọn cột muốn hiển thị</p>
+                {COT.map((c) => (
+                  <label key={c.key} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                    <input type="checkbox" checked={hien(c.key)} onChange={() => toggleCot(c.key)}
+                      className="h-4 w-4 rounded border-slate-300" />
+                    <span className="text-navy-900">{c.label}</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mx-8 mb-6 mt-2 overflow-x-auto rounded-2xl bg-white shadow-sm">
+        <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
-              <th className="px-4 py-3 w-12">STT</th>
+              {hien('stt') && <th className="px-4 py-3 w-12">STT</th>}
               <th className="px-4 py-3">Khách hàng</th>
-              <th className="px-4 py-3">Số điện thoại</th>
-              <th className="px-4 py-3">Nền tảng</th>
-              <th className="px-4 py-3">Dịch vụ</th>
-              <th className="px-4 py-3">Nguồn</th>
-              <th className="px-4 py-3">Loại</th>
-              <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3">Sale phụ trách</th>
-              <th className="px-4 py-3">Ngày tạo data</th>
-              <th className="px-4 py-3">Liên hệ gần nhất</th>
+              {hien('sdt') && <th className="px-4 py-3">Số điện thoại</th>}
+              {hien('nen_tang') && <th className="px-4 py-3">Nền tảng</th>}
+              {hien('dich_vu') && <th className="px-4 py-3">Dịch vụ</th>}
+              {hien('nguon') && <th className="px-4 py-3">Nguồn</th>}
+              {hien('loai') && <th className="px-4 py-3">Loại</th>}
+              {hien('trang_thai') && <th className="px-4 py-3">Trạng thái</th>}
+              {hien('sale') && <th className="px-4 py-3">Sale phụ trách</th>}
+              {hien('ngay_tao') && <th className="px-4 py-3">Ngày tạo data</th>}
+              {hien('lien_he') && <th className="px-4 py-3">Liên hệ gần nhất</th>}
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={12} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
+              <tr><td colSpan={soCot} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={12} className="px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
+              <tr><td colSpan={soCot} className="px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
             ) : filtered.map((c, idx) => {
               const chung = laKhachChung(c)
               const cuaMinh = c.sale_id === currentProfile?.id
@@ -249,7 +305,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
                 <tr key={c.id}
                   className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50"
                   onClick={() => setViewingCustomer(c)}>
-                  <td className="px-4 py-3 text-ink-400">{idx + 1}</td>
+                  {hien('stt') && <td className="px-4 py-3 text-ink-400">{idx + 1}</td>}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-navy-900">{c.ten_khach}</p>
@@ -275,35 +331,39 @@ export default function CustomerList({ currentProfile, onChotDon }) {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-ink-600">{c.sdt || '—'}</td>
+                  {hien('sdt') && <td className="px-4 py-3 text-ink-600">{c.sdt || '—'}</td>}
+                  {hien('nen_tang') && (
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {(c.nen_tang || []).map((nt) => (
                         <Badge key={nt} className={classOf(NEN_TANG_OPTIONS, nt)}>{labelOf(NEN_TANG_OPTIONS, nt)}</Badge>
                       ))}
                     </div>
-                  </td>
+                  </td>)}
+                  {hien('dich_vu') && (
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {(c.dich_vu || []).map((dv) => (
                         <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
                       ))}
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-ink-600">{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '—'}</td>
+                  </td>)}
+                  {hien('nguon') && <td className="px-4 py-3 text-ink-600">{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '—'}</td>}
+                  {hien('loai') && (
                   <td className="px-4 py-3">
                     <Badge className={c.loai_khach === 'moi' ? 'bg-coral-50 text-coral-600' : 'bg-slate-100 text-slate-600'}>
                       {labelOf(LOAI_KHACH_OPTIONS, c.loai_khach)}
                     </Badge>
-                  </td>
+                  </td>)}
+                  {hien('trang_thai') && (
                   <td className="px-4 py-3">
                     <Badge className={classTrangThai(c.trang_thai_cham_soc)}>
                       {tenTrangThai(c.trang_thai_cham_soc)}
                     </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-ink-600">{profileName(c.sale_id)}</td>
-                  <td className="px-4 py-3 text-ink-600">{(c.created_at || '').slice(0, 10) || '—'}</td>
-                  <td className="px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>
+                  </td>)}
+                  {hien('sale') && <td className="px-4 py-3 text-ink-600">{profileName(c.sale_id)}</td>}
+                  {hien('ngay_tao') && <td className="px-4 py-3 text-ink-600">{(c.created_at || '').slice(0, 10) || '—'}</td>}
+                  {hien('lien_he') && <td className="px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>}
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     {(isAdmin || cuaMinh) && (
                       <button onClick={(e) => { e.stopPropagation(); xoaKhach(c) }}
