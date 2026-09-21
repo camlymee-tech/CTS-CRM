@@ -67,6 +67,7 @@ export default function PackagesModal({ onClose }) {
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-navy-900">{p.ten_goi}</p>
                             {p.so_thang && <Badge className="bg-teal-50 text-teal-600">{p.so_thang} tháng</Badge>}
+                            {p.so_san_pham && <Badge className="bg-violet-50 text-violet-600">{p.so_san_pham} SP</Badge>}
                             {!p.active && <Badge className="bg-slate-200 text-slate-600">Đang tắt</Badge>}
                           </div>
                           {p.mo_ta && <p className="mt-0.5 text-xs text-ink-600">{p.mo_ta}</p>}
@@ -110,6 +111,8 @@ function PackageForm({ goi, services, onClose, onSaved }) {
     mo_ta: goi.mo_ta || '',
     gia: goi.gia ?? '',
     so_thang: goi.so_thang ?? '',
+    so_san_pham: goi.so_san_pham ?? '',
+    noi_dung_hd: goi.noi_dung_hd || '',
     thu_tu: goi.thu_tu ?? 0,
   })
   const [saving, setSaving] = useState(false)
@@ -124,6 +127,8 @@ function PackageForm({ goi, services, onClose, onSaved }) {
       mo_ta: form.mo_ta || null,
       gia: Number(form.gia) || 0,
       so_thang: form.so_thang ? Number(form.so_thang) : null,
+      so_san_pham: form.so_san_pham ? Number(form.so_san_pham) : null,
+      noi_dung_hd: form.noi_dung_hd || null,
       thu_tu: Number(form.thu_tu) || 0,
     }
     const { error } = isEdit
@@ -146,12 +151,23 @@ function PackageForm({ goi, services, onClose, onSaved }) {
           onChange={(e) => setForm({ ...form, ten_goi: e.target.value })} placeholder="VD: VIP 1" />
         <Input label="Giá (đ) *" type="number" min="0" step="1000" required value={form.gia}
           onChange={(e) => setForm({ ...form, gia: e.target.value })} />
-        <Input label="Thời hạn (tháng)" type="number" min="0" value={form.so_thang}
-          onChange={(e) => setForm({ ...form, so_thang: e.target.value })}
-          placeholder="Để trống nếu gói không theo tháng" />
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Thời hạn (tháng)" type="number" min="0" value={form.so_thang}
+            onChange={(e) => setForm({ ...form, so_thang: e.target.value })}
+            placeholder="Để trống nếu gói không theo tháng" />
+          <Input label="Số sản phẩm" type="number" min="0" value={form.so_san_pham}
+            onChange={(e) => setForm({ ...form, so_san_pham: e.target.value })}
+            placeholder="VD: 20" />
+        </div>
         <Textarea label="Mô tả" rows={3} value={form.mo_ta}
           onChange={(e) => setForm({ ...form, mo_ta: e.target.value })}
           placeholder="Quyền lợi trong gói, phù hợp với ai..." />
+        <Textarea label="Nội dung triển khai (cho hợp đồng)" rows={5} value={form.noi_dung_hd}
+          onChange={(e) => setForm({ ...form, noi_dung_hd: e.target.value })}
+          placeholder={"Mỗi dòng: Tên nội dung | Chi tiết\nVD: Chuẩn hoá nền tảng | Tư vấn & hoàn thiện thủ tục khởi tạo gian hàng..."} />
+        <p className="-mt-2 text-xs text-ink-400">
+          Dùng dấu | ngăn tên nội dung và chi tiết. Khi xuất hợp đồng cho gói này, bảng nội dung sẽ tự điền theo đây.
+        </p>
         <Input label="Thứ tự hiển thị" type="number" value={form.thu_tu}
           onChange={(e) => setForm({ ...form, thu_tu: e.target.value })} />
 

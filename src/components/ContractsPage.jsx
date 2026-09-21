@@ -10,6 +10,7 @@ export default function ContractsPage({ currentProfile }) {
   const [customers, setCustomers] = useState([])
   const [orders, setOrders] = useState([])
   const [items, setItems] = useState({})
+  const [packages, setPackages] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -21,14 +22,16 @@ export default function ContractsPage({ currentProfile }) {
 
   async function load() {
     setLoading(true)
-    const [{ data: ct }, { data: cu }, { data: od }, { data: it }, { data: pf }] = await Promise.all([
+    const [{ data: ct }, { data: cu }, { data: od }, { data: it }, { data: pf }, { data: pk }] = await Promise.all([
       supabase.from('contracts').select('*').order('ngay_ky', { ascending: false }),
       supabase.from('customers').select('id, ten_khach, ma_khach, sdt'),
       supabase.from('orders').select('id, ma_don, sale_id'),
       supabase.from('order_items').select('*'),
       supabase.from('profiles').select('id, full_name'),
+      supabase.from('service_packages').select('*'),
     ])
     setContracts(ct || []); setCustomers(cu || []); setOrders(od || []); setProfiles(pf || [])
+    setPackages(pk || [])
     const g = {}
     for (const i of it || []) g[i.order_id] = [...(g[i.order_id] || []), i]
     setItems(g)
@@ -188,6 +191,7 @@ export default function ContractsPage({ currentProfile }) {
           khach={khach(xuatHD.customer_id)}
           don={don(xuatHD.order_id)}
           dichVu={items[xuatHD.order_id] || []}
+          packages={packages}
           onClose={() => setXuatHD(null)}
           onSaved={() => { setXuatHD(null); load() }}
         />
@@ -201,10 +205,20 @@ export default function ContractsPage({ currentProfile }) {
   )
 }
 
-function XuatHopDongForm({ contract, khach, don, dichVu, onClose, onSaved }) {
+// Tìm gói (trong service_packages) khớp với dịch vụ đã chốt trên đơn, theo loại hợp đồng
+// đang chọn — ads -> "Chạy quảng cáo"; xay_shop -> "Xây shop" / "Tối ưu sản phẩm"
+function timGoiKhop(loaiDV, dichVu, packages) {
+  const khop = loaiDV === 'xay_shop' ? /xây shop|tối ưu/i : /quảng cáo/i
+  const item = (dichVu || []).find((d) => d.package_id && khop.test(d.ten_dich_vu))
+  if (!item) return null
+  return (packages || []).find((p) => p.id === item.package_id) || null
+}
+
+function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSaved }) {
   const laXayShop = (dichVu || []).some((d) => /xây shop|tối ưu/i.test(d.ten_dich_vu))
   const [loaiDV, setLoaiDV] = useState(contract.loai_dich_vu || (laXayShop ? 'xay_shop' : 'ads'))
   const [vtat, setVtat] = useState(khach?.ten_viet_tat || vietTat(khach?.ten_khach))
+  const goiKhop0 = timGoiKhop(loaiDV, dichVu, packages)
   const [form, setForm] = useState({
     ngay_ky: contract.ngay_ky || new Date().toISOString().slice(0, 10),
     dia_chi: khach?.dia_chi || '',
@@ -214,13 +228,27 @@ function XuatHopDongForm({ contract, khach, don, dichVu, onClose, onSaved }) {
     email: khach?.email || '',
     link_shop: khach?.link_shop || '',
     so_luong_gian_hang: contract.so_luong_gian_hang || 1,
-    so_san_pham: contract.so_san_pham || '',
+    so_san_pham: contract.so_san_pham || goiKhop0?.so_san_pham || '',
     ten_goi: contract.ten_goi || (dichVu || []).map((d) => d.ten_goi).filter(Boolean).join(', '),
     ngay_bat_dau: contract.ngay_bat_dau || '',
-    noi_dung: '',  // mỗi dòng: "Nội dung | Chi tiết"
+    noi_dung: goiKhop0?.noi_dung_hd || '',  // mỗi dòng: "Nội dung | Chi tiết" — tự điền theo gói, sửa được
   })
   const [dangXuat, setDangXuat] = useState(false)
   const [msg, setMsg] = useState('')
+
+  // Đổi loại hợp đồng (ads/xay_shop) thì dò lại gói khớp để điền lại số SP/nội dung
+  function doiLoaiDV(loai) {
+    setLoaiDV(loai)
+    const g = timGoiKhop(loai, dichVu, packages)
+    if (g) {
+      setForm((f) => ({
+        ...f,
+        so_san_pham: f.so_san_pham || g.so_san_pham || '',
+        ten_goi: g.ten_goi || f.ten_goi,
+        noi_dung: g.noi_dung_hd || f.noi_dung,
+      }))
+    }
+  }
 
   const soHD = taoSoHopDong({
     loaiDichVu: loaiDV, ngay: form.ngay_ky,
@@ -293,7 +321,7 @@ function XuatHopDongForm({ contract, khach, don, dichVu, onClose, onSaved }) {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Select label="Loại hợp đồng" value={loaiDV} onChange={(e) => setLoaiDV(e.target.value)}>
+          <Select label="Loại hợp đồng" value={loaiDV} onChange={(e) => doiLoaiDV(e.target.value)}>
             <option value="ads">Chạy quảng cáo (TUKI ADS)</option>
             <option value="xay_shop">Xây shop (TUKIGROUP)</option>
           </Select>
@@ -328,7 +356,8 @@ function XuatHopDongForm({ contract, khach, don, dichVu, onClose, onSaved }) {
           <Input label="Số lượng gian hàng" type="number" min="1" value={form.so_luong_gian_hang}
             onChange={(e) => setForm({ ...form, so_luong_gian_hang: e.target.value })} />
           <Input label="Số sản phẩm (theo gói)" type="number" value={form.so_san_pham}
-            onChange={(e) => setForm({ ...form, so_san_pham: e.target.value })} placeholder="VD: 20" />
+            onChange={(e) => setForm({ ...form, so_san_pham: e.target.value })}
+            placeholder={goiKhop0?.so_san_pham ? `Tự điền: ${goiKhop0.so_san_pham}` : 'VD: 20'} />
           <Input label="Tên gói" value={form.ten_goi}
             onChange={(e) => setForm({ ...form, ten_goi: e.target.value })} placeholder="VD: SHOPEE PRO - 1 tháng" />
           {loaiDV === 'ads' && (
@@ -338,11 +367,14 @@ function XuatHopDongForm({ contract, khach, don, dichVu, onClose, onSaved }) {
         </div>
 
         <div>
-          <Textarea label="Nội dung triển khai (mỗi dòng: Tên nội dung | Chi tiết)" rows={5}
+          <Textarea label="Nội dung triển khai (mỗi dòng: Tên nội dung | Chi tiết)" rows={6}
             value={form.noi_dung} onChange={(e) => setForm({ ...form, noi_dung: e.target.value })}
             placeholder={"Phân tích & lựa chọn sản phẩm | Lựa chọn 20 sản phẩm phân bổ ngân sách\nLên & care quảng cáo | Care tối đa 20 sản phẩm"} />
           <p className="mt-1 text-xs text-ink-400">
-            Để trống nếu không cần bảng nội dung. Dùng dấu | ngăn giữa tên nội dung và chi tiết.
+            {form.noi_dung
+              ? 'Đã tự điền theo gói khách chọn ở đơn dịch vụ — sửa lại nếu cần. '
+              : 'Để trống nếu không cần bảng nội dung. '}
+            Dùng dấu | ngăn giữa tên nội dung và chi tiết.
           </p>
         </div>
 
