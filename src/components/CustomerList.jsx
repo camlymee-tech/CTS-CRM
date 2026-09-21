@@ -209,7 +209,13 @@ export default function CustomerList({ currentProfile, onChotDon }) {
         </div>
       </header>
 
-      <div className="grid gap-3 px-8 pt-6" style={{ gridTemplateColumns: `repeat(${Math.min(TRANG_THAI.length, 7)}, minmax(0, 1fr))` }}>
+      <div className="grid gap-3 px-8 pt-6" style={{ gridTemplateColumns: `repeat(${Math.min(TRANG_THAI.length + 1, 8)}, minmax(0, 1fr))` }}>
+        <StatCard
+          label="Tổng khách hàng"
+          value={nenDem.length}
+          active={filterTrangThai === ''}
+          onClick={() => setFilterTrangThai('')}
+        />
         {TRANG_THAI.map((o) => (
           <StatCard
             key={o.ma}
