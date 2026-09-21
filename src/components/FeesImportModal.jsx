@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
 import { Upload, FileSpreadsheet, ClipboardPaste, CircleCheck, TriangleAlert } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select } from './ui'
 
@@ -97,6 +96,7 @@ export default function FeesImportModal({ onXong }) {
     setLoi(''); setRows([]); setXong(null)
     try {
       const buf = await f.arrayBuffer()
+      const XLSX = await import('xlsx')
       const wb = XLSX.read(buf, { type: 'array' })
       const sheet = wb.Sheets[wb.SheetNames[0]]
       const bang = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' })

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Pencil, ExternalLink, FileText, AlertTriangle } from 'lucide-react'
+import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Modal, Textarea } from './ui'
 import { TRANG_THAI_HD_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
+import { taoSoHopDong, vietTat } from '../lib/docSo'
 
 export default function ContractsPage({ currentProfile }) {
   const [contracts, setContracts] = useState([])
@@ -14,6 +15,7 @@ export default function ContractsPage({ currentProfile }) {
   const [search, setSearch] = useState('')
   const [filterTT, setFilterTT] = useState('')
   const [editing, setEditing] = useState(null)
+  const [xuatHD, setXuatHD] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -164,6 +166,10 @@ export default function ContractsPage({ currentProfile }) {
                         <ExternalLink size={14} />
                       </a>
                     )}
+                    <button onClick={() => setXuatHD(c)}
+                      className="mr-3 inline-flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700" title="Xuất file hợp đồng">
+                      <FileDown size={14} /> Xuất
+                    </button>
                     <button onClick={() => setEditing(c)}
                       className="text-ink-400 hover:text-coral-500" title="Sửa hợp đồng">
                       <Pencil size={14} />
@@ -176,11 +182,180 @@ export default function ContractsPage({ currentProfile }) {
         </table>
       </div>
 
+      {xuatHD && (
+        <XuatHopDongForm
+          contract={xuatHD}
+          khach={khach(xuatHD.customer_id)}
+          don={don(xuatHD.order_id)}
+          dichVu={items[xuatHD.order_id] || []}
+          onClose={() => setXuatHD(null)}
+          onSaved={() => { setXuatHD(null); load() }}
+        />
+      )}
+
       {editing && (
         <ContractForm contract={editing} khach={khach(editing.customer_id)}
           onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />
       )}
     </div>
+  )
+}
+
+function XuatHopDongForm({ contract, khach, don, dichVu, onClose, onSaved }) {
+  const laXayShop = (dichVu || []).some((d) => /xây shop|tối ưu/i.test(d.ten_dich_vu))
+  const [loaiDV, setLoaiDV] = useState(contract.loai_dich_vu || (laXayShop ? 'xay_shop' : 'ads'))
+  const [vtat, setVtat] = useState(khach?.ten_viet_tat || vietTat(khach?.ten_khach))
+  const [form, setForm] = useState({
+    ngay_ky: contract.ngay_ky || new Date().toISOString().slice(0, 10),
+    dia_chi: khach?.dia_chi || '',
+    mst: khach?.mst || '',
+    nguoi_dai_dien: khach?.nguoi_dai_dien || '',
+    chuc_vu: khach?.chuc_vu || '',
+    email: khach?.email || '',
+    link_shop: khach?.link_shop || '',
+    so_luong_gian_hang: contract.so_luong_gian_hang || 1,
+    so_san_pham: contract.so_san_pham || '',
+    ten_goi: contract.ten_goi || (dichVu || []).map((d) => d.ten_goi).filter(Boolean).join(', '),
+    ngay_bat_dau: contract.ngay_bat_dau || '',
+    noi_dung: '',  // mỗi dòng: "Nội dung | Chi tiết"
+  })
+  const [dangXuat, setDangXuat] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const soHD = taoSoHopDong({
+    loaiDichVu: loaiDV, ngay: form.ngay_ky,
+    maKhach: khach?.ma_khach, tenVietTat: vtat,
+  })
+
+  async function xuat() {
+    setDangXuat(true); setMsg('')
+    // Lưu lại thông tin bên A vào khách + thông tin hợp đồng để lần sau khỏi nhập lại
+    await supabase.from('customers').update({
+      dia_chi: form.dia_chi || null, mst: form.mst || null,
+      nguoi_dai_dien: form.nguoi_dai_dien || null, chuc_vu: form.chuc_vu || null,
+      email: form.email || null, ten_viet_tat: vtat || null,
+    }).eq('id', khach.id)
+    await supabase.from('contracts').update({
+      so_hop_dong: soHD, loai_dich_vu: loaiDV,
+      so_luong_gian_hang: Number(form.so_luong_gian_hang) || 1,
+      so_san_pham: form.so_san_pham ? Number(form.so_san_pham) : null,
+      ten_goi: form.ten_goi || null,
+      ngay_bat_dau: form.ngay_bat_dau || null,
+    }).eq('id', contract.id)
+
+    const rows = form.noi_dung.trim()
+      ? form.noi_dung.trim().split('\n').map((l) => {
+          const [a, ...b] = l.split('|')
+          return [a.trim(), b.join('|').trim()]
+        })
+      : []
+
+    try {
+      const { taoFileHopDong } = await import('../lib/hopDong')
+      const blob = await taoFileHopDong({
+        loai_dich_vu: loaiDV,
+        so_hop_dong: soHD,
+        ngay_ky: form.ngay_ky,
+        ten_khach: khach?.ten_khach,
+        sdt: khach?.sdt,
+        dia_chi: form.dia_chi, mst: form.mst,
+        nguoi_dai_dien: form.nguoi_dai_dien, chuc_vu: form.chuc_vu, email: form.email,
+        link_shop: form.link_shop,
+        so_luong_gian_hang: Number(form.so_luong_gian_hang) || 1,
+        so_san_pham: form.so_san_pham ? Number(form.so_san_pham) : null,
+        ten_goi: form.ten_goi,
+        ngay_bat_dau: form.ngay_bat_dau,
+        gia_tri: contract.gia_tri,
+        rows_noi_dung: rows,
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `HopDong_${soHD.replace(/\//g, '-')}.docx`
+      a.click()
+      URL.revokeObjectURL(url)
+      setDangXuat(false)
+      onSaved()
+    } catch (e) {
+      setDangXuat(false)
+      setMsg('Lỗi tạo file: ' + e.message)
+    }
+  }
+
+  return (
+    <Modal title="Xuất hợp đồng" onClose={onClose} wide>
+      <div className="space-y-4">
+        <div className="rounded-xl bg-slate-50 px-4 py-3">
+          <p className="text-xs uppercase tracking-wide text-ink-400">Khách hàng</p>
+          <p className="font-display font-semibold text-navy-900">{khach?.ten_khach || '—'}</p>
+          <p className="text-sm text-ink-600">Giá trị {formatVnd(contract.gia_tri)}
+            {loaiDV === 'ads' ? ' (chưa gồm VAT — file sẽ tự cộng 8%)' : ' (đã gồm VAT)'}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Select label="Loại hợp đồng" value={loaiDV} onChange={(e) => setLoaiDV(e.target.value)}>
+            <option value="ads">Chạy quảng cáo (TUKI ADS)</option>
+            <option value="xay_shop">Xây shop (TUKIGROUP)</option>
+          </Select>
+          <Input label="Ngày ký" type="date" value={form.ngay_ky}
+            onChange={(e) => setForm({ ...form, ngay_ky: e.target.value })} />
+        </div>
+
+        <div className="rounded-lg bg-teal-50 px-3 py-2 text-sm">
+          <span className="text-ink-600">Số hợp đồng: </span>
+          <span className="font-medium text-navy-900">{soHD}</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Tên viết tắt (trong số HĐ)" value={vtat}
+            onChange={(e) => setVtat(e.target.value.toUpperCase())} />
+          <Input label="Người đại diện (Bên A)" value={form.nguoi_dai_dien}
+            onChange={(e) => setForm({ ...form, nguoi_dai_dien: e.target.value })} />
+          <Input label="Chức vụ" value={form.chuc_vu}
+            onChange={(e) => setForm({ ...form, chuc_vu: e.target.value })} />
+          <Input label="Mã số thuế" value={form.mst}
+            onChange={(e) => setForm({ ...form, mst: e.target.value })} />
+          <div className="col-span-2">
+            <Input label="Địa chỉ" value={form.dia_chi}
+              onChange={(e) => setForm({ ...form, dia_chi: e.target.value })} />
+          </div>
+          {loaiDV === 'xay_shop' && (
+            <Input label="Email" value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          )}
+          <Input label="Link shop" value={form.link_shop}
+            onChange={(e) => setForm({ ...form, link_shop: e.target.value })} />
+          <Input label="Số lượng gian hàng" type="number" min="1" value={form.so_luong_gian_hang}
+            onChange={(e) => setForm({ ...form, so_luong_gian_hang: e.target.value })} />
+          <Input label="Số sản phẩm (theo gói)" type="number" value={form.so_san_pham}
+            onChange={(e) => setForm({ ...form, so_san_pham: e.target.value })} placeholder="VD: 20" />
+          <Input label="Tên gói" value={form.ten_goi}
+            onChange={(e) => setForm({ ...form, ten_goi: e.target.value })} placeholder="VD: SHOPEE PRO - 1 tháng" />
+          {loaiDV === 'ads' && (
+            <Input label="Ngày dự kiến bắt đầu" type="date" value={form.ngay_bat_dau}
+              onChange={(e) => setForm({ ...form, ngay_bat_dau: e.target.value })} />
+          )}
+        </div>
+
+        <div>
+          <Textarea label="Nội dung triển khai (mỗi dòng: Tên nội dung | Chi tiết)" rows={5}
+            value={form.noi_dung} onChange={(e) => setForm({ ...form, noi_dung: e.target.value })}
+            placeholder={"Phân tích & lựa chọn sản phẩm | Lựa chọn 20 sản phẩm phân bổ ngân sách\nLên & care quảng cáo | Care tối đa 20 sản phẩm"} />
+          <p className="mt-1 text-xs text-ink-400">
+            Để trống nếu không cần bảng nội dung. Dùng dấu | ngăn giữa tên nội dung và chi tiết.
+          </p>
+        </div>
+
+        {msg && <p className="text-sm text-rose-600">{msg}</p>}
+
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Hủy</Button>
+          <Button type="button" onClick={xuat} disabled={dangXuat}>
+            <FileDown size={15} /> {dangXuat ? 'Đang tạo file...' : 'Tải hợp đồng Word'}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
