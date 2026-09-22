@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye, Printer, Download } from 'lucide-react'
+import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye, Printer, Download, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Modal, Textarea } from './ui'
 import { TRANG_THAI_HD_OPTIONS, classOf, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
@@ -111,6 +111,13 @@ export default function ContractsPage({ currentProfile }) {
   const sapHetHan = contracts.filter((c) => c.trang_thai === 'hieu_luc' && c.ngay_het_han
     && c.ngay_het_han >= homNay
     && c.ngay_het_han <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10))
+
+  async function xoaHopDong(c) {
+    if (!window.confirm(`Xoá hợp đồng ${c.so_hop_dong}? Không thể hoàn tác. Đơn dịch vụ liên quan vẫn được giữ nguyên.`)) return
+    const { error } = await supabase.from('contracts').delete().eq('id', c.id)
+    if (error) { window.alert('Không xoá được: ' + error.message); return }
+    load()
+  }
 
   async function taiExcel() {
     const XLSX = await import('xlsx')
@@ -283,8 +290,12 @@ export default function ContractsPage({ currentProfile }) {
                       <FileDown size={14} /> Xuất
                     </button>
                     <button onClick={() => setEditing(c)}
-                      className="text-ink-400 hover:text-coral-500" title="Sửa hợp đồng">
+                      className="mr-3 text-ink-400 hover:text-coral-500" title="Sửa hợp đồng">
                       <Pencil size={14} />
+                    </button>
+                    <button onClick={() => xoaHopDong(c)}
+                      className="text-ink-400 hover:text-rose-500" title="Xoá hợp đồng">
+                      <Trash2 size={14} />
                     </button>
                   </td>
                 </tr>

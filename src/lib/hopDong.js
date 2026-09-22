@@ -14,17 +14,23 @@ const P = (children, o = {}) => new Paragraph({
 })
 const dong = (nhan, giaTri, o = {}) => P([T(nhan, { bold: o.bold }), T(giaTri || '.....................................')])
 
-function bangNoiDung(rows) {
+function bangNoiDung(rows, headers = ['NỘI DUNG TRIỂN KHAI', 'CHI TIẾT']) {
   const cell = (text, opt = {}) => new TableCell({
     width: { size: opt.w || 50, type: WidthType.PERCENTAGE },
-    children: [P(T(text, { bold: opt.bold, size: 22 }), { after: 40, align: opt.align })],
+    // text có thể là 1 chuỗi (tiêu đề cột) hoặc mảng nhiều ý — mỗi ý xuống 1 dòng riêng cho dễ đọc
+    children: Array.isArray(text)
+      ? text.map((t, i) => P(T(t, { bold: opt.bold, size: 22 }), { after: i === text.length - 1 ? 40 : 60, align: opt.align }))
+      : [P(T(text, { bold: opt.bold, size: 22 }), { after: 40, align: opt.align })],
     shading: opt.header ? { fill: 'D9E2F3' } : undefined,
   })
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [
-      new TableRow({ children: [cell('NỘI DUNG TRIỂN KHAI', { header: true, bold: true, w: 40, align: AlignmentType.CENTER }), cell('CHI TIẾT', { header: true, bold: true, w: 60, align: AlignmentType.CENTER })] }),
-      ...rows.map((r) => new TableRow({ children: [cell(r[0], { w: 40 }), cell(r[1], { w: 60 })] })),
+      new TableRow({ children: [cell(headers[0], { header: true, bold: true, w: 40, align: AlignmentType.CENTER }), cell(headers[1], { header: true, bold: true, w: 60, align: AlignmentType.CENTER })] }),
+      ...rows.map((r) => new TableRow({ children: [
+        cell(r[0], { w: 40 }),
+        cell(String(r[1] || '').split(';').map((s) => s.trim()).filter(Boolean), { w: 60 }),
+      ] })),
     ],
   })
 }
@@ -41,7 +47,7 @@ const kyTen = (tenA, tenB) => new Table({
   borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
   rows: [
     new TableRow({ children: [
-      new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [P(T('ĐẠI DIỆN BÊN A', { bold: true }), { align: AlignmentType.CENTER, after: 40 }), P(T('(Ký, ghi rõ họ tên)', { italics: true, size: 20 }), { align: AlignmentType.CENTER })] }),
+      new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [P(T('ĐẠI DIỆN BÊN A', { bold: true }), { align: AlignmentType.CENTER, after: 40 }), P(T('(Ký, ghi rõ họ tên)', { italics: true, size: 20 }), { align: AlignmentType.CENTER }), ...(tenA ? [P(T(''), { after: 400 }), P(T(tenA, { bold: true }), { align: AlignmentType.CENTER })] : [])] }),
       new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [P(T('ĐẠI DIỆN BÊN B', { bold: true }), { align: AlignmentType.CENTER, after: 40 }), P(T('(Ký, ghi rõ họ tên)', { italics: true, size: 20 }), { align: AlignmentType.CENTER }), ...(tenB ? [P(T(''), { after: 400 }), P(T(tenB, { bold: true }), { align: AlignmentType.CENTER })] : [])] }),
     ] }),
   ],
@@ -139,46 +145,61 @@ function hopDongXayShop(hd) {
   const tong = Number(hd.gia_tri) || 0          // đã gồm VAT
   const noiDung = hd.rows_noi_dung || []
   const soSP = hd.so_san_pham || 30
+  const soShop = Number(hd.so_luong_gian_hang) || 1
+  const soShopPad = String(soShop).padStart(2, '0')
+  const linkShop = hd.link_shop || 'Chưa có link shop'
 
   return [
-    P([T('CÔNG TY CỔ PHẦN TẬP ĐOÀN TUKIGROUP', { bold: true, size: 22 })], { after: 0 }),
+    P(T('CÔNG TY CỔ PHẦN', { bold: true, size: 22 }), { after: 0 }),
+    P([T('TẬP ĐOÀN TUKIGROUP', { bold: true, size: 22 })], { after: 0 }),
     P([T('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', { bold: true, size: 22 })], { align: AlignmentType.RIGHT, after: 0 }),
     P([T('Độc lập – Tự do – Hạnh phúc', { bold: true, size: 22 })], { align: AlignmentType.RIGHT, after: 200 }),
 
-    P(T('HỢP ĐỒNG CUNG CẤP DỊCH VỤ THƯƠNG MẠI ĐIỆN TỬ', { bold: true, size: 28 }), { align: AlignmentType.CENTER, after: 60 }),
-    P([T(`Số: ${hd.so_hop_dong}`, { bold: true }), T('          '), T(ngayVN(hd.ngay_ky), { italics: true, size: 22 })], { align: AlignmentType.CENTER, after: 200 }),
+    P(T('HỢP ĐỒNG CUNG CẤP DỊCH VỤ', { bold: true, size: 28 }), { align: AlignmentType.CENTER, after: 0 }),
+    P(T('THƯƠNG MẠI ĐIỆN TỬ', { bold: true, size: 28 }), { align: AlignmentType.CENTER, after: 200 }),
+
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [new TableRow({ children: [
+        new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [P(T(`Số: ${hd.so_hop_dong}`, { bold: true }))] }),
+        new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [P(T(ngayVN(hd.ngay_ky), { italics: true }), { align: AlignmentType.RIGHT })] }),
+      ] })],
+    }),
+    P(T(''), { after: 200 }),
 
     ...canCu(),
 
-    P(T('I. BÊN SỬ DỤNG DỊCH VỤ (BÊN A):', { bold: true })),
-    dong('Tên: ', hd.ten_khach),
-    dong('Đại diện: ', hd.nguoi_dai_dien),
-    dong('Chức vụ: ', hd.chuc_vu),
+    P(T(`I. BÊN SỬ DỤNG DỊCH VỤ: ${(hd.ten_khach || '').toUpperCase()}`, { bold: true })),
+    P(T(`Đại diện: ${hd.nguoi_dai_dien || '.....................................'} - Chức vụ: ${hd.chuc_vu || '.....................................'}`)),
     dong('Địa chỉ: ', hd.dia_chi),
     dong('MST: ', hd.mst),
     dong('SĐT: ', hd.sdt),
     dong('Email: ', hd.email),
+    P(T('(Sau đây gọi tắt là Bên A)', { italics: true }), { after: 200 }),
 
-    P(T('II. BÊN CUNG CẤP DỊCH VỤ (BÊN B): CÔNG TY CỔ PHẦN TẬP ĐOÀN TUKIGROUP', { bold: true })),
+    P(T('II. BÊN CUNG CẤP DỊCH VỤ: CÔNG TY CỔ PHẦN TẬP ĐOÀN TUKIGROUP', { bold: true })),
     P(T('Đại diện: NGUYỄN TRUNG KIÊN - Chức vụ: Chủ tịch HĐQT')),
     P(T('Địa chỉ: Tầng 3, T2 Times Tower, số 35 đường Lê Văn Lương, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam')),
-    P(T('MST: 0109789110 - SĐT: 0868.388.862')),
-    P(T('Số tài khoản: 86286888888 tại Ngân hàng TMCP Á Châu (ACB)'), { after: 200 }),
+    P(T('MST: 0109789110')),
+    P(T('SĐT: 0868.388.862')),
+    P(T('Số tài khoản: 86286888888 tại Ngân hàng Thương mại cổ phần Á Châu (ACB)')),
+    P(T('(Sau đây gọi tắt là Bên B)', { italics: true }), { after: 200 }),
 
-    P(T('Cùng nhau thỏa thuận và thống nhất ký kết Hợp đồng dịch vụ thương mại điện tử với những điều khoản sau:'), { after: 160 }),
+    P(T('Cùng nhau thoả thuận và thống nhất ký kết Hợp đồng dịch vụ thương mại điện tử (sau đây được gọi là Hợp đồng) với những điều khoản sau:'), { after: 160 }),
 
     P(T('ĐIỀU 1: NỘI DUNG HỢP ĐỒNG', { bold: true })),
     P(T(`Bên B cung cấp Gói dịch vụ TỐI ƯU${hd.ten_goi ? ` (${hd.ten_goi})` : ''} - Chuẩn hóa và tối ưu tối đa ${soSP} sản phẩm cho bên A với những nội dung sau:`)),
-    dong('- Số lượng shop: ', String(hd.so_luong_gian_hang || 1)),
-    dong('- Link Shopee: ', hd.link_shop),
-    ...(noiDung.length ? [P(T('')), bangNoiDung(noiDung), P(T(''))] : []),
+    dong('- Số lượng shop: ', soShopPad),
+    dong('- Link Shopee: ', linkShop),
+    ...(noiDung.length ? [P(T('')), bangNoiDung(noiDung, [`Hạng mục ${soShop} shop`, 'Nội dung']), P(T(''))] : []),
 
     P(T('ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG', { bold: true })),
     P([T('Giá trị hợp đồng (bao gồm VAT): ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
     P([T('Bằng chữ: ', {}), T(`${docTienThanhChu(tong)}./.`, { italics: true })], { after: 160 }),
 
     P(T('ĐIỀU 3: PHƯƠNG THỨC THANH TOÁN', { bold: true })),
-    P([T('3.1. Bên A thanh toán 100% phí dịch vụ khi bắt đầu công việc: ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
+    P([T('3.1. Bên A thanh toán 100% phí dịch vụ khi bắt đầu công việc với số tiền như sau: ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
+    P([T('Bằng chữ: ', {}), T(`${docTienThanhChu(tong)}./.`, { italics: true })]),
     P(T('3.2. Thanh toán bằng hình thức: Chuyển khoản.'), { after: 160 }),
 
     P(T('ĐIỀU 4: QUYỀN VÀ NGHĨA VỤ CỦA BÊN A', { bold: true })),
