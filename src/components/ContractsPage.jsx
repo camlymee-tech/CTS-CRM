@@ -368,8 +368,7 @@ function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSa
         <div className="rounded-xl bg-slate-50 px-4 py-3">
           <p className="text-xs uppercase tracking-wide text-ink-400">Khách hàng</p>
           <p className="font-display font-semibold text-navy-900">{khach?.ten_khach || '—'}</p>
-          <p className="text-sm text-ink-600">Giá trị {formatVnd(contract.gia_tri)}
-            {loaiDV === 'ads' ? ' (chưa gồm VAT — file sẽ tự cộng 8%)' : ' (đã gồm VAT)'}</p>
+          <p className="text-sm text-ink-600">Giá trị {formatVnd(contract.gia_tri)} (đã gồm VAT)</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

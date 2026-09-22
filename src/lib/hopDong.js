@@ -54,9 +54,9 @@ function ngayVN(d) {
 
 // ---------------- HỢP ĐỒNG QUẢNG CÁO ----------------
 function hopDongAds(hd) {
-  const giaTri = Number(hd.gia_tri) || 0        // giá trị (chưa VAT)
-  const vat = Math.round(giaTri * 0.08)
-  const tong = giaTri + vat
+  const tong = Math.round(Number(hd.gia_tri) || 0)   // giá trị đơn đã bao gồm VAT
+  const giaTri = Math.round(tong / 1.08)              // tách ngược ra giá trước VAT để hiển thị
+  const vat = tong - giaTri
   const noiDung = hd.rows_noi_dung || []
   const soSP = hd.so_san_pham || 30
 

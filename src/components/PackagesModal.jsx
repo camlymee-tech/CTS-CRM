@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Modal, Button, Input, Select, Textarea, Badge } from './ui'
-import { formatVnd } from '../lib/constants'
+import { formatVnd, giaTruocVat } from '../lib/constants'
 
 export default function PackagesModal({ onClose }) {
   const [services, setServices] = useState([])
@@ -72,7 +72,12 @@ export default function PackagesModal({ onClose }) {
                           </div>
                           {p.mo_ta && <p className="mt-0.5 text-xs text-ink-600">{p.mo_ta}</p>}
                         </div>
-                        <p className="flex-none font-display font-bold text-coral-500">{formatVnd(p.gia)}</p>
+                        <div className="flex-none text-right">
+                          <p className="font-display font-bold text-coral-500">{formatVnd(p.gia)}</p>
+                          <p className="text-[11px] uppercase tracking-wide text-ink-400">Sau VAT</p>
+                          <p className="mt-1 text-xs text-ink-500">{formatVnd(giaTruocVat(p.gia))}</p>
+                          <p className="text-[11px] uppercase tracking-wide text-ink-400">Trước VAT</p>
+                        </div>
                         <div className="flex flex-none gap-2">
                           <button onClick={() => batTat(p)} className="text-xs text-ink-400 hover:text-navy-900">
                             {p.active ? 'Tắt' : 'Bật'}

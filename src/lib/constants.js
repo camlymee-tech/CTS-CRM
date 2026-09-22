@@ -81,3 +81,10 @@ export const TRANG_THAI_HD_OPTIONS = [
 export function formatVnd(n) {
   return new Intl.NumberFormat('vi-VN').format(Number(n) || 0) + ' đ'
 }
+
+// Giá gói lưu trong hệ thống luôn là giá SAU VAT (giá bán thực tế cho khách).
+// Hàm này tách ngược ra giá TRƯỚC VAT chỉ để hiển thị tham khảo, làm tròn đến nghìn đồng.
+export function giaTruocVat(giaSauVat, thuePct = 8) {
+  const g = Number(giaSauVat) || 0
+  return Math.round(g / (1 + thuePct / 100) / 1000) * 1000
+}
