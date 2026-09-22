@@ -1,9 +1,41 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown } from 'lucide-react'
+import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Modal, Textarea } from './ui'
 import { TRANG_THAI_HD_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
 import { taoSoHopDong, vietTat } from '../lib/docSo'
+import ContractPreview from './ContractPreview'
+
+// Chuỗi "Tên | Chi tiết" mỗi dòng -> mảng [ [tên, chi tiết], ... ] cho bảng nội dung hợp đồng
+function parseNoiDung(text) {
+  return (text || '').trim()
+    ? text.trim().split('\n').map((l) => {
+        const [a, ...b] = l.split('|')
+        return [a.trim(), b.join('|').trim()]
+      })
+    : []
+}
+
+// Dựng lại dữ liệu hợp đồng (đúng cấu trúc taoFileHopDong cần) từ 1 hợp đồng đã lưu,
+// dùng để xem trước ngay từ danh sách mà không cần mở lại form xuất file
+function hdTuHopDongDaLuu(c, khach) {
+  return {
+    loai_dich_vu: c.loai_dich_vu || 'ads',
+    so_hop_dong: c.so_hop_dong,
+    ngay_ky: c.ngay_ky,
+    ten_khach: khach?.ten_khach,
+    sdt: khach?.sdt,
+    dia_chi: khach?.dia_chi, mst: khach?.mst,
+    nguoi_dai_dien: khach?.nguoi_dai_dien, chuc_vu: khach?.chuc_vu, email: khach?.email,
+    link_shop: khach?.link_shop,
+    so_luong_gian_hang: c.so_luong_gian_hang || 1,
+    so_san_pham: c.so_san_pham,
+    ten_goi: c.ten_goi,
+    ngay_bat_dau: c.ngay_bat_dau,
+    gia_tri: c.gia_tri,
+    rows_noi_dung: parseNoiDung(c.noi_dung_hd),
+  }
+}
 
 export default function ContractsPage({ currentProfile }) {
   const [contracts, setContracts] = useState([])
@@ -17,6 +49,7 @@ export default function ContractsPage({ currentProfile }) {
   const [filterTT, setFilterTT] = useState('')
   const [editing, setEditing] = useState(null)
   const [xuatHD, setXuatHD] = useState(null)
+  const [xemHD, setXemHD] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -24,7 +57,7 @@ export default function ContractsPage({ currentProfile }) {
     setLoading(true)
     const [{ data: ct }, { data: cu }, { data: od }, { data: it }, { data: pf }, { data: pk }] = await Promise.all([
       supabase.from('contracts').select('*').order('ngay_ky', { ascending: false }),
-      supabase.from('customers').select('id, ten_khach, ma_khach, sdt'),
+      supabase.from('customers').select('id, ten_khach, ma_khach, sdt, dia_chi, mst, nguoi_dai_dien, chuc_vu, email, ten_viet_tat, link_shop'),
       supabase.from('orders').select('id, ma_don, sale_id'),
       supabase.from('order_items').select('*'),
       supabase.from('profiles').select('id, full_name'),
@@ -169,6 +202,12 @@ export default function ContractsPage({ currentProfile }) {
                         <ExternalLink size={14} />
                       </a>
                     )}
+                    {c.loai_dich_vu && (
+                      <button onClick={() => setXemHD(c)}
+                        className="mr-3 inline-flex items-center gap-1 text-xs text-navy-700 hover:text-navy-900" title="Xem trước hợp đồng">
+                        <Eye size={14} /> Xem
+                      </button>
+                    )}
                     <button onClick={() => setXuatHD(c)}
                       className="mr-3 inline-flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700" title="Xuất file hợp đồng">
                       <FileDown size={14} /> Xuất
@@ -200,6 +239,13 @@ export default function ContractsPage({ currentProfile }) {
       {editing && (
         <ContractForm contract={editing} khach={khach(editing.customer_id)}
           onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />
+      )}
+
+      {xemHD && (
+        <ContractPreview
+          hd={hdTuHopDongDaLuu(xemHD, khach(xemHD.customer_id))}
+          onClose={() => setXemHD(null)}
+        />
       )}
     </div>
   )
@@ -250,10 +296,32 @@ function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSa
     }
   }
 
+  const [xemTruoc, setXemTruoc] = useState(false)
+
   const soHD = taoSoHopDong({
     loaiDichVu: loaiDV, ngay: form.ngay_ky,
     maKhach: khach?.ma_khach, tenVietTat: vtat,
   })
+
+  // Dữ liệu hợp đồng dựng từ form hiện tại — dùng chung cho cả Xem trước và Xuất file Word
+  function hdHienTai() {
+    return {
+      loai_dich_vu: loaiDV,
+      so_hop_dong: soHD,
+      ngay_ky: form.ngay_ky,
+      ten_khach: khach?.ten_khach,
+      sdt: khach?.sdt,
+      dia_chi: form.dia_chi, mst: form.mst,
+      nguoi_dai_dien: form.nguoi_dai_dien, chuc_vu: form.chuc_vu, email: form.email,
+      link_shop: form.link_shop,
+      so_luong_gian_hang: Number(form.so_luong_gian_hang) || 1,
+      so_san_pham: form.so_san_pham ? Number(form.so_san_pham) : null,
+      ten_goi: form.ten_goi,
+      ngay_bat_dau: form.ngay_bat_dau,
+      gia_tri: contract.gia_tri,
+      rows_noi_dung: parseNoiDung(form.noi_dung),
+    }
+  }
 
   async function xuat() {
     setDangXuat(true); setMsg('')
@@ -269,33 +337,12 @@ function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSa
       so_san_pham: form.so_san_pham ? Number(form.so_san_pham) : null,
       ten_goi: form.ten_goi || null,
       ngay_bat_dau: form.ngay_bat_dau || null,
+      noi_dung_hd: form.noi_dung || null,
     }).eq('id', contract.id)
-
-    const rows = form.noi_dung.trim()
-      ? form.noi_dung.trim().split('\n').map((l) => {
-          const [a, ...b] = l.split('|')
-          return [a.trim(), b.join('|').trim()]
-        })
-      : []
 
     try {
       const { taoFileHopDong } = await import('../lib/hopDong')
-      const blob = await taoFileHopDong({
-        loai_dich_vu: loaiDV,
-        so_hop_dong: soHD,
-        ngay_ky: form.ngay_ky,
-        ten_khach: khach?.ten_khach,
-        sdt: khach?.sdt,
-        dia_chi: form.dia_chi, mst: form.mst,
-        nguoi_dai_dien: form.nguoi_dai_dien, chuc_vu: form.chuc_vu, email: form.email,
-        link_shop: form.link_shop,
-        so_luong_gian_hang: Number(form.so_luong_gian_hang) || 1,
-        so_san_pham: form.so_san_pham ? Number(form.so_san_pham) : null,
-        ten_goi: form.ten_goi,
-        ngay_bat_dau: form.ngay_bat_dau,
-        gia_tri: contract.gia_tri,
-        rows_noi_dung: rows,
-      })
+      const blob = await taoFileHopDong(hdHienTai())
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -382,11 +429,18 @@ function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSa
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>Hủy</Button>
+          <Button type="button" variant="secondary" onClick={() => setXemTruoc(true)}>
+            <Eye size={15} /> Xem trước
+          </Button>
           <Button type="button" onClick={xuat} disabled={dangXuat}>
             <FileDown size={15} /> {dangXuat ? 'Đang tạo file...' : 'Tải hợp đồng Word'}
           </Button>
         </div>
       </div>
+
+      {xemTruoc && (
+        <ContractPreview hd={hdHienTai()} onClose={() => setXemTruoc(false)} />
+      )}
     </Modal>
   )
 }
