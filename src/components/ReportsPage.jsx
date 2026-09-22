@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Select } from './ui'
-import { formatVnd } from '../lib/constants'
+import { formatVnd, giaTruocVat } from '../lib/constants'
 
 export default function ReportsPage() {
   const [orders, setOrders] = useState([])
@@ -36,7 +36,7 @@ export default function ReportsPage() {
 
   const idLoc = useMemo(() => new Set(donLoc.map((o) => o.id)), [donLoc])
 
-  const tongDoanhSo = donLoc.reduce((s, o) => s + (Number(o.gia_tri) || 0), 0)
+  const tongDoanhSo = donLoc.reduce((s, o) => s + giaTruocVat(o.gia_tri), 0)
 
   const theoSale = useMemo(() => {
     const m = {}
@@ -44,7 +44,7 @@ export default function ReportsPage() {
       const key = o.sale_id || 'chua_gan'
       m[key] = m[key] || { soDon: 0, doanhSo: 0 }
       m[key].soDon += 1
-      m[key].doanhSo += Number(o.gia_tri) || 0
+      m[key].doanhSo += giaTruocVat(o.gia_tri)
     }
     return Object.entries(m)
       .map(([id, v]) => ({ id, ten: profiles.find((p) => p.id === id)?.full_name || 'Chưa gán sale', ...v }))
@@ -57,7 +57,7 @@ export default function ReportsPage() {
       if (!idLoc.has(it.order_id)) continue
       m[it.ten_dich_vu] = m[it.ten_dich_vu] || { soLuong: 0, doanhSo: 0 }
       m[it.ten_dich_vu].soLuong += 1
-      m[it.ten_dich_vu].doanhSo += Number(it.gia) || 0
+      m[it.ten_dich_vu].doanhSo += giaTruocVat(it.gia)
     }
     return Object.entries(m).map(([ten, v]) => ({ ten, ...v })).sort((a, b) => b.doanhSo - a.doanhSo)
   }, [items, idLoc])
@@ -68,7 +68,7 @@ export default function ReportsPage() {
       if (!o.ngay_chot) continue
       const [y, mm] = o.ngay_chot.split('-')
       if (nam && y !== nam) continue
-      m[mm] = (m[mm] || 0) + (Number(o.gia_tri) || 0)
+      m[mm] = (m[mm] || 0) + giaTruocVat(o.gia_tri)
     }
     return Array.from({ length: 12 }, (_, i) => {
       const mm = String(i + 1).padStart(2, '0')
@@ -84,7 +84,7 @@ export default function ReportsPage() {
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
         <div>
           <h1 className="font-display text-xl font-bold text-navy-900">Tổng kết doanh số</h1>
-          <p className="text-sm text-ink-600">Doanh số theo sale, theo dịch vụ và theo tháng (không tính đơn huỷ)</p>
+          <p className="text-sm text-ink-600">Doanh số theo sale, theo dịch vụ và theo tháng (không tính đơn huỷ, số liệu chưa gồm VAT)</p>
         </div>
         <div className="flex gap-2">
           <Select value={nam} onChange={(e) => setNam(e.target.value)} className="w-28">
@@ -106,9 +106,9 @@ export default function ReportsPage() {
       ) : (
         <>
           <div className="grid grid-cols-3 gap-4 px-8 pt-6">
-            <StatCard label="Tổng doanh số" value={formatVnd(tongDoanhSo)} accent="coral" />
+            <StatCard label="Tổng doanh số (chưa VAT)" value={formatVnd(tongDoanhSo)} accent="coral" />
             <StatCard label="Số đơn chốt" value={donLoc.length} />
-            <StatCard label="Giá trị trung bình / đơn"
+            <StatCard label="Giá trị trung bình / đơn (chưa VAT)"
               value={formatVnd(donLoc.length ? tongDoanhSo / donLoc.length : 0)} accent="teal" />
           </div>
 

@@ -5,7 +5,7 @@ import { Button, Input, Select, Badge } from './ui'
 import OrderForm from './OrderForm'
 import CustomerDetail from './CustomerDetail'
 import PackagesModal from './PackagesModal'
-import { DICH_VU_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
+import { DICH_VU_OPTIONS, classOf, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
 
 export default function OrdersPage({ currentProfile, pendingCustomer, onPendingHandled }) {
@@ -47,8 +47,9 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
   }
 
   async function remove(o) {
-    if (!window.confirm(`Xoá đơn ${o.ma_don}? Thao tác này không hoàn tác được.`)) return
-    await supabase.from('orders').delete().eq('id', o.id)
+    if (!window.confirm(`Xoá đơn ${o.ma_don}? Thao tác này không hoàn tác được, hợp đồng gắn với đơn (nếu có) cũng sẽ bị xoá theo.`)) return
+    const { error } = await supabase.from('orders').delete().eq('id', o.id)
+    if (error) { window.alert('Không xoá được: ' + error.message); return }
     load()
   }
 
@@ -81,7 +82,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
     let nay = 0, truoc = 0, soDon = 0
     for (const o of orders) {
       if (o.trang_thai === 'huy' || !o.ngay_chot) continue
-      const tien = Number(o.gia_tri) || 0
+      const tien = giaTruocVat(o.gia_tri)
       if (o.ngay_chot >= mocNay) { nay += tien; soDon += 1 }
       else if (o.ngay_chot >= mocTruoc) truoc += tien
     }
@@ -90,7 +91,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
 
   const tongDoanhSo = filtered
     .filter((o) => o.trang_thai !== 'huy')
-    .reduce((s, o) => s + (Number(o.gia_tri) || 0), 0)
+    .reduce((s, o) => s + giaTruocVat(o.gia_tri), 0)
 
   function closeForm() {
     setShowForm(false)
@@ -120,7 +121,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
 
       <div className="grid grid-cols-4 gap-4 px-8 pt-6">
         <StatCard
-          label={`Doanh số tháng ${new Date().getMonth() + 1}`}
+          label={`Doanh số tháng ${new Date().getMonth() + 1} (chưa VAT)`}
           value={formatVnd(doanhSoThang.nay)}
           accent="coral"
           note={doanhSoThang.truoc > 0
@@ -129,7 +130,7 @@ export default function OrdersPage({ currentProfile, pendingCustomer, onPendingH
           noteUp={doanhSoThang.nay >= doanhSoThang.truoc}
           phamVi={`${doanhSoThang.soDon} đơn trong tháng`} />
         <StatCard label="Số đơn" value={filtered.length} phamVi="Theo bộ lọc" />
-        <StatCard label="Tổng giá trị (trừ đơn huỷ)" value={formatVnd(tongDoanhSo)} phamVi="Theo bộ lọc" />
+        <StatCard label="Tổng giá trị (trừ đơn huỷ, chưa VAT)" value={formatVnd(tongDoanhSo)} phamVi="Theo bộ lọc" />
         <StatCard label="Đơn đang triển khai"
           value={filtered.filter((o) => khachCua(o.customer_id)?.trang_thai_cham_soc === 'dang_trien_khai').length}
           accent="teal" phamVi="Theo bộ lọc" />

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Select, Badge } from './ui'
-import { NGUON_KHACH_OPTIONS, laDataDuocChia, labelOf, formatVnd } from '../lib/constants'
+import { NGUON_KHACH_OPTIONS, laDataDuocChia, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
 
 const NGAY_BO_QUEN = 7
@@ -90,7 +90,7 @@ export default function AnalyticsPage() {
     }
     for (const o of orders) {
       if (!o.sale_id || (o.ngay_chot || '') < moc) continue
-      co(o.sale_id); m[o.sale_id].chot += 1; m[o.sale_id].doanhSo += Number(o.gia_tri) || 0
+      co(o.sale_id); m[o.sale_id].chot += 1; m[o.sale_id].doanhSo += giaTruocVat(o.gia_tri)
     }
 
     return Object.entries(m)
@@ -215,7 +215,7 @@ export default function AnalyticsPage() {
                       <th className="pb-2 text-right">Lượt CS</th>
                       <th className="pb-2 text-right">Đơn chốt</th>
                       <th className="pb-2 text-right">Tỉ lệ tư vấn</th>
-                      <th className="pb-2 text-right">Doanh số</th>
+                      <th className="pb-2 text-right">Doanh số (chưa VAT)</th>
                     </tr>
                   </thead>
                   <tbody>
