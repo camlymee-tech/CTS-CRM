@@ -165,7 +165,12 @@ export default function ContractsPage({ currentProfile }) {
               return (
                 <tr key={c.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
                   <td className="px-5 py-3">
-                    <p className="font-medium text-navy-900">{c.so_hop_dong}</p>
+                    <button
+                      onClick={() => (c.loai_dich_vu ? setXemHD(c) : setXuatHD(c))}
+                      className="text-left font-medium text-navy-900 hover:text-coral-500 hover:underline"
+                      title="Bấm để xem hợp đồng">
+                      {c.so_hop_dong}
+                    </button>
                     {d && <p className="text-xs text-ink-400">Đơn {d.ma_don}</p>}
                   </td>
                   <td className="px-5 py-3">

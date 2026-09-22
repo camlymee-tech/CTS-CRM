@@ -4,6 +4,22 @@ import { supabase } from '../supabaseClient'
 import { Modal, Input, Select, Textarea, Button } from './ui'
 import { formatVnd } from '../lib/constants'
 
+// Đơn có thể gồm nhiều dịch vụ; hợp đồng chỉ có 1 loại (ads/xay_shop), nên ưu
+// tiên dịch vụ "Xây shop"/"Tối ưu sản phẩm" làm dịch vụ chính, còn lại là "Chạy quảng cáo"
+function goiChinhCuaDon(items, packages) {
+  const xayShop = items.find((it) => it.package_id && /xây shop|tối ưu/i.test(it.ten_dich_vu))
+  const ads = items.find((it) => it.package_id && /quảng cáo/i.test(it.ten_dich_vu))
+  const it = xayShop || ads
+  const pk = it && packages.find((p) => p.id === it.package_id)
+  if (!pk) return null
+  return {
+    loai_dich_vu: xayShop ? 'xay_shop' : 'ads',
+    ten_goi: pk.ten_goi,
+    so_san_pham: pk.so_san_pham || null,
+    noi_dung_hd: pk.noi_dung_hd || null,
+  }
+}
+
 export default function OrderForm({ order, customer, customers = [], profiles = [], currentProfile, onClose, onSaved }) {
   const isEdit = !!order
   const [services, setServices] = useState([])
@@ -99,8 +115,16 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
         gia: Number(it.gia) || 0,
       }))
     )
+    if (itemErr) { setSaving(false); setError(itemErr.message); return }
+
+    // Đẩy tên gói, số sản phẩm, nội dung triển khai sang hợp đồng tự sinh của đơn —
+    // để chị mở trang Hợp đồng lên là đã có sẵn, không cần điền lại thủ công
+    const goiChinh = goiChinhCuaDon(hopLe, packages)
+    if (goiChinh) {
+      await supabase.from('contracts').update(goiChinh).eq('order_id', orderId)
+    }
+
     setSaving(false)
-    if (itemErr) { setError(itemErr.message); return }
     onSaved()
   }
 
