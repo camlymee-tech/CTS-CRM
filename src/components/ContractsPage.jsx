@@ -27,7 +27,7 @@ function timGoiKhop(loaiDV, dichVu, packages) {
 
 // Dựng lại dữ liệu hợp đồng (đúng cấu trúc taoFileHopDong cần) từ 1 hợp đồng đã lưu,
 // dùng để xem trước ngay từ danh sách mà không cần mở lại form xuất file
-function hdTuHopDongDaLuu(c, khach) {
+export function hdTuHopDongDaLuu(c, khach) {
   return {
     loai_dich_vu: c.loai_dich_vu || 'ads',
     so_hop_dong: c.so_hop_dong,
@@ -332,7 +332,7 @@ export default function ContractsPage({ currentProfile }) {
   )
 }
 
-function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSaved }) {
+export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSaved }) {
   const laXayShop = (dichVu || []).some((d) => /xây shop|tối ưu/i.test(d.ten_dich_vu))
   const [loaiDV, setLoaiDV] = useState(contract.loai_dich_vu || (laXayShop ? 'xay_shop' : 'ads'))
   const [vtat, setVtat] = useState(khach?.ten_viet_tat || vietTat(khach?.ten_khach))

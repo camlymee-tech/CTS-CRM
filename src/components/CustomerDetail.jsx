@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import {
   X, Phone, MessageCircle, Users as UsersIcon, MoreHorizontal, Plus, Pencil,
   Link2, Store, HandHeart, CircleAlert, CircleCheck, History, Check, Trash2, CalendarClock, FileText, ShoppingBag,
+  FileDown, Eye,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Textarea, Select, Badge, Input } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
+import { XuatHopDongForm, hdTuHopDongDaLuu } from './ContractsPage'
+import ContractPreview from './ContractPreview'
 import {
   LOAI_TUONG_TAC_OPTIONS, NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, LOAI_KHACH_OPTIONS,
@@ -27,8 +30,11 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const [hopDong, setHopDong] = useState([])
   const [dvTheoDon, setDvTheoDon] = useState({})
   const [profiles, setProfiles] = useState([])
+  const [packages, setPackages] = useState([])
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState('')
+  const [xuatHD, setXuatHD] = useState(null)   // { hd, don }
+  const [xemHD, setXemHD] = useState(null)
 
   const cuaMinh = customer.sale_id === currentProfile?.id
   const chung = laKhachChung(customer)
@@ -39,7 +45,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   async function load() {
     setLoading(true)
-    const [{ data: it }, { data: lg }, { data: pf }, { data: od }, { data: ct }] = await Promise.all([
+    const [{ data: it }, { data: lg }, { data: pf }, { data: od }, { data: ct }, { data: pk }] = await Promise.all([
       supabase.from('customer_interactions').select('*').eq('customer_id', customer.id)
         .order('ngay_thuc_hien', { ascending: false }),
       supabase.from('customer_logs').select('*').eq('customer_id', customer.id)
@@ -47,9 +53,11 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
       supabase.from('profiles').select('id, full_name'),
       supabase.from('orders').select('*').eq('customer_id', customer.id).order('ngay_chot', { ascending: false }),
       supabase.from('contracts').select('*').eq('customer_id', customer.id).order('ngay_ky', { ascending: false }),
+      supabase.from('service_packages').select('*'),
     ])
     setInteractions(it || []); setLogs(lg || []); setProfiles(pf || [])
     setDonHang(od || []); setHopDong(ct || [])
+    setPackages(pk || [])
 
     const ids = (od || []).map((o) => o.id)
     if (ids.length) {
@@ -216,11 +224,17 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
               )}
 
               {tab === 'don_hd' && (
-                donHang.length === 0
-                  ? <p className="text-sm text-ink-400">
-                      Khách chưa có đơn dịch vụ nào. Chuyển trạng thái sang "Chốt hợp đồng" để tạo đơn.
+                <div className="space-y-3">
+                  <button type="button" onClick={() => onChotDon?.(customer)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-coral-300 px-3 py-2 text-sm font-medium text-coral-600 hover:bg-coral-50">
+                    <Plus size={15} /> Tạo đơn dịch vụ {donHang.length > 0 ? 'khác' : 'mới'}
+                  </button>
+
+                  {donHang.length === 0 ? (
+                    <p className="text-sm text-ink-400">
+                      Khách chưa có đơn dịch vụ nào.
                     </p>
-                  : (
+                  ) : (
                     <div className="space-y-3">
                       {donHang.map((o) => {
                         const hd = hopDong.find((h) => h.order_id === o.id)
@@ -260,6 +274,16 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                                     <a href={hd.file_url} target="_blank" rel="noreferrer"
                                       className="text-teal-500 hover:underline">Mở file</a>
                                   )}
+                                  {hd.loai_dich_vu && (
+                                    <button type="button" onClick={() => setXemHD(hd)}
+                                      className="inline-flex items-center gap-1 text-navy-700 hover:text-navy-900">
+                                      <Eye size={12} /> Xem
+                                    </button>
+                                  )}
+                                  <button type="button" onClick={() => setXuatHD({ hd, don: o })}
+                                    className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700">
+                                    <FileDown size={12} /> Xuất hợp đồng
+                                  </button>
                                 </>
                               )}
                             </div>
@@ -268,7 +292,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                         )
                       })}
                     </div>
-                  )
+                  )}
+                </div>
               )}
 
               {tab === 'cham_soc' && (
@@ -337,6 +362,25 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
             }} />
         )}
       </div>
+
+      {xuatHD && (
+        <XuatHopDongForm
+          contract={xuatHD.hd}
+          khach={customer}
+          don={xuatHD.don}
+          dichVu={dvTheoDon[xuatHD.don.id] || []}
+          packages={packages}
+          onClose={() => setXuatHD(null)}
+          onSaved={() => { setXuatHD(null); load() }}
+        />
+      )}
+
+      {xemHD && (
+        <ContractPreview
+          hd={hdTuHopDongDaLuu(xemHD, customer)}
+          onClose={() => setXemHD(null)}
+        />
+      )}
     </div>
   )
 }
