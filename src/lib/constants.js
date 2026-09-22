@@ -6,6 +6,8 @@ export const NEN_TANG_OPTIONS = [
 export const DICH_VU_OPTIONS = [
   { value: 'quang_cao', label: 'Chạy quảng cáo', className: 'bg-violet-100 text-violet-700 border border-violet-300' },
   { value: 'xay_shop', label: 'Xây shop', className: 'bg-sky-100 text-sky-700 border border-sky-300' },
+  { value: 'toi_uu_sp', label: 'Tối ưu sản phẩm', className: 'bg-amber-100 text-amber-700 border border-amber-300' },
+  { value: 'bo_sung', label: 'Dịch vụ bổ sung', className: 'bg-slate-100 text-slate-600 border border-slate-300' },
 ]
 
 export const LOAI_KHACH_OPTIONS = [

@@ -118,7 +118,7 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
     if (itemErr) { setSaving(false); setError(itemErr.message); return }
 
     // Đẩy tên gói, số sản phẩm, nội dung triển khai sang hợp đồng tự sinh của đơn —
-    // để chị mở trang Hợp đồng lên là đã có sẵn, không cần điền lại thủ công
+    // để mở trang Hợp đồng lên là đã có sẵn, không cần điền lại thủ công
     const goiChinh = goiChinhCuaDon(hopLe, packages)
     if (goiChinh) {
       await supabase.from('contracts').update(goiChinh).eq('order_id', orderId)

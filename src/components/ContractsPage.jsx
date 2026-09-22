@@ -369,7 +369,9 @@ function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSa
     }
   }
 
-  const soHD = taoSoHopDong({
+  // Giữ nguyên số hợp đồng đã có (tự sinh lúc tạo đơn) — chỉ sinh số mới theo mẫu
+  // TUKISELLER/TUKIADS cho hợp đồng CHƯA từng có số, để không đổi số mỗi lần xuất lại
+  const soHD = contract.so_hop_dong || taoSoHopDong({
     loaiDichVu: loaiDV, ngay: form.ngay_ky,
     maKhach: khach?.ma_khach, tenVietTat: vtat,
   })
@@ -453,11 +455,16 @@ function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSa
         <div className="rounded-lg bg-teal-50 px-3 py-2 text-sm">
           <span className="text-ink-600">Số hợp đồng: </span>
           <span className="font-medium text-navy-900">{soHD}</span>
+          {contract.so_hop_dong && (
+            <span className="ml-1 text-xs text-ink-400">(giữ nguyên số đã có, không đổi khi xuất lại)</span>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Tên viết tắt (trong số HĐ)" value={vtat}
-            onChange={(e) => setVtat(e.target.value.toUpperCase())} />
+          {!contract.so_hop_dong && (
+            <Input label="Tên viết tắt (trong số HĐ)" value={vtat}
+              onChange={(e) => setVtat(e.target.value.toUpperCase())} />
+          )}
           <Input label="Người đại diện (Bên A)" value={form.nguoi_dai_dien}
             onChange={(e) => setForm({ ...form, nguoi_dai_dien: e.target.value })} />
           <Input label="Chức vụ" value={form.chuc_vu}

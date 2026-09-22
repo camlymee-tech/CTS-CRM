@@ -197,6 +197,19 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                   <Field label="Chăm sóc tiếp theo" value={customer.ngay_cham_soc_tiep_theo} />
                 </div>
 
+                <div>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">
+                    Thông tin pháp lý (dùng khi lên hợp đồng)
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                    <Field label="Người đại diện" value={customer.nguoi_dai_dien} />
+                    <Field label="Chức vụ" value={customer.chuc_vu} />
+                    <Field label="Mã số thuế" value={customer.mst} />
+                    <Field label="Email" value={customer.email} />
+                    <div className="col-span-2"><Field label="Địa chỉ" value={customer.dia_chi} /></div>
+                  </div>
+                </div>
+
                 <VanDeGiaiPhap customer={customer} suaDuoc={suaDuoc}
                   onSaved={(patch) => setCustomer({ ...customer, ...patch })} />
                 </div>
