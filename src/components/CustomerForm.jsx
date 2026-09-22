@@ -19,6 +19,11 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
     ten_khach: customer?.ten_khach || '',
     link_fb: customer?.link_fb || '',
     link_shop: customer?.link_shop || '',
+    dia_chi: customer?.dia_chi || '',
+    mst: customer?.mst || '',
+    nguoi_dai_dien: customer?.nguoi_dai_dien || '',
+    chuc_vu: customer?.chuc_vu || '',
+    email: customer?.email || '',
     sdt: customer?.sdt || '',
     nen_tang: customer?.nen_tang || [],
     dich_vu: customer?.dich_vu || [],
@@ -85,6 +90,11 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
       sale_id: form.sale_id || null,
       link_fb: form.link_fb || null,
       link_shop: form.link_shop || null,
+      dia_chi: form.dia_chi || null,
+      mst: form.mst || null,
+      nguoi_dai_dien: form.nguoi_dai_dien || null,
+      chuc_vu: form.chuc_vu || null,
+      email: form.email || null,
     }
     const { data, error } = isEdit
       ? await supabase.from('customers').update(payload).eq('id', customer.id).select().single()
@@ -124,6 +134,25 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
         <Input label="Link shop" value={form.link_shop}
           onChange={(e) => setForm({ ...form, link_shop: e.target.value })}
           placeholder="https://shopee.vn/... hoặc TikTok Shop" />
+
+        <div className="col-span-2 flex flex-col gap-1.5 text-sm">
+          <span className="font-medium text-navy-900">Thông tin pháp lý (dùng khi lên hợp đồng)</span>
+          <p className="text-xs text-ink-400">
+            Khai 1 lần ở đây, dùng chung cho mọi hợp đồng của khách này — không cần nhập lại mỗi lần xuất hợp đồng.
+          </p>
+        </div>
+        <Input label="Người đại diện (Bên A)" value={form.nguoi_dai_dien}
+          onChange={(e) => setForm({ ...form, nguoi_dai_dien: e.target.value })} />
+        <Input label="Chức vụ" value={form.chuc_vu}
+          onChange={(e) => setForm({ ...form, chuc_vu: e.target.value })} />
+        <Input label="Mã số thuế" value={form.mst}
+          onChange={(e) => setForm({ ...form, mst: e.target.value })} />
+        <Input label="Email" value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <div className="col-span-2">
+          <Input label="Địa chỉ" value={form.dia_chi}
+            onChange={(e) => setForm({ ...form, dia_chi: e.target.value })} />
+        </div>
 
         {khachTrung && (
           <div className="col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-4">

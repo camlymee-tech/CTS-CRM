@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye } from 'lucide-react'
+import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye, Printer, Download } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Modal, Textarea } from './ui'
-import { TRANG_THAI_HD_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
+import { TRANG_THAI_HD_OPTIONS, classOf, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
 import { taoSoHopDong, vietTat } from '../lib/docSo'
 import ContractPreview from './ContractPreview'
 
@@ -14,6 +14,15 @@ function parseNoiDung(text) {
         return [a.trim(), b.join('|').trim()]
       })
     : []
+}
+
+// Tìm gói (trong service_packages) khớp với dịch vụ đã chốt trên đơn, theo loại hợp đồng
+// đang chọn — ads -> "Chạy quảng cáo"; xay_shop -> "Xây shop" / "Tối ưu sản phẩm"
+function timGoiKhop(loaiDV, dichVu, packages) {
+  const khop = loaiDV === 'xay_shop' ? /xây shop|tối ưu/i : /quảng cáo/i
+  const item = (dichVu || []).find((d) => d.package_id && khop.test(d.ten_dich_vu))
+  if (!item) return null
+  return (packages || []).find((p) => p.id === item.package_id) || null
 }
 
 // Dựng lại dữ liệu hợp đồng (đúng cấu trúc taoFileHopDong cần) từ 1 hợp đồng đã lưu,
@@ -47,6 +56,9 @@ export default function ContractsPage({ currentProfile }) {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterTT, setFilterTT] = useState('')
+  const [filterSale, setFilterSale] = useState('')
+  const [tuNgay, setTuNgay] = useState('')
+  const [denNgay, setDenNgay] = useState('')
   const [editing, setEditing] = useState(null)
   const [xuatHD, setXuatHD] = useState(null)
   const [xemHD, setXemHD] = useState(null)
@@ -79,40 +91,76 @@ export default function ContractsPage({ currentProfile }) {
 
   const filtered = useMemo(() => contracts.filter((c) => {
     if (filterTT && c.trang_thai !== filterTT) return false
+    const d = don(c.order_id)
+    if (filterSale && d?.sale_id !== filterSale) return false
+    if (tuNgay && (!c.ngay_ky || c.ngay_ky < tuNgay)) return false
+    if (denNgay && (!c.ngay_ky || c.ngay_ky > denNgay)) return false
     if (search) {
       const k = khach(c.customer_id)
-      const d = don(c.order_id)
       const dv = (items[c.order_id] || []).map((i) => i.ten_dich_vu).join(' ')
-      if (!`${c.so_hop_dong} ${k?.ten_khach || ''} ${k?.sdt || ''} ${d?.ma_don || ''} ${dv}`
+      if (!`${c.so_hop_dong} ${k?.ten_khach || ''} ${k?.sdt || ''} ${k?.ma_khach || ''} ${d?.ma_don || ''} ${dv}`
         .toLowerCase().includes(search.toLowerCase())) return false
     }
     return true
-  }), [contracts, customers, orders, items, search, filterTT])
+  }), [contracts, customers, orders, items, search, filterTT, filterSale, tuNgay, denNgay])
 
   const tongGiaTri = filtered.filter((c) => c.trang_thai !== 'da_huy')
     .reduce((s, c) => s + (Number(c.gia_tri) || 0), 0)
+  const tongGiaTriTruocVat = filtered.filter((c) => c.trang_thai !== 'da_huy')
+    .reduce((s, c) => s + giaTruocVat(c.gia_tri), 0)
   const sapHetHan = contracts.filter((c) => c.trang_thai === 'hieu_luc' && c.ngay_het_han
     && c.ngay_het_han >= homNay
     && c.ngay_het_han <= new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10))
 
+  async function taiExcel() {
+    const XLSX = await import('xlsx')
+    const rows = filtered.map((c) => {
+      const k = khach(c.customer_id)
+      const d = don(c.order_id)
+      const dv = (items[c.order_id] || []).map((i) => `${i.ten_dich_vu}${i.ten_goi ? ' · ' + i.ten_goi : ''}`).join(', ')
+      return {
+        'Số hợp đồng': c.so_hop_dong,
+        'Mã đơn': d?.ma_don || '',
+        'Khách hàng': k?.ten_khach || '',
+        'Mã KH': k?.ma_khach || '',
+        'SĐT': k?.sdt || '',
+        'Dịch vụ': dv,
+        'Giá trị (đã VAT)': Number(c.gia_tri) || 0,
+        'Giá trị (trước VAT)': giaTruocVat(c.gia_tri),
+        'Ngày ký': c.ngay_ky || '',
+        'Hết hạn': c.ngay_het_han || '',
+        'Sale': tenSale(d?.sale_id),
+        'Trạng thái': labelOf(TRANG_THAI_HD_OPTIONS, c.trang_thai),
+      }
+    })
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Hop dong')
+    XLSX.writeFile(wb, `HopDong_${homNay}.xlsx`)
+  }
+
   return (
     <div className="flex-1 overflow-y-auto">
-      <header className="border-b border-slate-200 bg-white px-8 py-5">
+      <header className="border-b border-slate-200 bg-white px-8 py-5 print:hidden">
         <h1 className="font-display text-xl font-bold text-navy-900">Hợp đồng</h1>
         <p className="text-sm text-ink-600">
           Hợp đồng tự sinh khi tạo đơn dịch vụ. Một khách có thể có nhiều hợp đồng.
         </p>
       </header>
 
-      <div className="grid grid-cols-3 gap-4 px-8 pt-6">
+      <h2 className="hidden px-8 pt-6 font-display text-lg font-bold text-navy-900 print:block">
+        Danh sách hợp đồng
+      </h2>
+
+      <div className="grid grid-cols-3 gap-4 px-8 pt-6 print:hidden">
         <StatCard label="Tổng hợp đồng" value={filtered.length} />
-        <StatCard label="Tổng giá trị" value={formatVnd(tongGiaTri)} accent="coral" />
+        <StatCard label="Tổng giá trị (chưa VAT)" value={formatVnd(tongGiaTriTruocVat)} accent="coral" />
         <StatCard label="Sắp hết hạn trong 30 ngày" value={sapHetHan.length}
           accent={sapHetHan.length ? 'amber' : 'teal'} />
       </div>
 
       {sapHetHan.length > 0 && (
-        <div className="mx-8 mt-4 flex items-start gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mx-8 mt-4 flex items-start gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 print:hidden">
           <AlertTriangle size={16} className="mt-0.5 flex-none" />
           <div>
             <b>{sapHetHan.length} hợp đồng sắp hết hạn</b> — đây là cơ hội tái ký, nên liên hệ khách trước khi hết hạn:{' '}
@@ -122,19 +170,36 @@ export default function ContractsPage({ currentProfile }) {
         </div>
       )}
 
-      <div className="mx-8 mt-6 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
+      <div className="mx-8 mt-6 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm print:hidden">
         <div className="relative min-w-[220px] flex-1">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
           <Input placeholder="Tìm theo số HĐ, khách hàng, SĐT, mã đơn, dịch vụ..." value={search}
             onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Select value={filterTT} onChange={(e) => setFilterTT(e.target.value)} className="w-48">
+        <Select value={filterTT} onChange={(e) => setFilterTT(e.target.value)} className="w-44">
           <option value="">Tất cả trạng thái</option>
           {TRANG_THAI_HD_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </Select>
+        <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
+          <option value="">Tất cả sale</option>
+          {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+        </Select>
+        <div className="flex items-center gap-1.5">
+          <Input type="date" value={tuNgay} onChange={(e) => setTuNgay(e.target.value)} className="w-36" title="Ký từ ngày" />
+          <span className="text-ink-400">—</span>
+          <Input type="date" value={denNgay} onChange={(e) => setDenNgay(e.target.value)} className="w-36" title="Đến ngày" />
+        </div>
+        <div className="ml-auto flex gap-2">
+          <Button type="button" variant="secondary" onClick={() => window.print()}>
+            <Printer size={15} /> In
+          </Button>
+          <Button type="button" variant="secondary" onClick={taiExcel}>
+            <Download size={15} /> Tải Excel
+          </Button>
+        </div>
       </div>
 
-      <div className="mx-8 my-6 overflow-x-auto rounded-2xl bg-white shadow-sm">
+      <div className="mx-8 my-6 overflow-x-auto rounded-2xl bg-white shadow-sm print:mx-0 print:shadow-none">
         <table className="w-full min-w-[1000px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
@@ -146,7 +211,7 @@ export default function ContractsPage({ currentProfile }) {
               <th className="px-5 py-3">Hết hạn</th>
               <th className="px-5 py-3">Sale</th>
               <th className="px-5 py-3">Trạng thái</th>
-              <th className="px-5 py-3"></th>
+              <th className="px-5 py-3 print:hidden"></th>
             </tr>
           </thead>
           <tbody>
@@ -167,7 +232,7 @@ export default function ContractsPage({ currentProfile }) {
                   <td className="px-5 py-3">
                     <button
                       onClick={() => (c.loai_dich_vu ? setXemHD(c) : setXuatHD(c))}
-                      className="text-left font-medium text-navy-900 hover:text-coral-500 hover:underline"
+                      className="text-left font-medium text-navy-900 hover:text-coral-500 hover:underline print:no-underline print:text-navy-900"
                       title="Bấm để xem hợp đồng">
                       {c.so_hop_dong}
                     </button>
@@ -175,7 +240,7 @@ export default function ContractsPage({ currentProfile }) {
                   </td>
                   <td className="px-5 py-3">
                     <p className="text-navy-900">{k?.ten_khach || '—'}</p>
-                    <p className="text-xs text-ink-400">{k?.ma_khach}</p>
+                    <p className="text-xs text-ink-400">{k?.ma_khach}{k?.ma_khach && k?.sdt ? ' · ' : ''}{k?.sdt}</p>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-1">
@@ -200,7 +265,7 @@ export default function ContractsPage({ currentProfile }) {
                       {labelOf(TRANG_THAI_HD_OPTIONS, c.trang_thai)}
                     </Badge>
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-right">
+                  <td className="whitespace-nowrap px-5 py-3 text-right print:hidden">
                     {c.file_url && (
                       <a href={c.file_url} target="_blank" rel="noreferrer"
                         className="mr-3 inline-flex text-teal-500 hover:text-teal-600" title="Mở file hợp đồng">
@@ -256,15 +321,6 @@ export default function ContractsPage({ currentProfile }) {
   )
 }
 
-// Tìm gói (trong service_packages) khớp với dịch vụ đã chốt trên đơn, theo loại hợp đồng
-// đang chọn — ads -> "Chạy quảng cáo"; xay_shop -> "Xây shop" / "Tối ưu sản phẩm"
-function timGoiKhop(loaiDV, dichVu, packages) {
-  const khop = loaiDV === 'xay_shop' ? /xây shop|tối ưu/i : /quảng cáo/i
-  const item = (dichVu || []).find((d) => d.package_id && khop.test(d.ten_dich_vu))
-  if (!item) return null
-  return (packages || []).find((p) => p.id === item.package_id) || null
-}
-
 function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSaved }) {
   const laXayShop = (dichVu || []).some((d) => /xây shop|tối ưu/i.test(d.ten_dich_vu))
   const [loaiDV, setLoaiDV] = useState(contract.loai_dich_vu || (laXayShop ? 'xay_shop' : 'ads'))
@@ -286,6 +342,7 @@ function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSa
   })
   const [dangXuat, setDangXuat] = useState(false)
   const [msg, setMsg] = useState('')
+  const [xemTruoc, setXemTruoc] = useState(false)
 
   // Đổi loại hợp đồng (ads/xay_shop) thì dò lại gói khớp để điền lại số SP/nội dung
   function doiLoaiDV(loai) {
@@ -300,8 +357,6 @@ function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSa
       }))
     }
   }
-
-  const [xemTruoc, setXemTruoc] = useState(false)
 
   const soHD = taoSoHopDong({
     loaiDichVu: loaiDV, ngay: form.ngay_ky,
@@ -369,6 +424,10 @@ function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSa
           <p className="text-xs uppercase tracking-wide text-ink-400">Khách hàng</p>
           <p className="font-display font-semibold text-navy-900">{khach?.ten_khach || '—'}</p>
           <p className="text-sm text-ink-600">Giá trị {formatVnd(contract.gia_tri)} (đã gồm VAT)</p>
+          <p className="mt-1 text-xs text-ink-400">
+            Thông tin Bên A (địa chỉ, MST, người đại diện, link shop...) lấy từ hồ sơ khách hàng —
+            sửa ở đây sẽ tự cập nhật lại luôn hồ sơ khách để dùng chung cho các hợp đồng sau.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
