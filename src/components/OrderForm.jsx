@@ -133,6 +133,10 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
       const goiChinh = goiChinhCuaDon(hopLe, packages)
       if (goiChinh) {
         await supabase.from('contracts').update(goiChinh).eq('order_id', orderId)
+      } else {
+        // Đơn chỉ gồm Dịch vụ bổ sung (không phải Seller hay ADS) -> không cần hợp đồng,
+        // xoá luôn hợp đồng trống mà trigger đã tự sinh khi tạo đơn
+        await supabase.from('contracts').delete().eq('order_id', orderId)
       }
     }
 

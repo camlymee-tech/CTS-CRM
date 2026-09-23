@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Printer } from 'lucide-react'
 import { renderAsync } from 'docx-preview'
 import { Modal, Button } from './ui'
 
@@ -48,8 +49,23 @@ export default function ContractPreview({ hd, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(hd)])
 
+  function inHopDong() {
+    if (!containerRef.current) return
+    const cuaSo = window.open('', '_blank')
+    if (!cuaSo) return
+    cuaSo.document.write(`<html><head><title>In hợp đồng</title></head><body>${containerRef.current.innerHTML}</body></html>`)
+    cuaSo.document.close()
+    cuaSo.focus()
+    setTimeout(() => cuaSo.print(), 300)
+  }
+
   return (
     <Modal title="Xem trước hợp đồng" onClose={onClose} wide>
+      <div className="mb-3 flex justify-end">
+        <Button type="button" variant="secondary" onClick={inHopDong} disabled={loading || !!error}>
+          <Printer size={15} /> In hợp đồng
+        </Button>
+      </div>
       {loading && <p className="mb-2 text-sm text-ink-400">Đang dựng bản xem trước...</p>}
       {error && (
         <div className="mb-2">

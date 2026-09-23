@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  X, Phone, MessageCircle, Users as UsersIcon, MoreHorizontal, Plus, Pencil,
+  X, Phone, MessageCircle, Users as UsersIcon, MoreHorizontal, Plus,
   Link2, Store, HandHeart, CircleAlert, CircleCheck, History, Check, Trash2, CalendarClock, FileText, ShoppingBag,
   FileDown, Eye,
 } from 'lucide-react'
@@ -21,7 +21,7 @@ const ICONS = { goi_dien: Phone, nhan_tin: MessageCircle, gap_mat: UsersIcon, kh
 
 
 
-export default function CustomerDetail({ customer: khachBanDau, currentProfile, onClose, onChanged, onEdit }) {
+export default function CustomerDetail({ customer: khachBanDau, currentProfile, onClose, onChanged }) {
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung, maTaoDon } = useTrangThai()
   const [customer, setCustomer] = useState(khachBanDau)
   const [tab, setTab] = useState('thong_tin')
@@ -107,6 +107,20 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   const tongGiaTriDon = donHang.reduce((s, o) => s + (Number(o.gia_tri) || 0), 0)
 
+  async function xoaDon(o) {
+    if (!window.confirm(`Xoá đơn ${o.ma_don}? Thao tác này không hoàn tác được, hợp đồng gắn với đơn (nếu có) cũng sẽ bị xoá theo.`)) return
+    const { error } = await supabase.from('orders').delete().eq('id', o.id)
+    if (error) { setMsg('Không xoá được: ' + error.message); return }
+    setMsg(''); load(); onChanged?.()
+  }
+
+  async function xoaHopDong(hd) {
+    if (!window.confirm(`Xoá hợp đồng ${hd.so_hop_dong}? Thao tác này không hoàn tác được. Đơn dịch vụ liên quan vẫn được giữ nguyên.`)) return
+    const { error } = await supabase.from('contracts').delete().eq('id', hd.id)
+    if (error) { setMsg('Không xoá được: ' + error.message); return }
+    setMsg(''); load(); onChanged?.()
+  }
+
   // Form gộp toàn bộ thông tin khách hàng có thể sửa — 1 nút Lưu duy nhất, không cần mở form riêng
   const [formTT, setFormTT] = useState({
     ten_khach: customer.ten_khach || '',
@@ -118,6 +132,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     nganh_hang: customer.nganh_hang || '',
     nguon_khach: customer.nguon_khach || '',
     loai_khach: customer.loai_khach || '',
+    sale_id: customer.sale_id || '',
+    ngay_lien_he_gan_nhat: customer.ngay_lien_he_gan_nhat || '',
     ngay_cham_soc_tiep_theo: customer.ngay_cham_soc_tiep_theo || '',
     nguoi_dai_dien: customer.nguoi_dai_dien || '',
     chuc_vu: customer.chuc_vu || '',
@@ -141,7 +157,12 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     }
     const { error } = await supabase.from('customers').update(patch).eq('id', customer.id)
     setDangLuuTT(false)
-    if (error) { setMsg('Không lưu được: ' + error.message); return }
+    if (error) {
+      setMsg(error.message.includes('SDT_TRUNG')
+        ? 'Số điện thoại này đã thuộc về một khách hàng khác trong hệ thống.'
+        : 'Không lưu được: ' + error.message)
+      return
+    }
     setMsg('')
     setCustomer((c) => ({ ...c, ...patch }))
     setLuuXongTT('Đã lưu')
@@ -167,17 +188,9 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
             <div className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-coral-100 font-display text-lg font-bold text-coral-600">
               {(customer.ten_khach || '?').trim().charAt(0).toUpperCase()}
             </div>
-            <div className="flex flex-none items-center gap-1">
-              {suaDuoc && (
-                <button onClick={() => onEdit?.(customer)}
-                  className="rounded-lg p-1.5 text-ink-400 hover:bg-slate-100 hover:text-navy-900" title="Sửa thông tin">
-                  <Pencil size={16} />
-                </button>
-              )}
-              <button onClick={onClose} className="rounded-lg p-1.5 text-ink-400 hover:bg-slate-100 hover:text-navy-900">
-                <X size={18} />
-              </button>
-            </div>
+            <button onClick={onClose} className="rounded-lg p-1.5 text-ink-400 hover:bg-slate-100 hover:text-navy-900">
+              <X size={18} />
+            </button>
           </div>
 
           <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink-400">{customer.ma_khach}</p>
@@ -294,6 +307,13 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                         <option value="">—</option>
                         {NGUON_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </Select>
+                      <Select label="Sale phụ trách" value={formTT.sale_id}
+                        onChange={(e) => setFormTT({ ...formTT, sale_id: e.target.value })}>
+                        <option value="">-- Chưa gán --</option>
+                        {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                      </Select>
+                      <Input label="Liên hệ gần nhất" type="date" value={formTT.ngay_lien_he_gan_nhat}
+                        onChange={(e) => setFormTT({ ...formTT, ngay_lien_he_gan_nhat: e.target.value })} />
                       <Input label="Chăm sóc tiếp theo" type="date" value={formTT.ngay_cham_soc_tiep_theo}
                         onChange={(e) => setFormTT({ ...formTT, ngay_cham_soc_tiep_theo: e.target.value })} />
                     </div>
@@ -416,7 +436,13 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                                 ))}
                               </div>
                             </div>
-                            <p className="flex-none font-display font-bold text-coral-500">{formatVnd(o.gia_tri)}</p>
+                            <div className="flex flex-none flex-col items-end gap-1">
+                              <p className="font-display font-bold text-coral-500">{formatVnd(o.gia_tri)}</p>
+                              <button type="button" onClick={() => xoaDon(o)}
+                                className="inline-flex items-center gap-1 text-xs text-ink-400 hover:text-rose-500">
+                                <Trash2 size={12} /> Xoá
+                              </button>
+                            </div>
                           </div>
 
                           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-50 pt-3 text-xs text-ink-600">
@@ -451,7 +477,13 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                               </div>
                               {donGoc && <p className="mt-1 text-xs text-ink-400">Từ đơn {donGoc.ma_don}</p>}
                             </div>
-                            <p className="flex-none font-display font-bold text-coral-500">{formatVnd(hd.gia_tri)}</p>
+                            <div className="flex flex-none flex-col items-end gap-1">
+                              <p className="font-display font-bold text-coral-500">{formatVnd(hd.gia_tri)}</p>
+                              <button type="button" onClick={() => xoaHopDong(hd)}
+                                className="inline-flex items-center gap-1 text-xs text-ink-400 hover:text-rose-500">
+                                <Trash2 size={12} /> Xoá
+                              </button>
+                            </div>
                           </div>
 
                           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-50 pt-3 text-xs text-ink-600">
