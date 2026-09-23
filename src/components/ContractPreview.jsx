@@ -53,10 +53,27 @@ export default function ContractPreview({ hd, onClose }) {
     if (!containerRef.current) return
     const cuaSo = window.open('', '_blank')
     if (!cuaSo) return
-    cuaSo.document.write(`<html><head><title>In hợp đồng</title></head><body>${containerRef.current.innerHTML}</body></html>`)
+    cuaSo.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>In hợp đồng</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: #fff; display: flex; justify-content: center; }
+  .docx-wrapper { background: #fff !important; padding: 0 !important; }
+  .docx { width: 100% !important; max-width: 800px; margin: 0 auto !important; box-shadow: none !important; }
+  @media print {
+    body { padding: 0; }
+    .docx-wrapper { padding: 0 !important; }
+  }
+</style>
+</head>
+<body>${containerRef.current.innerHTML}</body>
+</html>`)
     cuaSo.document.close()
     cuaSo.focus()
-    setTimeout(() => cuaSo.print(), 300)
+    setTimeout(() => cuaSo.print(), 400)
   }
 
   return (

@@ -28,9 +28,14 @@ function timGoiKhop(loaiDV, dichVu, packages) {
 // Dựng lại dữ liệu hợp đồng (đúng cấu trúc taoFileHopDong cần) từ 1 hợp đồng đã lưu,
 // dùng để xem trước ngay từ danh sách mà không cần mở lại form xuất file
 export function hdTuHopDongDaLuu(c, khach) {
+  // Xem/In cũng phải theo đúng quy tắc số hợp đồng (DDMMYY/HĐDV/...) như lúc Xuất —
+  // nếu số đang lưu vẫn là số tạm (HD-YYYYMM-NNN) thì tính lại cho khớp, không hiện số cũ
+  const soHD = laSoChuan(c.so_hop_dong) ? c.so_hop_dong : taoSoHopDong({
+    loaiDichVu: c.loai_dich_vu || 'ads', ngay: c.ngay_ky, maKhach: khach?.ma_khach,
+  })
   return {
     loai_dich_vu: c.loai_dich_vu || 'ads',
-    so_hop_dong: c.so_hop_dong,
+    so_hop_dong: soHD,
     ngay_ky: c.ngay_ky,
     ten_khach: khach?.ten_khach,
     sdt: khach?.sdt,
