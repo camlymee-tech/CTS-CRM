@@ -91,6 +91,17 @@ export default function ReportsPage() {
       .sort((a, b) => b.tong - a.tong)
   }, [items, idLoc, orders, profiles])
 
+  // Tách doanh số theo loại đơn: Mới (tự sinh hợp đồng) và Tái ký (chỉ thêm đơn, dùng lại HĐ)
+  const theoLoaiDon = useMemo(() => {
+    const m = { moi: { ma: 'moi', ten: 'Đơn mới', soDon: 0, doanhSo: 0 }, tai_ky: { ma: 'tai_ky', ten: 'Tái ký', soDon: 0, doanhSo: 0 } }
+    for (const o of donLoc) {
+      const key = o.loai_don === 'tai_ky' ? 'tai_ky' : 'moi'
+      m[key].soDon += 1
+      m[key].doanhSo += giaTruocVat(o.gia_tri)
+    }
+    return Object.values(m)
+  }, [donLoc])
+
   const theoDichVu = useMemo(() => {
     const m = {}
     for (const it of items) {
@@ -150,6 +161,17 @@ export default function ReportsPage() {
             <StatCard label="Số đơn chốt" value={donLoc.length} />
             <StatCard label="Giá trị trung bình / đơn (chưa VAT)"
               value={formatVnd(donLoc.length ? tongDoanhSo / donLoc.length : 0)} accent="teal" />
+          </div>
+
+          <div className="mx-8 mt-6 grid grid-cols-2 gap-4">
+            {theoLoaiDon.map((l) => (
+              <Panel key={l.ma} title={l.ten}>
+                <p className={`font-display text-2xl font-bold ${l.ma === 'moi' ? 'text-coral-500' : 'text-teal-500'}`}>
+                  {formatVnd(l.doanhSo)}
+                </p>
+                <p className="mt-1 text-sm text-ink-400">{l.soDon} đơn</p>
+              </Panel>
+            ))}
           </div>
 
           <div className="mx-8 mt-6 grid grid-cols-3 gap-4">
