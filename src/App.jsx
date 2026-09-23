@@ -8,11 +8,9 @@ import CustomerList from './components/CustomerList'
 import TeamPage from './components/TeamPage'
 import DocumentsPage from './components/DocumentsPage'
 import NotificationsPage from './components/NotificationsPage'
-import OrdersPage from './components/OrdersPage'
-import ReportsPage from './components/ReportsPage'
+import BaoCaoPage from './components/BaoCaoPage'
 import ChecklistPage from './components/ChecklistPage'
 import PricingPage from './components/PricingPage'
-import AnalyticsPage from './components/AnalyticsPage'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -96,9 +94,7 @@ export default function App() {
       />
       {page === 'checklist' && <ChecklistPage currentProfile={profile} />}
       {page === 'customers' && <CustomerList currentProfile={profile} />}
-      {page === 'orders' && <OrdersPage currentProfile={profile} />}
-      {page === 'reports' && <ReportsPage />}
-      {page === 'analytics' && <AnalyticsPage />}
+      {page === 'baocao' && <BaoCaoPage currentProfile={profile} />}
       {page === 'team' && <TeamPage currentProfile={profile} />}
       {page === 'pricing' && <PricingPage currentProfile={profile} />}
       {page === 'documents' && <DocumentsPage currentProfile={profile} />}

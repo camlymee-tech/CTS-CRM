@@ -3,6 +3,13 @@ import { supabase } from '../supabaseClient'
 import { Select } from './ui'
 import { formatVnd, giaTruocVat } from '../lib/constants'
 
+// Xây shop + Tối ưu sản phẩm gộp thành 1 nhóm "Seller"; Chạy quảng cáo là "ADS"; còn lại là "Bổ sung"
+function nhomDichVu(ten) {
+  if (/xây shop|tối ưu/i.test(ten || '')) return 'Seller'
+  if (/quảng cáo/i.test(ten || '')) return 'ADS'
+  return 'Bổ sung'
+}
+
 export default function ReportsPage() {
   const [orders, setOrders] = useState([])
   const [items, setItems] = useState([])
@@ -50,6 +57,39 @@ export default function ReportsPage() {
       .map(([id, v]) => ({ id, ten: profiles.find((p) => p.id === id)?.full_name || 'Chưa gán sale', ...v }))
       .sort((a, b) => b.doanhSo - a.doanhSo)
   }, [donLoc, profiles])
+
+  // Seller = Xây shop + Tối ưu sản phẩm (theo đúng quy ước: 2 dịch vụ này gộp là 1 mảng Seller)
+  const theoNhom = useMemo(() => {
+    const m = { Seller: { ten: 'Seller (Xây shop + Tối ưu sản phẩm)', doanhSo: 0, soLuong: 0 },
+      ADS: { ten: 'Chạy quảng cáo (ADS)', doanhSo: 0, soLuong: 0 },
+      'Bổ sung': { ten: 'Dịch vụ bổ sung', doanhSo: 0, soLuong: 0 } }
+    for (const it of items) {
+      if (!idLoc.has(it.order_id)) continue
+      const nhom = nhomDichVu(it.ten_dich_vu)
+      m[nhom].doanhSo += giaTruocVat(it.gia)
+      m[nhom].soLuong += 1
+    }
+    return Object.values(m)
+  }, [items, idLoc])
+
+  // Ma trận doanh số theo từng sale x từng nhóm dịch vụ
+  const theoSaleNhom = useMemo(() => {
+    const m = {}
+    for (const it of items) {
+      if (!idLoc.has(it.order_id)) continue
+      const don = orders.find((o) => o.id === it.order_id)
+      const saleId = don?.sale_id || 'chua_gan'
+      const nhom = nhomDichVu(it.ten_dich_vu)
+      m[saleId] = m[saleId] || { Seller: 0, ADS: 0, 'Bổ sung': 0 }
+      m[saleId][nhom] += giaTruocVat(it.gia)
+    }
+    return Object.entries(m)
+      .map(([id, v]) => ({
+        id, ten: profiles.find((p) => p.id === id)?.full_name || 'Chưa gán sale', ...v,
+        tong: v.Seller + v.ADS + v['Bổ sung'],
+      }))
+      .sort((a, b) => b.tong - a.tong)
+  }, [items, idLoc, orders, profiles])
 
   const theoDichVu = useMemo(() => {
     const m = {}
@@ -110,6 +150,44 @@ export default function ReportsPage() {
             <StatCard label="Số đơn chốt" value={donLoc.length} />
             <StatCard label="Giá trị trung bình / đơn (chưa VAT)"
               value={formatVnd(donLoc.length ? tongDoanhSo / donLoc.length : 0)} accent="teal" />
+          </div>
+
+          <div className="mx-8 mt-6 grid grid-cols-3 gap-4">
+            {theoNhom.map((n) => (
+              <Panel key={n.ten} title={n.ten}>
+                <p className="font-display text-2xl font-bold text-navy-900">{formatVnd(n.doanhSo)}</p>
+                <p className="mt-1 text-sm text-ink-400">{n.soLuong} lượt bán</p>
+              </Panel>
+            ))}
+          </div>
+
+          <div className="mx-8 mt-6">
+            <Panel title="Doanh số theo sale — theo từng nhóm dịch vụ">
+              {theoSaleNhom.length === 0 ? <Empty /> : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
+                      <th className="pb-2">Sale</th>
+                      <th className="pb-2 text-right">Seller</th>
+                      <th className="pb-2 text-right">ADS</th>
+                      <th className="pb-2 text-right">Bổ sung</th>
+                      <th className="pb-2 text-right">Tổng</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {theoSaleNhom.map((s) => (
+                      <tr key={s.id} className="border-t border-slate-50">
+                        <td className="py-2.5 font-medium text-navy-900">{s.ten}</td>
+                        <td className="py-2.5 text-right text-ink-600">{formatVnd(s.Seller)}</td>
+                        <td className="py-2.5 text-right text-ink-600">{formatVnd(s.ADS)}</td>
+                        <td className="py-2.5 text-right text-ink-600">{formatVnd(s['Bổ sung'])}</td>
+                        <td className="py-2.5 text-right font-semibold text-navy-900">{formatVnd(s.tong)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Panel>
           </div>
 
           <div className="mx-8 mt-6 grid grid-cols-2 gap-4">
