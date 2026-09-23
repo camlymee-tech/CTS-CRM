@@ -237,7 +237,9 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                   ) : (
                     <div className="space-y-3">
                       {donHang.map((o) => {
-                        const hd = hopDong.find((h) => h.order_id === o.id)
+                        const hd = o.loai_don === 'tai_ky'
+                          ? hopDong.find((h) => h.id === o.tai_ky_hop_dong_id)
+                          : hopDong.find((h) => h.order_id === o.id)
                         return (
                           <div key={o.id} className="rounded-xl border border-slate-100 p-4">
                             <div className="flex items-start justify-between gap-3">
@@ -245,6 +247,9 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                                 <div className="flex items-center gap-2">
                                   <ShoppingBag size={14} className="text-coral-500" />
                                   <p className="font-medium text-navy-900">{o.ma_don}</p>
+                                  {o.loai_don === 'tai_ky'
+                                    ? <Badge className="bg-teal-50 text-teal-600">Tái ký</Badge>
+                                    : <Badge className="bg-coral-50 text-coral-600">Mới</Badge>}
                                 </div>
                                 <div className="mt-1.5 flex flex-wrap gap-1">
                                   {(dvTheoDon[o.id] || []).map((i) => (

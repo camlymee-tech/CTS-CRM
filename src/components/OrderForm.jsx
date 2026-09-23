@@ -24,12 +24,15 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
   const isEdit = !!order
   const [services, setServices] = useState([])
   const [packages, setPackages] = useState([])
+  const [contracts, setContracts] = useState([])
   const [form, setForm] = useState({
     customer_id: order?.customer_id || customer?.id || '',
     sale_id: order?.sale_id || customer?.sale_id || currentProfile?.id || '',
     ngay_chot: order?.ngay_chot || new Date().toISOString().slice(0, 10),
     so_thang: order?.so_thang || '',
     ghi_chu: order?.ghi_chu || '',
+    loai_don: order?.loai_don || 'moi',
+    tai_ky_hop_dong_id: order?.tai_ky_hop_dong_id || '',
   })
   const [items, setItems] = useState([{ service_id: '', package_id: '', ten_dich_vu: '', ten_goi: '', gia: '', so_thang: '' }])
   const [saving, setSaving] = useState(false)
@@ -40,6 +43,8 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
       .then(({ data }) => setServices(data || []))
     supabase.from('service_packages').select('*').eq('active', true).order('thu_tu')
       .then(({ data }) => setPackages(data || []))
+    supabase.from('contracts').select('id, so_hop_dong, customer_id, loai_dich_vu, ten_goi')
+      .then(({ data }) => setContracts(data || []))
     if (isEdit) {
       supabase.from('order_items').select('*').eq('order_id', order.id)
         .then(({ data }) => {
@@ -80,6 +85,9 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
     e.preventDefault()
     const hopLe = items.filter((it) => it.ten_dich_vu)
     if (hopLe.length === 0) { setError('Chọn ít nhất một dịch vụ khách mua'); return }
+    if (form.loai_don === 'tai_ky' && !form.tai_ky_hop_dong_id) {
+      setError('Đơn tái ký cần chọn hợp đồng liên quan'); return
+    }
 
     setSaving(true)
     setError('')
@@ -91,6 +99,8 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
         : (Math.max(0, ...hopLe.map((it) => Number(it.so_thang) || 0)) || null),
       ghi_chu: form.ghi_chu || null,
       gia_tri: tongTien,
+      loai_don: form.loai_don,
+      tai_ky_hop_dong_id: form.loai_don === 'tai_ky' ? form.tai_ky_hop_dong_id : null,
     }
 
     let orderId = order?.id
@@ -118,10 +128,12 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
     if (itemErr) { setSaving(false); setError(itemErr.message); return }
 
     // Đẩy tên gói, số sản phẩm, nội dung triển khai sang hợp đồng tự sinh của đơn —
-    // để mở trang Hợp đồng lên là đã có sẵn, không cần điền lại thủ công
-    const goiChinh = goiChinhCuaDon(hopLe, packages)
-    if (goiChinh) {
-      await supabase.from('contracts').update(goiChinh).eq('order_id', orderId)
+    // chỉ áp dụng cho đơn MỚI (đơn tái ký dùng lại hợp đồng đã có, không tự tạo hợp đồng)
+    if (form.loai_don !== 'tai_ky') {
+      const goiChinh = goiChinhCuaDon(hopLe, packages)
+      if (goiChinh) {
+        await supabase.from('contracts').update(goiChinh).eq('order_id', orderId)
+      }
     }
 
     setSaving(false)
@@ -150,6 +162,29 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
             </Select>
           </div>
         )}
+
+        <div className="col-span-2 grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-3">
+          <Select label="Loại đơn *" value={form.loai_don}
+            onChange={(e) => setForm({ ...form, loai_don: e.target.value, tai_ky_hop_dong_id: '' })}>
+            <option value="moi">Đơn mới (lần đầu dùng dịch vụ — tự tạo hợp đồng)</option>
+            <option value="tai_ky">Tái ký (khách đã có hợp đồng — chỉ thêm đơn hàng)</option>
+          </Select>
+          {form.loai_don === 'tai_ky' ? (
+            <Select label="Hợp đồng liên quan *" required value={form.tai_ky_hop_dong_id}
+              onChange={(e) => setForm({ ...form, tai_ky_hop_dong_id: e.target.value })}>
+              <option value="">-- Chọn hợp đồng --</option>
+              {contracts.filter((c) => c.customer_id === form.customer_id).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.so_hop_dong}{c.ten_goi ? ` · ${c.ten_goi}` : ''}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <p className="self-end text-xs text-ink-400">
+              1 dịch vụ chỉ cần 1 hợp đồng — nếu khách đã ký dịch vụ này rồi, chọn "Tái ký" thay vì tạo đơn mới.
+            </p>
+          )}
+        </div>
 
         <div className="col-span-2">
           <p className="mb-2 text-sm font-medium text-navy-900">Dịch vụ khách mua *</p>
