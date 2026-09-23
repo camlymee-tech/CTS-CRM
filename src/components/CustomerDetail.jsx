@@ -107,12 +107,45 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   const tongGiaTriDon = donHang.reduce((s, o) => s + (Number(o.gia_tri) || 0), 0)
 
-  // Lưu nhanh 1 trường của khách hàng — dùng cho các ô sửa tại chỗ (không cần mở form riêng)
-  async function luuTruong(patch) {
+  // Form gộp toàn bộ thông tin khách hàng có thể sửa — 1 nút Lưu duy nhất, không cần mở form riêng
+  const [formTT, setFormTT] = useState({
+    ten_khach: customer.ten_khach || '',
+    sdt: customer.sdt || '',
+    link_fb: customer.link_fb || '',
+    link_shop: customer.link_shop || '',
+    nen_tang: customer.nen_tang || [],
+    dich_vu: customer.dich_vu || [],
+    nganh_hang: customer.nganh_hang || '',
+    nguon_khach: customer.nguon_khach || '',
+    loai_khach: customer.loai_khach || '',
+    ngay_cham_soc_tiep_theo: customer.ngay_cham_soc_tiep_theo || '',
+    nguoi_dai_dien: customer.nguoi_dai_dien || '',
+    chuc_vu: customer.chuc_vu || '',
+    mst: customer.mst || '',
+    email: customer.email || '',
+    dia_chi: customer.dia_chi || '',
+  })
+  const [dangLuuTT, setDangLuuTT] = useState(false)
+  const [luuXongTT, setLuuXongTT] = useState('')
+
+  function toggleArrTT(field, val) {
+    setFormTT((f) => ({ ...f, [field]: f[field].includes(val) ? f[field].filter((v) => v !== val) : [...f[field], val] }))
+  }
+
+  async function luuThongTin(e) {
+    e.preventDefault()
+    setDangLuuTT(true)
+    const patch = { ...formTT }
+    for (const k of Object.keys(patch)) {
+      if (!Array.isArray(patch[k]) && patch[k] === '') patch[k] = null
+    }
     const { error } = await supabase.from('customers').update(patch).eq('id', customer.id)
+    setDangLuuTT(false)
     if (error) { setMsg('Không lưu được: ' + error.message); return }
     setMsg('')
     setCustomer((c) => ({ ...c, ...patch }))
+    setLuuXongTT('Đã lưu')
+    setTimeout(() => setLuuXongTT(''), 1500)
     onChanged?.()
   }
 
@@ -151,48 +184,22 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
           <h2 className="font-display text-lg font-bold leading-tight text-navy-900">{customer.ten_khach}</h2>
 
           <div className="mt-2 flex flex-col gap-1.5 text-sm">
-            {suaDuoc ? (
-              <div className="flex items-center gap-1.5">
-                <Phone size={13} className="flex-none text-ink-400" />
-                <input type="text" defaultValue={customer.sdt || ''} placeholder="Số điện thoại"
-                  onBlur={(e) => { if (e.target.value !== (customer.sdt || '')) luuTruong({ sdt: e.target.value || null }) }}
-                  className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm text-ink-600 outline-none focus:border-coral-500" />
-              </div>
-            ) : customer.sdt && (
+            {customer.sdt && (
               <span className="inline-flex items-center gap-1.5 text-ink-600">
                 <Phone size={13} className="text-ink-400" /> {customer.sdt}
               </span>
             )}
-            {suaDuoc ? (
-              <>
-                <div className="flex items-center gap-1.5">
-                  <Link2 size={13} className="flex-none text-ink-400" />
-                  <input type="text" defaultValue={customer.link_fb || ''} placeholder="Link Facebook"
-                    onBlur={(e) => { if (e.target.value !== (customer.link_fb || '')) luuTruong({ link_fb: e.target.value || null }) }}
-                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm text-ink-600 outline-none focus:border-coral-500" />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Store size={13} className="flex-none text-ink-400" />
-                  <input type="text" defaultValue={customer.link_shop || ''} placeholder="Link shop"
-                    onBlur={(e) => { if (e.target.value !== (customer.link_shop || '')) luuTruong({ link_shop: e.target.value || null }) }}
-                    className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm text-ink-600 outline-none focus:border-coral-500" />
-                </div>
-              </>
-            ) : (
-              <>
-                {customer.link_fb && (
-                  <a href={customer.link_fb} target="_blank" rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-teal-500 hover:underline">
-                    <Link2 size={13} /> Facebook
-                  </a>
-                )}
-                {customer.link_shop && (
-                  <a href={customer.link_shop} target="_blank" rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-teal-500 hover:underline">
-                    <Store size={13} /> Link shop
-                  </a>
-                )}
-              </>
+            {customer.link_fb && (
+              <a href={customer.link_fb} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-teal-500 hover:underline">
+                <Link2 size={13} /> Facebook
+              </a>
+            )}
+            {customer.link_shop && (
+              <a href={customer.link_shop} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-teal-500 hover:underline">
+                <Store size={13} /> Link shop
+              </a>
             )}
           </div>
 
@@ -230,12 +237,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
           </div>
 
           <div className="mt-3 space-y-2 text-sm">
-            {suaDuoc ? (
-              <InlineSelect label="Nguồn khách" value={customer.nguon_khach} field="nguon_khach"
-                options={NGUON_KHACH_OPTIONS} onSave={luuTruong} />
-            ) : (
-              <Field label="Nguồn khách" value={labelOf(NGUON_KHACH_OPTIONS, customer.nguon_khach)} />
-            )}
+            <Field label="Nguồn khách" value={labelOf(NGUON_KHACH_OPTIONS, customer.nguon_khach)} />
             <Field label="Ngày tạo" value={(customer.created_at || '').slice(0, 10)} />
           </div>
 
@@ -269,47 +271,113 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
           {loading ? <p className="text-sm text-ink-400">Đang tải...</p> : (
             <>
               {tab === 'thong_tin' && (
-                <div className="space-y-5">
-                {suaDuoc ? (
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <InlineText label="Ngành hàng" value={customer.nganh_hang} field="nganh_hang" onSave={luuTruong} />
-                    <InlineSelect label="Loại khách" value={customer.loai_khach} field="loai_khach"
-                      options={LOAI_KHACH_OPTIONS} onSave={luuTruong} />
-                    <InlineText label="Chăm sóc tiếp theo" value={customer.ngay_cham_soc_tiep_theo}
-                      field="ngay_cham_soc_tiep_theo" type="date" onSave={luuTruong} />
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                    <Field label="Ngành hàng" value={customer.nganh_hang} />
-                    <Field label="Loại khách" value={labelOf(LOAI_KHACH_OPTIONS, customer.loai_khach)} />
-                    <Field label="Chăm sóc tiếp theo" value={customer.ngay_cham_soc_tiep_theo} />
-                  </div>
-                )}
-
-                <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">
-                    Thông tin pháp lý (dùng khi lên hợp đồng)
-                  </p>
-                  {suaDuoc ? (
+                suaDuoc ? (
+                  <form onSubmit={luuThongTin} className="space-y-5">
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                      <InlineText label="Người đại diện" value={customer.nguoi_dai_dien} field="nguoi_dai_dien" onSave={luuTruong} />
-                      <InlineText label="Chức vụ" value={customer.chuc_vu} field="chuc_vu" onSave={luuTruong} />
-                      <InlineText label="Mã số thuế" value={customer.mst} field="mst" onSave={luuTruong} />
-                      <InlineText label="Email" value={customer.email} field="email" onSave={luuTruong} />
-                      <div className="col-span-2">
-                        <InlineText label="Địa chỉ" value={customer.dia_chi} field="dia_chi" onSave={luuTruong} />
+                      <Input label="Tên khách hàng" value={formTT.ten_khach}
+                        onChange={(e) => setFormTT({ ...formTT, ten_khach: e.target.value })} />
+                      <Input label="Số điện thoại" value={formTT.sdt}
+                        onChange={(e) => setFormTT({ ...formTT, sdt: e.target.value })} />
+                      <Input label="Link Facebook" value={formTT.link_fb}
+                        onChange={(e) => setFormTT({ ...formTT, link_fb: e.target.value })} />
+                      <Input label="Link shop" value={formTT.link_shop}
+                        onChange={(e) => setFormTT({ ...formTT, link_shop: e.target.value })} />
+                      <Input label="Ngành hàng" value={formTT.nganh_hang}
+                        onChange={(e) => setFormTT({ ...formTT, nganh_hang: e.target.value })} />
+                      <Select label="Loại khách" value={formTT.loai_khach}
+                        onChange={(e) => setFormTT({ ...formTT, loai_khach: e.target.value })}>
+                        <option value="">—</option>
+                        {LOAI_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </Select>
+                      <Select label="Nguồn khách" value={formTT.nguon_khach}
+                        onChange={(e) => setFormTT({ ...formTT, nguon_khach: e.target.value })}>
+                        <option value="">—</option>
+                        {NGUON_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </Select>
+                      <Input label="Chăm sóc tiếp theo" type="date" value={formTT.ngay_cham_soc_tiep_theo}
+                        onChange={(e) => setFormTT({ ...formTT, ngay_cham_soc_tiep_theo: e.target.value })} />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 text-sm">
+                      <span className="font-medium text-navy-900">Nền tảng</span>
+                      <div className="flex flex-wrap gap-2">
+                        {NEN_TANG_OPTIONS.map((opt) => (
+                          <button type="button" key={opt.value} onClick={() => toggleArrTT('nen_tang', opt.value)}
+                            className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                              formTT.nen_tang.includes(opt.value) ? opt.className : 'border-slate-200 text-ink-600'
+                            }`}>
+                            {opt.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                      <Field label="Người đại diện" value={customer.nguoi_dai_dien} />
-                      <Field label="Chức vụ" value={customer.chuc_vu} />
-                      <Field label="Mã số thuế" value={customer.mst} />
-                      <Field label="Email" value={customer.email} />
-                      <div className="col-span-2"><Field label="Địa chỉ" value={customer.dia_chi} /></div>
+
+                    <div className="flex flex-col gap-1.5 text-sm">
+                      <span className="font-medium text-navy-900">Dịch vụ quan tâm</span>
+                      <div className="flex flex-wrap gap-2">
+                        {DICH_VU_OPTIONS.map((opt) => (
+                          <button type="button" key={opt.value} onClick={() => toggleArrTT('dich_vu', opt.value)}
+                            className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                              formTT.dich_vu.includes(opt.value) ? opt.className : 'border-slate-200 text-ink-600'
+                            }`}>
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  )}
-                </div>
+
+                    <div>
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">
+                        Thông tin pháp lý (dùng khi lên hợp đồng)
+                      </p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                        <Input label="Người đại diện" value={formTT.nguoi_dai_dien}
+                          onChange={(e) => setFormTT({ ...formTT, nguoi_dai_dien: e.target.value })} />
+                        <Input label="Chức vụ" value={formTT.chuc_vu}
+                          onChange={(e) => setFormTT({ ...formTT, chuc_vu: e.target.value })} />
+                        <Input label="Mã số thuế" value={formTT.mst}
+                          onChange={(e) => setFormTT({ ...formTT, mst: e.target.value })} />
+                        <Input label="Email" value={formTT.email}
+                          onChange={(e) => setFormTT({ ...formTT, email: e.target.value })} />
+                        <div className="col-span-2">
+                          <Input label="Địa chỉ" value={formTT.dia_chi}
+                            onChange={(e) => setFormTT({ ...formTT, dia_chi: e.target.value })} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <Button type="submit" disabled={dangLuuTT}>
+                        {dangLuuTT ? 'Đang lưu...' : 'Lưu thông tin'}
+                      </Button>
+                      {luuXongTT && <span className="text-sm text-emerald-600">{luuXongTT}</span>}
+                    </div>
+                  </form>
+                ) : (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                      <Field label="Ngành hàng" value={customer.nganh_hang} />
+                      <Field label="Loại khách" value={labelOf(LOAI_KHACH_OPTIONS, customer.loai_khach)} />
+                      <Field label="Chăm sóc tiếp theo" value={customer.ngay_cham_soc_tiep_theo} />
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">
+                        Thông tin pháp lý (dùng khi lên hợp đồng)
+                      </p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                        <Field label="Người đại diện" value={customer.nguoi_dai_dien} />
+                        <Field label="Chức vụ" value={customer.chuc_vu} />
+                        <Field label="Mã số thuế" value={customer.mst} />
+                        <Field label="Email" value={customer.email} />
+                        <div className="col-span-2"><Field label="Địa chỉ" value={customer.dia_chi} /></div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
+
+              {tab === 'thong_tin' && (
+                <div className="mt-5 space-y-5">
 
                 <VanDeGiaiPhap customer={customer} suaDuoc={suaDuoc}
                   onSaved={(patch) => setCustomer({ ...customer, ...patch })} />
@@ -586,29 +654,6 @@ function StatTile({ label, value, small }) {
       <p className={`font-display font-bold text-navy-900 ${small ? 'text-xs' : 'text-sm'}`}>{value}</p>
       <p className="mt-0.5 text-[10px] leading-tight text-ink-400">{label}</p>
     </div>
-  )
-}
-
-function InlineText({ label, value, field, onSave, placeholder, type = 'text' }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-medium text-ink-400">{label}</span>
-      <input type={type} defaultValue={value || ''} placeholder={placeholder}
-        onBlur={(e) => { if (e.target.value !== (value || '')) onSave({ [field]: e.target.value || null }) }}
-        className="mt-0.5 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-navy-900 outline-none focus:border-coral-500" />
-    </label>
-  )
-}
-
-function InlineSelect({ label, value, field, options, onSave, className = '' }) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="text-xs font-medium text-ink-400">{label}</span>
-      <Select value={value || ''} onChange={(e) => onSave({ [field]: e.target.value || null })} className="mt-0.5 py-1.5 text-sm">
-        <option value="">—</option>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </Select>
-    </label>
   )
 }
 

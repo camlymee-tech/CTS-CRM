@@ -49,15 +49,21 @@ export function vietTat(ten) {
     .slice(0, 4)
 }
 
+// Rút gọn mã khách hàng cho số hợp đồng: "KH-000030" -> "KH30" (bỏ số 0 thừa ở đầu)
+function rutGonMaKhach(maKhach) {
+  const chiSo = (maKhach || '').replace(/\D/g, '')
+  return chiSo ? `KH${parseInt(chiSo, 10)}` : 'KH'
+}
+
 // Số hợp đồng theo dịch vụ — quy tắc chung: DDMMYY/HĐDV/TUKIADS hoặc TUKISELLER-Mã khách hàng
-// (mã khách hàng lấy đúng theo mã đang hiển thị trên web, VD: KH-000030)
+// (mã khách hàng rút gọn từ mã đang hiển thị trên web, VD: KH-000030 -> KH30)
 export function taoSoHopDong({ loaiDichVu, ngay, maKhach }) {
   const d = ngay ? new Date(ngay) : new Date()
   const dd = String(d.getDate()).padStart(2, '0')
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const yy = String(d.getFullYear()).slice(-2)
   const ben = loaiDichVu === 'xay_shop' ? 'TUKISELLER' : 'TUKIADS'
-  const ma = maKhach || 'KH'
+  const ma = rutGonMaKhach(maKhach)
   return `${dd}${mm}${yy}/HĐDV/${ben}-${ma}`
 }
 
