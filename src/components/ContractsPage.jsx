@@ -427,7 +427,9 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
       onSaved()
     } catch (e) {
       setDangXuat(false)
-      setMsg('Lỗi tạo file: ' + e.message)
+      setMsg(/Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(e.message)
+        ? 'Trang đang mở là bản cũ (do vừa có cập nhật mới) — tải lại trang (F5) rồi xuất lại nhé.'
+        : 'Lỗi tạo file: ' + e.message)
     }
   }
 
