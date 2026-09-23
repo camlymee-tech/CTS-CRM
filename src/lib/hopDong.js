@@ -70,8 +70,8 @@ function hopDongAds(hd) {
 
   return [
     P([T('CÔNG TY TNHH TUKI ADS', { bold: true, size: 22 })], { align: AlignmentType.LEFT, after: 0 }),
-    P([T('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', { bold: true, size: 22 })], { align: AlignmentType.RIGHT, after: 0 }),
-    P([T('Độc lập – Tự do – Hạnh phúc', { bold: true, size: 22 })], { align: AlignmentType.RIGHT, after: 200 }),
+    P([T('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', { bold: true, size: 22 })], { align: AlignmentType.CENTER, after: 0 }),
+    P([T('Độc lập – Tự do – Hạnh phúc', { bold: true, size: 22, underline: {} })], { align: AlignmentType.CENTER, after: 200 }),
     P(T(ngayVN(hd.ngay_ky), { italics: true }), { align: AlignmentType.RIGHT, after: 200 }),
 
     P(T('HỢP ĐỒNG CUNG CẤP DỊCH VỤ THƯƠNG MẠI ĐIỆN TỬ', { bold: true, size: 32 }), { align: AlignmentType.CENTER, after: 60 }),
@@ -154,8 +154,8 @@ function hopDongXayShop(hd) {
   return [
     P(T('CÔNG TY CỔ PHẦN', { bold: true, size: 22 }), { after: 0 }),
     P([T('TẬP ĐOÀN TUKIGROUP', { bold: true, size: 22 })], { after: 0 }),
-    P([T('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', { bold: true, size: 22 })], { align: AlignmentType.RIGHT, after: 0 }),
-    P([T('Độc lập – Tự do – Hạnh phúc', { bold: true, size: 22 })], { align: AlignmentType.RIGHT, after: 200 }),
+    P([T('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', { bold: true, size: 22 })], { align: AlignmentType.CENTER, after: 0 }),
+    P([T('Độc lập – Tự do – Hạnh phúc', { bold: true, size: 22, underline: {} })], { align: AlignmentType.CENTER, after: 200 }),
 
     P(T('HỢP ĐỒNG CUNG CẤP DỊCH VỤ', { bold: true, size: 32 }), { align: AlignmentType.CENTER, after: 0 }),
     P(T('THƯƠNG MẠI ĐIỆN TỬ', { bold: true, size: 32 }), { align: AlignmentType.CENTER, after: 200 }),
