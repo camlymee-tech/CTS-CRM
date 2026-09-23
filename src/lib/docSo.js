@@ -49,13 +49,19 @@ export function vietTat(ten) {
     .slice(0, 4)
 }
 
-// Số hợp đồng theo dịch vụ
-export function taoSoHopDong({ loaiDichVu, ngay, maKhach, tenVietTat }) {
+// Số hợp đồng theo dịch vụ — quy tắc chung: DDMMYY/HĐDV/TUKIADS hoặc TUKISELLER-Mã khách hàng
+// (mã khách hàng lấy đúng theo mã đang hiển thị trên web, VD: KH-000030)
+export function taoSoHopDong({ loaiDichVu, ngay, maKhach }) {
   const d = ngay ? new Date(ngay) : new Date()
   const dd = String(d.getDate()).padStart(2, '0')
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const yy = String(d.getFullYear()).slice(-2)
   const ben = loaiDichVu === 'xay_shop' ? 'TUKISELLER' : 'TUKIADS'
-  const ma = (maKhach || '').replace('KH-', '') || 'KH'
-  return `${dd}${mm}${yy}/${ma}/HDDV/${ben}-${tenVietTat || 'KH'}`
+  const ma = maKhach || 'KH'
+  return `${dd}${mm}${yy}/HĐDV/${ben}-${ma}`
+}
+
+// true nếu số hợp đồng đã theo đúng quy tắc chung ở trên (để không đánh số lại)
+export function laSoChuan(soHopDong) {
+  return /\/HĐDV\//.test(soHopDong || '')
 }

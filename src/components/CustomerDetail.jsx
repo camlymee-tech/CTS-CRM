@@ -118,8 +118,9 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   const TABS = [
     { key: 'thong_tin', label: 'Thông tin' },
-    { key: 'don_hd', label: `Đơn & HĐ (${donHang.length})` },
     { key: 'cham_soc', label: `Chăm sóc (${interactions.length})` },
+    { key: 'don_hang', label: `Đơn hàng (${donHang.length})` },
+    { key: 'hop_dong', label: `Hợp đồng (${hopDong.length})` },
     { key: 'nhat_ky', label: 'Nhật ký' },
   ]
 
@@ -315,7 +316,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                 </div>
               )}
 
-              {tab === 'don_hd' && (
+              {tab === 'don_hang' && (
                 <div className="space-y-3">
                   <button type="button" onClick={() => setDonMoi(true)}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-coral-300 px-3 py-2 text-sm font-medium text-coral-600 hover:bg-coral-50">
@@ -328,69 +329,88 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                     </p>
                   ) : (
                     <div className="space-y-3">
-                      {donHang.map((o) => {
-                        const hd = o.loai_don === 'tai_ky'
-                          ? hopDong.find((h) => h.id === o.tai_ky_hop_dong_id)
-                          : hopDong.find((h) => h.order_id === o.id)
-                        return (
-                          <div key={o.id} className="rounded-xl border border-slate-100 p-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <ShoppingBag size={14} className="text-coral-500" />
-                                  <p className="font-medium text-navy-900">{o.ma_don}</p>
-                                  {o.loai_don === 'tai_ky'
-                                    ? <Badge className="bg-teal-50 text-teal-600">Tái ký</Badge>
-                                    : <Badge className="bg-coral-50 text-coral-600">Mới</Badge>}
-                                </div>
-                                <div className="mt-1.5 flex flex-wrap gap-1">
-                                  {(dvTheoDon[o.id] || []).map((i) => (
-                                    <Badge key={i.id} className="bg-slate-100 text-slate-600">
-                                      {i.ten_dich_vu}{i.ten_goi ? ` · ${i.ten_goi}` : ''} · {formatVnd(i.gia)}
-                                    </Badge>
-                                  ))}
-                                </div>
+                      {donHang.map((o) => (
+                        <div key={o.id} className="rounded-xl border border-slate-100 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <ShoppingBag size={14} className="text-coral-500" />
+                                <p className="font-medium text-navy-900">{o.ma_don}</p>
+                                {o.loai_don === 'tai_ky'
+                                  ? <Badge className="bg-teal-50 text-teal-600">Tái ký</Badge>
+                                  : <Badge className="bg-coral-50 text-coral-600">Mới</Badge>}
                               </div>
-                              <p className="flex-none font-display font-bold text-coral-500">{formatVnd(o.gia_tri)}</p>
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-50 pt-3 text-xs text-ink-600">
-                              <span>Chốt: <b className="text-navy-900">{o.ngay_chot || '—'}</b></span>
-                              {o.so_thang && <span>Thời hạn: <b className="text-navy-900">{o.so_thang} tháng</b></span>}
-                              {hd && (
-                                <>
-                                  <span className="inline-flex items-center gap-1">
-                                    <FileText size={12} className="text-teal-500" />
-                                    <b className="text-navy-900">{hd.so_hop_dong}</b>
-                                  </span>
-                                  <Badge className={classOf(TRANG_THAI_HD_OPTIONS, hd.trang_thai)}>
-                                    {labelOf(TRANG_THAI_HD_OPTIONS, hd.trang_thai)}
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {(dvTheoDon[o.id] || []).map((i) => (
+                                  <Badge key={i.id} className="bg-slate-100 text-slate-600">
+                                    {i.ten_dich_vu}{i.ten_goi ? ` · ${i.ten_goi}` : ''} · {formatVnd(i.gia)}
                                   </Badge>
-                                  {hd.ngay_het_han && <span>Hết hạn: <b className="text-navy-900">{hd.ngay_het_han}</b></span>}
-                                  {hd.file_url && (
-                                    <a href={hd.file_url} target="_blank" rel="noreferrer"
-                                      className="text-teal-500 hover:underline">Mở file</a>
-                                  )}
-                                  {hd.loai_dich_vu && (
-                                    <button type="button" onClick={() => setXemHD(hd)}
-                                      className="inline-flex items-center gap-1 text-navy-700 hover:text-navy-900">
-                                      <Eye size={12} /> Xem
-                                    </button>
-                                  )}
-                                  <button type="button" onClick={() => setXuatHD({ hd, don: o })}
-                                    className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700">
-                                    <FileDown size={12} /> Xuất hợp đồng
-                                  </button>
-                                </>
-                              )}
+                                ))}
+                              </div>
                             </div>
-                            {o.ghi_chu && <p className="mt-2 text-xs text-ink-600">{o.ghi_chu}</p>}
+                            <p className="flex-none font-display font-bold text-coral-500">{formatVnd(o.gia_tri)}</p>
                           </div>
-                        )
-                      })}
+
+                          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-50 pt-3 text-xs text-ink-600">
+                            <span>Chốt: <b className="text-navy-900">{o.ngay_chot || '—'}</b></span>
+                            {o.so_thang && <span>Thời hạn: <b className="text-navy-900">{o.so_thang} tháng</b></span>}
+                          </div>
+                          {o.ghi_chu && <p className="mt-2 text-xs text-ink-600">{o.ghi_chu}</p>}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
+              )}
+
+              {tab === 'hop_dong' && (
+                hopDong.length === 0 ? (
+                  <p className="text-sm text-ink-400">Khách chưa có hợp đồng nào.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {hopDong.map((hd) => {
+                      const donGoc = donHang.find((o) => o.id === hd.order_id)
+                      return (
+                        <div key={hd.id} className="rounded-xl border border-slate-100 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <FileText size={14} className="text-teal-500" />
+                                <p className="font-medium text-navy-900">{hd.so_hop_dong}</p>
+                                <Badge className={classOf(TRANG_THAI_HD_OPTIONS, hd.trang_thai)}>
+                                  {labelOf(TRANG_THAI_HD_OPTIONS, hd.trang_thai)}
+                                </Badge>
+                              </div>
+                              {donGoc && <p className="mt-1 text-xs text-ink-400">Từ đơn {donGoc.ma_don}</p>}
+                            </div>
+                            <p className="flex-none font-display font-bold text-coral-500">{formatVnd(hd.gia_tri)}</p>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-50 pt-3 text-xs text-ink-600">
+                            <span>Ký: <b className="text-navy-900">{hd.ngay_ky || '—'}</b></span>
+                            {hd.ngay_het_han && <span>Hết hạn: <b className="text-navy-900">{hd.ngay_het_han}</b></span>}
+                            {hd.file_url && (
+                              <a href={hd.file_url} target="_blank" rel="noreferrer"
+                                className="text-teal-500 hover:underline">Mở file</a>
+                            )}
+                            {hd.loai_dich_vu && (
+                              <button type="button" onClick={() => setXemHD(hd)}
+                                className="inline-flex items-center gap-1 text-navy-700 hover:text-navy-900">
+                                <Eye size={12} /> Xem
+                              </button>
+                            )}
+                            {donGoc && (
+                              <button type="button" onClick={() => setXuatHD({ hd, don: donGoc })}
+                                className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700">
+                                <FileDown size={12} /> Xuất hợp đồng
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
               )}
 
               {tab === 'cham_soc' && (

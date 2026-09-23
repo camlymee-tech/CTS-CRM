@@ -158,14 +158,8 @@ function hopDongXayShop(hd) {
     P(T('HỢP ĐỒNG CUNG CẤP DỊCH VỤ', { bold: true, size: 28 }), { align: AlignmentType.CENTER, after: 0 }),
     P(T('THƯƠNG MẠI ĐIỆN TỬ', { bold: true, size: 28 }), { align: AlignmentType.CENTER, after: 200 }),
 
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [new TableRow({ children: [
-        new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [P(T(`Số: ${hd.so_hop_dong}`, { bold: true }))] }),
-        new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [P(T(ngayVN(hd.ngay_ky), { italics: true }), { align: AlignmentType.RIGHT })] }),
-      ] })],
-    }),
-    P(T(''), { after: 200 }),
+    P(T(`Số: ${hd.so_hop_dong}`, { bold: true }), { align: AlignmentType.CENTER, after: 60 }),
+    P(T(ngayVN(hd.ngay_ky), { italics: true }), { align: AlignmentType.CENTER, after: 200 }),
 
     ...canCu(),
 
