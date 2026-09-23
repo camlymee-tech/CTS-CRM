@@ -462,7 +462,6 @@ export default function CustomerList({ currentProfile }) {
           currentProfile={currentProfile}
           onClose={() => setViewingCustomer(null)}
           onChanged={loadCustomers}
-          onEdit={(c) => { setViewingCustomer(null); setEditingCustomer(c); setShowForm(true) }}
         />
       )}
 
