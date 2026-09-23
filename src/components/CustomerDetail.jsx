@@ -9,6 +9,7 @@ import { Button, Textarea, Select, Badge, Input } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
 import { XuatHopDongForm, hdTuHopDongDaLuu } from './ContractsPage'
 import ContractPreview from './ContractPreview'
+import OrderForm from './OrderForm'
 import {
   LOAI_TUONG_TAC_OPTIONS, NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, LOAI_KHACH_OPTIONS,
@@ -20,7 +21,7 @@ const ICONS = { goi_dien: Phone, nhan_tin: MessageCircle, gap_mat: UsersIcon, kh
 
 
 
-export default function CustomerDetail({ customer: khachBanDau, currentProfile, onClose, onChanged, onEdit, onChotDon }) {
+export default function CustomerDetail({ customer: khachBanDau, currentProfile, onClose, onChanged, onEdit }) {
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung, maTaoDon } = useTrangThai()
   const [customer, setCustomer] = useState(khachBanDau)
   const [tab, setTab] = useState('thong_tin')
@@ -35,6 +36,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const [msg, setMsg] = useState('')
   const [xuatHD, setXuatHD] = useState(null)   // { hd, don }
   const [xemHD, setXemHD] = useState(null)
+  const [donMoi, setDonMoi] = useState(false)
 
   const cuaMinh = customer.sale_id === currentProfile?.id
   const chung = laKhachChung(customer)
@@ -97,11 +99,13 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     setCustomer(moi)
     load(); onChanged?.()
 
-    // Vừa chuyển sang Chốt hợp đồng -> sang tạo đơn dịch vụ luôn
+    // Vừa chuyển sang Chốt hợp đồng -> mở form tạo đơn dịch vụ ngay tại đây
     if (maTaoDon.includes(tt) && !maTaoDon.includes(truoc)) {
-      onChotDon?.(moi)
+      setDonMoi(true)
     }
   }
+
+  const tongGiaTriDon = donHang.reduce((s, o) => s + (Number(o.gia_tri) || 0), 0)
 
   const TABS = [
     { key: 'thong_tin', label: 'Thông tin' },
@@ -111,33 +115,20 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   ]
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-navy-950/30 backdrop-blur-sm">
-      <div className="flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
-        <div className="border-b border-slate-100 px-6 py-5">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-navy-950/30 p-4 backdrop-blur-sm">
+      <div className="grid h-full max-h-[920px] w-full max-w-6xl grid-cols-1 overflow-hidden rounded-2xl bg-white shadow-2xl md:grid-cols-[300px_1fr]">
+
+        {/* CỘT TRÁI — tóm tắt khách hàng */}
+        <div className="flex flex-col overflow-y-auto border-r border-slate-100 bg-slate-50/60 p-5">
           <div className="flex items-start justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-400">{customer.ma_khach}</p>
-              <h2 className="font-display text-xl font-bold text-navy-900">{customer.ten_khach}</h2>
-              <div className="mt-1 flex gap-3 text-sm">
-                {customer.link_fb && (
-                  <a href={customer.link_fb} target="_blank" rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-teal-500 hover:underline">
-                    <Link2 size={12} /> Facebook
-                  </a>
-                )}
-                {customer.link_shop && (
-                  <a href={customer.link_shop} target="_blank" rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-teal-500 hover:underline">
-                    <Store size={12} /> Link shop
-                  </a>
-                )}
-              </div>
+            <div className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-coral-100 font-display text-lg font-bold text-coral-600">
+              {(customer.ten_khach || '?').trim().charAt(0).toUpperCase()}
             </div>
             <div className="flex flex-none items-center gap-1">
               {suaDuoc && (
                 <button onClick={() => onEdit?.(customer)}
                   className="rounded-lg p-1.5 text-ink-400 hover:bg-slate-100 hover:text-navy-900" title="Sửa thông tin">
-                  <Pencil size={17} />
+                  <Pencil size={16} />
                 </button>
               )}
               <button onClick={onClose} className="rounded-lg p-1.5 text-ink-400 hover:bg-slate-100 hover:text-navy-900">
@@ -146,16 +137,33 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {(customer.nen_tang || []).map((nt) => (
-              <Badge key={nt} className={classOf(NEN_TANG_OPTIONS, nt)}>{labelOf(NEN_TANG_OPTIONS, nt)}</Badge>
-            ))}
-            {(customer.dich_vu || []).map((dv) => (
-              <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
-            ))}
+          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink-400">{customer.ma_khach}</p>
+          <h2 className="font-display text-lg font-bold leading-tight text-navy-900">{customer.ten_khach}</h2>
+
+          <div className="mt-2 flex flex-col gap-1 text-sm">
+            {customer.sdt && (
+              <span className="inline-flex items-center gap-1.5 text-ink-600">
+                <Phone size={13} className="text-ink-400" /> {customer.sdt}
+              </span>
+            )}
+            {customer.link_fb && (
+              <a href={customer.link_fb} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-teal-500 hover:underline">
+                <Link2 size={13} /> Facebook
+              </a>
+            )}
+            {customer.link_shop && (
+              <a href={customer.link_shop} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-teal-500 hover:underline">
+                <Store size={13} /> Link shop
+              </a>
+            )}
+          </div>
+
+          <div className="mt-3">
             {suaDuoc ? (
               <Select value={customer.trang_thai_cham_soc} onChange={(e) => doiTrangThai(e.target.value)}
-                className="h-8 w-44 py-1 text-xs">
+                className="w-full py-1.5 text-sm">
                 {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
               </Select>
             ) : (
@@ -165,19 +173,47 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
             )}
           </div>
 
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {(customer.nen_tang || []).map((nt) => (
+              <Badge key={nt} className={classOf(NEN_TANG_OPTIONS, nt)}>{labelOf(NEN_TANG_OPTIONS, nt)}</Badge>
+            ))}
+            {(customer.dich_vu || []).map((dv) => (
+              <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
+            <p className="text-xs text-ink-400">Sale phụ trách</p>
+            <p className="text-sm font-medium text-navy-900">{tenNguoi(customer.sale_id)}</p>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <StatTile label="Liên hệ gần nhất" value={customer.ngay_lien_he_gan_nhat || '—'} />
+            <StatTile label="Lượt chăm sóc" value={interactions.length} />
+            <StatTile label="Giá trị đơn" value={formatVnd(tongGiaTriDon)} small />
+          </div>
+
+          <div className="mt-3 space-y-2 text-sm">
+            <Field label="Nguồn khách" value={labelOf(NGUON_KHACH_OPTIONS, customer.nguon_khach)} />
+            <Field label="Ngày tạo" value={(customer.created_at || '').slice(0, 10)} />
+          </div>
+
           {chung && !cuaMinh && (
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-amber-50 px-4 py-2.5">
-              <p className="text-sm text-amber-800">
+            <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5">
+              <p className="text-xs text-amber-800">
                 Data chung — hiện do <b>{tenNguoi(customer.sale_id)}</b> phụ trách
               </p>
-              <Button onClick={nhanKhach} className="px-3 py-1.5 text-xs">
+              <Button onClick={nhanKhach} className="mt-2 w-full px-3 py-1.5 text-xs">
                 <HandHeart size={14} /> Nhận khách
               </Button>
             </div>
           )}
           {msg && <p className="mt-2 text-sm text-rose-600">{msg}</p>}
+        </div>
 
-          <div className="mt-4 flex gap-1 border-b border-slate-100">
+        {/* CỘT PHẢI — tab nội dung */}
+        <div className="flex min-w-0 flex-col overflow-hidden">
+          <div className="flex gap-1 border-b border-slate-100 px-6 pt-4">
             {TABS.map((t) => (
               <button key={t.key} onClick={() => setTab(t.key)}
                 className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${
@@ -187,7 +223,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
               </button>
             ))}
           </div>
-        </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? <p className="text-sm text-ink-400">Đang tải...</p> : (
@@ -195,13 +230,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
               {tab === 'thong_tin' && (
                 <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                  <Field label="Số điện thoại" value={customer.sdt} />
                   <Field label="Ngành hàng" value={customer.nganh_hang} />
-                  <Field label="Nguồn khách" value={labelOf(NGUON_KHACH_OPTIONS, customer.nguon_khach)} />
                   <Field label="Loại khách" value={labelOf(LOAI_KHACH_OPTIONS, customer.loai_khach)} />
-                  <Field label="Sale phụ trách" value={tenNguoi(customer.sale_id)} />
-                  <Field label="Ngày tạo" value={(customer.created_at || '').slice(0, 10)} />
-                  <Field label="Liên hệ gần nhất" value={customer.ngay_lien_he_gan_nhat} />
                   <Field label="Chăm sóc tiếp theo" value={customer.ngay_cham_soc_tiep_theo} />
                 </div>
 
@@ -225,7 +255,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
               {tab === 'don_hd' && (
                 <div className="space-y-3">
-                  <button type="button" onClick={() => onChotDon?.(customer)}
+                  <button type="button" onClick={() => setDonMoi(true)}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-coral-300 px-3 py-2 text-sm font-medium text-coral-600 hover:bg-coral-50">
                     <Plus size={15} /> Tạo đơn dịch vụ {donHang.length > 0 ? 'khác' : 'mới'}
                   </button>
@@ -366,7 +396,18 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
               load(); onChanged?.()
             }} />
         )}
+        </div>
       </div>
+
+      {donMoi && (
+        <OrderForm
+          customer={customer}
+          profiles={profiles}
+          currentProfile={currentProfile}
+          onClose={() => setDonMoi(false)}
+          onSaved={() => { setDonMoi(false); load(); onChanged?.() }}
+        />
+      )}
 
       {xuatHD && (
         <XuatHopDongForm
@@ -453,6 +494,15 @@ function O({ nhan, giaTri }) {
     <div>
       <p className="text-xs font-medium text-ink-400">{nhan}</p>
       <p className="mt-0.5 whitespace-pre-wrap text-sm text-navy-900">{giaTri || '—'}</p>
+    </div>
+  )
+}
+
+function StatTile({ label, value, small }) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white px-1.5 py-2">
+      <p className={`font-display font-bold text-navy-900 ${small ? 'text-xs' : 'text-sm'}`}>{value}</p>
+      <p className="mt-0.5 text-[10px] leading-tight text-ink-400">{label}</p>
     </div>
   )
 }

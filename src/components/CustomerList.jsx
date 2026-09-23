@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge } from './ui'
 import CustomerForm from './CustomerForm'
 import CustomerDetail from './CustomerDetail'
+import OrderForm from './OrderForm'
 import StatusesModal from './StatusesModal'
 import { useTrangThai } from '../lib/StatusContext'
 import {
@@ -21,9 +22,10 @@ import {
 const chiSo = (s) => (s || '').replace(/\D/g, '')
 
 
-export default function CustomerList({ currentProfile, onChotDon }) {
+export default function CustomerList({ currentProfile }) {
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung } = useTrangThai()
   const [quanLyTT, setQuanLyTT] = useState(false)
+  const [donMoiKhach, setDonMoiKhach] = useState(null)
 
   // Các cột có thể bật/tắt (Khách hàng và Thao tác luôn hiển thị)
   const COT = [
@@ -449,7 +451,7 @@ export default function CustomerList({ currentProfile, onChotDon }) {
           onSaved={(khachVuaChot) => {
             setShowForm(false)
             loadCustomers()
-            if (khachVuaChot) onChotDon?.(khachVuaChot)
+            if (khachVuaChot) setDonMoiKhach(khachVuaChot)
           }}
         />
       )}
@@ -461,7 +463,16 @@ export default function CustomerList({ currentProfile, onChotDon }) {
           onClose={() => setViewingCustomer(null)}
           onChanged={loadCustomers}
           onEdit={(c) => { setViewingCustomer(null); setEditingCustomer(c); setShowForm(true) }}
-          onChotDon={(khach) => { setViewingCustomer(null); onChotDon?.(khach) }}
+        />
+      )}
+
+      {donMoiKhach && (
+        <OrderForm
+          customer={donMoiKhach}
+          profiles={profiles}
+          currentProfile={currentProfile}
+          onClose={() => setDonMoiKhach(null)}
+          onSaved={() => { setDonMoiKhach(null); loadCustomers() }}
         />
       )}
     </div>
