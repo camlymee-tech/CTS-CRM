@@ -145,10 +145,7 @@ function hopDongAds(hd) {
       `Mã số thuế: ${hd.mst || ''}  |  Điện thoại: ${hd.sdt || ''}`,
       `Email: ${hd.email || ''}`,
       `Số tài khoản: `,
-      // Cá nhân/hộ kinh doanh nhỏ thường không có "người đại diện" riêng — chỉ công ty mới cần
-      hd.nguoi_dai_dien
-        ? damPhan('Người đại diện: ', { text: hd.nguoi_dai_dien, bold: true }, `  –  Chức vụ: ${hd.chuc_vu || ''}`)
-        : `Tên người xuất hoá đơn: ${hd.ten_khach || ''}`,
+      damPhan('Người đại diện: ', { text: hd.nguoi_dai_dien || '', bold: true }, `  –  Chức vụ: ${hd.chuc_vu || ''}`),
     ]),
     P(T(''), { after: 160 }),
 
@@ -238,10 +235,7 @@ function hopDongXayShop(hd) {
       `Mã số thuế: ${hd.mst || ''}  |  Điện thoại: ${hd.sdt || ''}`,
       `Email: ${hd.email || ''}`,
       `Số tài khoản: `,
-      // Cá nhân/hộ kinh doanh nhỏ thường không có "người đại diện" riêng — chỉ công ty mới cần
-      hd.nguoi_dai_dien
-        ? damPhan('Người đại diện: ', { text: hd.nguoi_dai_dien, bold: true }, `  –  Chức vụ: ${hd.chuc_vu || ''}`)
-        : `Tên người xuất hoá đơn: ${hd.ten_khach || ''}`,
+      damPhan('Người đại diện: ', { text: hd.nguoi_dai_dien || '', bold: true }, `  –  Chức vụ: ${hd.chuc_vu || ''}`),
     ]),
     P(T('(Sau đây gọi tắt là Bên A)', { italics: true }), { before: 120, after: 200 }),
 
