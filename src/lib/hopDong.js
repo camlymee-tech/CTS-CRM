@@ -138,7 +138,7 @@ function hopDongAds(hd) {
     P(T('I. BÊN SỬ DỤNG DỊCH VỤ (BÊN A):', { bold: true })),
     P(T('.....................................', { bold: true })),
     hopThongTin([
-      ['Đại diện : .....................................', 'Chức vụ: .....................................'],
+      [`Đại diện : ${hd.nguoi_dai_dien || ''}`, `Chức vụ: ${hd.chuc_vu || ''}`],
       `Địa chỉ : ${hd.dia_chi || ''}`,
       `MST : ${hd.mst || ''}`,
       `SĐT : ${hd.sdt || ''}`,
@@ -228,7 +228,7 @@ function hopDongXayShop(hd) {
 
     P(T('I. BÊN SỬ DỤNG DỊCH VỤ: .....................................', { bold: true })),
     hopThongTin([
-      ['Đại diện : .....................................', 'Chức vụ: .....................................'],
+      [`Đại diện : ${hd.nguoi_dai_dien || ''}`, `Chức vụ: ${hd.chuc_vu || ''}`],
       `Địa chỉ : ${hd.dia_chi || ''}`,
       `MST : ${hd.mst || ''}`,
       `SĐT : ${hd.sdt || ''}`,
