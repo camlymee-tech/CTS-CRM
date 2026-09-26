@@ -40,6 +40,7 @@ export function hdTuHopDongDaLuu(c, khach) {
     ten_khach: khach?.ten_khach,
     sdt: khach?.sdt,
     dia_chi: khach?.dia_chi, mst: khach?.mst,
+    ten_tieu_de_bena: khach?.ten_tieu_de_bena,
     nguoi_dai_dien: khach?.nguoi_dai_dien, chuc_vu: khach?.chuc_vu, email: khach?.email,
     link_shop: khach?.link_shop,
     so_luong_gian_hang: c.so_luong_gian_hang || 1,
@@ -346,7 +347,7 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
     ngay_ky: contract.ngay_ky || new Date().toISOString().slice(0, 10),
     dia_chi: khach?.dia_chi || '',
     mst: khach?.mst || '',
-    ten_tieu_de_bena: '',
+    ten_tieu_de_bena: khach?.ten_tieu_de_bena || '',
     nguoi_dai_dien: '',
     chuc_vu: '',
     email: khach?.email || '',
@@ -409,6 +410,7 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
     // Lưu lại thông tin bên A vào khách + thông tin hợp đồng để lần sau khỏi nhập lại
     await supabase.from('customers').update({
       dia_chi: form.dia_chi || null, mst: form.mst || null,
+      ten_tieu_de_bena: form.ten_tieu_de_bena || null,
       nguoi_dai_dien: form.nguoi_dai_dien || null, chuc_vu: form.chuc_vu || null,
       email: form.email || null, ten_viet_tat: vtat || null,
     }).eq('id', khach.id)
@@ -470,18 +472,20 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Tên Bên A (dùng ở tiêu đề hợp đồng, để trống nếu là cá nhân)" value={form.ten_tieu_de_bena}
-            onChange={(e) => setForm({ ...form, ten_tieu_de_bena: e.target.value })} />
+          <div className="col-span-2">
+            <Input label="Tên Bên A (dùng ở tiêu đề hợp đồng, để trống nếu là cá nhân)" value={form.ten_tieu_de_bena}
+              onChange={(e) => setForm({ ...form, ten_tieu_de_bena: e.target.value })} />
+          </div>
           <Input label="Người đại diện (Bên A)" value={form.nguoi_dai_dien}
             onChange={(e) => setForm({ ...form, nguoi_dai_dien: e.target.value })} />
           <Input label="Chức vụ" value={form.chuc_vu}
             onChange={(e) => setForm({ ...form, chuc_vu: e.target.value })} />
-          <Input label="Mã số thuế" value={form.mst}
-            onChange={(e) => setForm({ ...form, mst: e.target.value })} />
           <div className="col-span-2">
             <Input label="Địa chỉ" value={form.dia_chi}
               onChange={(e) => setForm({ ...form, dia_chi: e.target.value })} />
           </div>
+          <Input label="Mã số thuế" value={form.mst}
+            onChange={(e) => setForm({ ...form, mst: e.target.value })} />
           {loaiDV === 'xay_shop' && (
             <Input label="Email" value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })} />

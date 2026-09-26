@@ -135,6 +135,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     sale_id: customer.sale_id || '',
     ngay_lien_he_gan_nhat: customer.ngay_lien_he_gan_nhat || '',
     ngay_cham_soc_tiep_theo: customer.ngay_cham_soc_tiep_theo || '',
+    ten_tieu_de_bena: customer.ten_tieu_de_bena || '',
     nguoi_dai_dien: customer.nguoi_dai_dien || '',
     chuc_vu: customer.chuc_vu || '',
     mst: customer.mst || '',
@@ -351,18 +352,22 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                         Thông tin pháp lý (dùng khi lên hợp đồng)
                       </p>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                        <div className="col-span-2">
+                          <Input label="Tên Bên A (dùng ở tiêu đề hợp đồng, để trống nếu là cá nhân)" value={formTT.ten_tieu_de_bena}
+                            onChange={(e) => setFormTT({ ...formTT, ten_tieu_de_bena: e.target.value })} />
+                        </div>
                         <Input label="Người đại diện" value={formTT.nguoi_dai_dien}
                           onChange={(e) => setFormTT({ ...formTT, nguoi_dai_dien: e.target.value })} />
                         <Input label="Chức vụ" value={formTT.chuc_vu}
                           onChange={(e) => setFormTT({ ...formTT, chuc_vu: e.target.value })} />
-                        <Input label="Mã số thuế" value={formTT.mst}
-                          onChange={(e) => setFormTT({ ...formTT, mst: e.target.value })} />
-                        <Input label="Email" value={formTT.email}
-                          onChange={(e) => setFormTT({ ...formTT, email: e.target.value })} />
                         <div className="col-span-2">
                           <Input label="Địa chỉ" value={formTT.dia_chi}
                             onChange={(e) => setFormTT({ ...formTT, dia_chi: e.target.value })} />
                         </div>
+                        <Input label="Mã số thuế" value={formTT.mst}
+                          onChange={(e) => setFormTT({ ...formTT, mst: e.target.value })} />
+                        <Input label="Email" value={formTT.email}
+                          onChange={(e) => setFormTT({ ...formTT, email: e.target.value })} />
                       </div>
                     </div>
 
@@ -385,11 +390,12 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                         Thông tin pháp lý (dùng khi lên hợp đồng)
                       </p>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                        <div className="col-span-2"><Field label="Tên Bên A" value={customer.ten_tieu_de_bena} /></div>
                         <Field label="Người đại diện" value={customer.nguoi_dai_dien} />
                         <Field label="Chức vụ" value={customer.chuc_vu} />
+                        <div className="col-span-2"><Field label="Địa chỉ" value={customer.dia_chi} /></div>
                         <Field label="Mã số thuế" value={customer.mst} />
                         <Field label="Email" value={customer.email} />
-                        <div className="col-span-2"><Field label="Địa chỉ" value={customer.dia_chi} /></div>
                       </div>
                     </div>
                   </div>
