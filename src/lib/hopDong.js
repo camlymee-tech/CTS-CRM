@@ -37,42 +37,15 @@ function bangNoiDung(rows, headers = ['NỘI DUNG TRIỂN KHAI', 'CHI TIẾT']) 
   })
 }
 
-// Bảng "Giá trị hợp đồng" kiểu hoá đơn: 1 dòng dịch vụ, dòng thuế GTGT, dòng tổng, dòng bằng chữ
-function bangGiaTri(tenDichVu, tong) {
-  const gia = Math.round(tong / 1.08)   // giá trước VAT
-  const vat = tong - gia
-  const dem = { top: 100, bottom: 100, left: 120, right: 120 }
-  const o = (children, opt = {}) => new TableCell({
-    columnSpan: opt.span, margins: dem,
-    width: opt.w ? { size: opt.w, type: WidthType.PERCENTAGE } : undefined,
-    children: [P(Array.isArray(children) ? children : T(children, { bold: opt.bold, italics: opt.italics, size: 22 }),
-      { align: opt.align || AlignmentType.LEFT, after: 0 })],
-    shading: opt.header ? { fill: 'D9E2F3' } : undefined,
-  })
-  const hang = (cells) => new TableRow({ children: cells })
+// Ô thông tin đóng khung (Bên A / Bên B kiểu Seller) — mỗi phần tử là 1 chuỗi (chiếm
+// trọn hàng) hoặc mảng 2 chuỗi (chia 2 cột, dùng cho hàng "Đại diện | Chức vụ")
+function hopThongTin(dongList) {
+  const dem = { top: 60, bottom: 60, left: 120, right: 120 }
+  const oFull = (text) => new TableCell({ columnSpan: 2, margins: dem, children: [P(T(text, { size: 22 }), { align: AlignmentType.LEFT, after: 20 })] })
+  const oNua = (text) => new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, margins: dem, children: [P(T(text, { size: 22 }), { align: AlignmentType.LEFT, after: 20 })] })
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [
-      hang([
-        o('STT', { header: true, bold: true, align: AlignmentType.CENTER, w: 6 }),
-        o('Tên dịch vụ', { header: true, bold: true, align: AlignmentType.CENTER, w: 34 }),
-        o('ĐVT', { header: true, bold: true, align: AlignmentType.CENTER, w: 8 }),
-        o('Số lượng', { header: true, bold: true, align: AlignmentType.CENTER, w: 12 }),
-        o('Đơn giá (VNĐ)', { header: true, bold: true, align: AlignmentType.CENTER, w: 20 }),
-        o('Thành tiền (VNĐ)', { header: true, bold: true, align: AlignmentType.CENTER, w: 20 }),
-      ]),
-      hang([
-        o('1', { align: AlignmentType.CENTER }),
-        o(tenDichVu || 'Dịch vụ'),
-        o('Gói', { align: AlignmentType.CENTER }),
-        o('1', { align: AlignmentType.CENTER }),
-        o(dinhDang(gia), { align: AlignmentType.RIGHT }),
-        o(dinhDang(gia), { align: AlignmentType.RIGHT }),
-      ]),
-      hang([o('Thuế GTGT (8%)', { span: 5, bold: true }), o(dinhDang(vat), { bold: true, align: AlignmentType.RIGHT })]),
-      hang([o('Tổng giá trị hợp đồng', { span: 5, bold: true }), o(dinhDang(tong), { bold: true, align: AlignmentType.RIGHT })]),
-      hang([o(`Số tiền bằng chữ: ${docTienThanhChu(tong)}.`, { span: 6, italics: true, align: AlignmentType.CENTER })]),
-    ],
+    rows: dongList.map((d) => new TableRow({ children: Array.isArray(d) ? [oNua(d[0]), oNua(d[1])] : [oFull(d)] })),
   })
 }
 
@@ -149,9 +122,10 @@ function hopDongAds(hd) {
     ...(noiDung.length ? [P(T('')), bangNoiDung(noiDung), P(T(''))] : []),
 
     P(T('ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG', { bold: true }), { before: 240 }),
-    P(T('')),
-    bangGiaTri(hd.ten_goi ? `Dịch vụ SHOPEE ADS (${hd.ten_goi})` : 'Dịch vụ SHOPEE ADS', tong),
-    P(T('')),
+    P([T('Giá trị sản phẩm: ', {}), T(`${dinhDang(giaTri)} VNĐ`, { bold: true })]),
+    P([T('VAT 8%: ', {}), T(`${dinhDang(vat)} VNĐ`, { bold: true })]),
+    P([T('Tổng giá trị hợp đồng: ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
+    P([T('Bằng chữ: ', {}), T(`${docTienThanhChu(tong)}./.`, { italics: true })]),
     dong('Thời gian dự kiến bắt đầu: ', hd.ngay_bat_dau ? new Date(hd.ngay_bat_dau).toLocaleDateString('vi-VN') : ''),
 
     P(T('ĐIỀU 3: PHƯƠNG THỨC THANH TOÁN', { bold: true }), { before: 240 }),
@@ -164,7 +138,7 @@ function hopDongAds(hd) {
     P(T('4.1. Cung cấp những thông tin cần thiết liên quan đến việc triển khai tổng thể gian hàng Shopee của bên A cho bên B.')),
     P(T('4.2. Không kéo dài thời gian duyệt kế hoạch, sản phẩm. Quá 05 ngày sau khi bên B bàn giao mà bên A không phản hồi thì xem như đã phê duyệt.')),
     P(T('4.3. Thanh toán đầy đủ và đúng hạn các khoản nêu tại Điều 2.')),
-    P(T('4.4. Trường hợp Bên A đơn phương chấm dứt hợp đồng không do lỗi Bên B, Bên B không hoàn trả giá trị hợp đồng đã thanh toán; số tiền sẽ được xem xét quy đổi sang dịch vụ khác.'), { after: 160 }),
+    P(T('4.4. Trong trường hợp Bên A đơn phương chấm dứt hợp đồng vì bất kỳ lý do nào không xuất phát từ lỗi của Bên B, Bên B không có nghĩa vụ hoàn trả toàn bộ hoặc một phần giá trị hợp đồng mà Bên A đã thanh toán. Số tiền Bên A đã thanh toán theo Điều 2 sẽ được Bên B xem xét và trao đổi với Bên A để quy đổi sang các dịch vụ khác do Bên B đang cung cấp tại thời điểm phát sinh việc chấm dứt hợp đồng, trên cơ sở khả năng cung cấp dịch vụ thực tế.'), { after: 160 }),
 
     P(T('ĐIỀU 5: QUYỀN VÀ NGHĨA VỤ CỦA BÊN B', { bold: true }), { before: 240 }),
     P(T('5.1. Chịu trách nhiệm lên kế hoạch chạy quảng cáo theo các đầu mục tại Điều 1.')),
@@ -176,8 +150,10 @@ function hopDongAds(hd) {
     P(T('ĐIỀU 6: ĐIỀU KHOẢN CHUNG', { bold: true }), { before: 240 }),
     P(T('6.1. Hai bên cam kết thực hiện nghiêm túc các điều khoản. Bên vi phạm phải bồi thường. Tranh chấp giải quyết trên tinh thần hòa giải; không thỏa thuận được sẽ đưa ra tòa án có thẩm quyền tại Hà Nội.')),
     P(T('6.2. Nếu bổ sung hạng mục so với hợp đồng, hai bên thống nhất chi phí phát sinh bằng 01 phụ lục kèm theo.')),
-    P(T('6.3. Hợp đồng có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán.')),
-    P(T('6.4. Hợp đồng lập thành 02 bản Tiếng Việt có giá trị như nhau, mỗi bên giữ 01 bản.'), { after: 300 }),
+    P(T('6.3. Trường hợp bất khả kháng (thiên tai, dịch bệnh, hỏa hoạn, chiến tranh, thay đổi chính sách/pháp luật của Nhà nước hoặc chính sách của sàn thương mại điện tử...) khiến một bên không thể thực hiện nghĩa vụ, bên đó không bị coi là vi phạm hợp đồng nhưng phải thông báo ngay cho bên còn lại và hai bên cùng bàn bạc phương án xử lý phù hợp.')),
+    P(T('6.4. Mọi sửa đổi, bổ sung nội dung hợp đồng chỉ có hiệu lực khi được lập thành văn bản (hoặc phụ lục) và có xác nhận của cả hai bên.')),
+    P(T('6.5. Hợp đồng có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán.')),
+    P(T('6.6. Hợp đồng lập thành 02 bản Tiếng Việt có giá trị như nhau, mỗi bên giữ 01 bản.'), { after: 300 }),
 
     kyTen(hd.ten_khach, 'LÊ DANH TUẤN'),
   ]
@@ -207,37 +183,38 @@ function hopDongXayShop(hd) {
     ...canCu(),
 
     P(T(`I. BÊN SỬ DỤNG DỊCH VỤ: ${(hd.ten_khach || '').toUpperCase()}`, { bold: true })),
-    ...(hd.nguoi_dai_dien ? [
-      P(T(`Đại diện: ${hd.nguoi_dai_dien}${hd.chuc_vu ? ` - Chức vụ: ${hd.chuc_vu}` : ''}`)),
-    ] : [
-      dong('Tên người xuất hoá đơn: ', hd.ten_khach),
+    hopThongTin([
+      // Cá nhân/hộ kinh doanh nhỏ thường không có "người đại diện" riêng — chỉ công ty mới cần
+      ...(hd.nguoi_dai_dien ? [[`Đại diện : ${hd.nguoi_dai_dien}`, `Chức vụ: ${hd.chuc_vu || ''}`]]
+        : [`Tên người xuất hoá đơn : ${hd.ten_khach || ''}`]),
+      `Địa chỉ : ${hd.dia_chi || ''}`,
+      `MST : ${hd.mst || ''}`,
+      `SĐT : ${hd.sdt || ''}`,
+      `Gmail : ${hd.email || ''}`,
     ]),
-    dong('Địa chỉ: ', hd.dia_chi),
-    dong('MST: ', hd.mst),
-    dong('SĐT: ', hd.sdt),
-    dong('Email: ', hd.email),
-    P(T('(Sau đây gọi tắt là Bên A)', { italics: true }), { after: 200 }),
+    P(T('(Sau đây gọi tắt là Bên A)', { italics: true }), { before: 120, after: 200 }),
 
     P(T('II. BÊN CUNG CẤP DỊCH VỤ: CÔNG TY CỔ PHẦN TẬP ĐOÀN TUKIGROUP', { bold: true })),
-    P(T('Đại diện: NGUYỄN TRUNG KIÊN - Chức vụ: Chủ tịch HĐQT')),
-    P(T('Địa chỉ: Tầng 3, T2 Times Tower, số 35 đường Lê Văn Lương, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam')),
-    P(T('MST: 0109789110')),
-    P(T('SĐT: 0868.388.862')),
-    P(T('Số tài khoản: 86286888888 tại Ngân hàng Thương mại cổ phần Á Châu (ACB)')),
-    P(T('(Sau đây gọi tắt là Bên B)', { italics: true }), { after: 200 }),
+    hopThongTin([
+      ['Đại diện : NGUYỄN TRUNG KIÊN', 'Chức vụ: Chủ tịch HĐQT'],
+      'Địa chỉ : Tầng 3, T2 Times Tower, số 35 đường Lê Văn Lương, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam',
+      'MST : 0109789110',
+      'SĐT : 0868.388.862',
+      'Số tài khoản : 86286888888 tại Ngân hàng Thương mại cổ phần Á Châu (ACB)',
+    ]),
+    P(T('(Sau đây gọi tắt là Bên B)', { italics: true }), { before: 120, after: 200 }),
 
     P(T('Cùng nhau thoả thuận và thống nhất ký kết Hợp đồng dịch vụ thương mại điện tử (sau đây được gọi là Hợp đồng) với những điều khoản sau:'), { after: 160 }),
 
     P(T('ĐIỀU 1: NỘI DUNG HỢP ĐỒNG', { bold: true }), { before: 240 }),
-    P(T(`Bên B cung cấp Gói dịch vụ TỐI ƯU${hd.ten_goi ? ` (${hd.ten_goi})` : ''} - Chuẩn hóa và tối ưu tối đa ${soSP} sản phẩm cho bên A với những nội dung sau:`)),
+    P(T(`Bên B cung cấp Gói dịch vụ TỐI ƯU (Chuẩn hóa và tối ưu TỐI ĐA ${soSP} sản phẩm) cho bên A với những nội dung sau:`)),
     dong('- Số lượng shop: ', soShopPad),
     dong('- Link Shopee: ', linkShop),
     ...(noiDung.length ? [P(T('')), bangNoiDung(noiDung, [`Hạng mục ${soShop} shop`, 'Nội dung']), P(T(''))] : []),
 
     P(T('ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG', { bold: true }), { before: 240 }),
-    P(T('')),
-    bangGiaTri(hd.ten_goi || 'Xây dựng gian hàng Shopee', tong),
-    P(T(''), { after: 160 }),
+    P([T('Giá trị hợp đồng (bao gồm VAT): ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
+    P([T('Bằng chữ: ', {}), T(`${docTienThanhChu(tong)}./.`, { italics: true })], { after: 160 }),
 
     P(T('ĐIỀU 3: PHƯƠNG THỨC THANH TOÁN', { bold: true }), { before: 240 }),
     P([T('3.1. Bên A thanh toán 100% phí dịch vụ khi bắt đầu công việc với số tiền như sau: ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
@@ -262,8 +239,10 @@ function hopDongXayShop(hd) {
     P(T('ĐIỀU 6: ĐIỀU KHOẢN CHUNG', { bold: true }), { before: 240 }),
     P(T('6.1. Hai bên cam kết thực hiện nghiêm túc các điều khoản. Bên vi phạm phải bồi thường. Tranh chấp giải quyết trên tinh thần hòa giải; không thỏa thuận được sẽ đưa ra tòa án có thẩm quyền tại Hà Nội.')),
     P(T('6.2. Nếu bổ sung mục thiết kế so với hợp đồng, hai bên thống nhất chi phí phát sinh bằng 01 phụ lục kèm theo.')),
-    P(T('6.3. Hợp đồng có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán.')),
-    P(T('6.4. Hợp đồng lập thành 02 bản Tiếng Việt có giá trị như nhau, mỗi bên giữ 01 bản.'), { after: 300 }),
+    P(T('6.3. Trường hợp bất khả kháng (thiên tai, dịch bệnh, hỏa hoạn, chiến tranh, thay đổi chính sách/pháp luật của Nhà nước hoặc chính sách của sàn thương mại điện tử...) khiến một bên không thể thực hiện nghĩa vụ, bên đó không bị coi là vi phạm hợp đồng nhưng phải thông báo ngay cho bên còn lại và hai bên cùng bàn bạc phương án xử lý phù hợp.')),
+    P(T('6.4. Mọi sửa đổi, bổ sung nội dung hợp đồng chỉ có hiệu lực khi được lập thành văn bản (hoặc phụ lục) và có xác nhận của cả hai bên.')),
+    P(T('6.5. Hợp đồng có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán.')),
+    P(T('6.6. Hợp đồng lập thành 02 bản Tiếng Việt có giá trị như nhau, mỗi bên giữ 01 bản.'), { after: 300 }),
 
     kyTen(hd.ten_khach, 'NGUYỄN TRUNG KIÊN'),
   ]
