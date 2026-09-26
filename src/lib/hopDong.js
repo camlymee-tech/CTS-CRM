@@ -198,7 +198,7 @@ function hopDongAds(hd) {
     P(T('6.3. Hợp đồng này có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán và hoàn tất thủ tục thanh lý khi hai bên đạt được các điều khoản trong hợp đồng.')),
     P(T('6.4. Hợp đồng này gồm 03 (bốn) trang bản Tiếng Việt có giá trị như nhau được lập thành 02 (hai) bản, mỗi bên giữ 01 (một) bản để thực hiện.'), { after: 300 }),
 
-    kyTen(hd.ten_khach, 'LÊ DANH TUẤN'),
+    kyTen('', 'LÊ DANH TUẤN'),
   ]
 }
 
@@ -284,7 +284,7 @@ function hopDongXayShop(hd) {
     P(T('6.3. Hợp đồng này có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán và hoàn tất thủ tục thanh lý khi hai bên đạt được các điều khoản trong hợp đồng.')),
     P(T('6.4. Hợp đồng này gồm 03 (ba) trang bản Tiếng Việt có giá trị như nhau được lập thành 02 (hai) bản, mỗi bên giữ 01 (một) bản để thực hiện.'), { after: 300 }),
 
-    kyTen(hd.ten_khach, 'NGUYỄN TRUNG KIÊN'),
+    kyTen('', 'NGUYỄN TRUNG KIÊN'),
   ]
 }
 
