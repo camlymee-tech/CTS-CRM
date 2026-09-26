@@ -37,6 +37,45 @@ function bangNoiDung(rows, headers = ['NỘI DUNG TRIỂN KHAI', 'CHI TIẾT']) 
   })
 }
 
+// Bảng "Giá trị hợp đồng" kiểu hoá đơn: 1 dòng dịch vụ, dòng thuế GTGT, dòng tổng, dòng bằng chữ
+function bangGiaTri(tenDichVu, tong) {
+  const gia = Math.round(tong / 1.08)   // giá trước VAT
+  const vat = tong - gia
+  const dem = { top: 100, bottom: 100, left: 120, right: 120 }
+  const o = (children, opt = {}) => new TableCell({
+    columnSpan: opt.span, margins: dem,
+    width: opt.w ? { size: opt.w, type: WidthType.PERCENTAGE } : undefined,
+    children: [P(Array.isArray(children) ? children : T(children, { bold: opt.bold, italics: opt.italics, size: 22 }),
+      { align: opt.align || AlignmentType.LEFT, after: 0 })],
+    shading: opt.header ? { fill: 'D9E2F3' } : undefined,
+  })
+  const hang = (cells) => new TableRow({ children: cells })
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      hang([
+        o('STT', { header: true, bold: true, align: AlignmentType.CENTER, w: 6 }),
+        o('Tên dịch vụ', { header: true, bold: true, align: AlignmentType.CENTER, w: 34 }),
+        o('ĐVT', { header: true, bold: true, align: AlignmentType.CENTER, w: 8 }),
+        o('Số lượng', { header: true, bold: true, align: AlignmentType.CENTER, w: 12 }),
+        o('Đơn giá (VNĐ)', { header: true, bold: true, align: AlignmentType.CENTER, w: 20 }),
+        o('Thành tiền (VNĐ)', { header: true, bold: true, align: AlignmentType.CENTER, w: 20 }),
+      ]),
+      hang([
+        o('1', { align: AlignmentType.CENTER }),
+        o(tenDichVu || 'Dịch vụ'),
+        o('Gói', { align: AlignmentType.CENTER }),
+        o('1', { align: AlignmentType.CENTER }),
+        o(dinhDang(gia), { align: AlignmentType.RIGHT }),
+        o(dinhDang(gia), { align: AlignmentType.RIGHT }),
+      ]),
+      hang([o('Thuế GTGT (8%)', { span: 5, bold: true }), o(dinhDang(vat), { bold: true, align: AlignmentType.RIGHT })]),
+      hang([o('Tổng giá trị hợp đồng', { span: 5, bold: true }), o(dinhDang(tong), { bold: true, align: AlignmentType.RIGHT })]),
+      hang([o(`Số tiền bằng chữ: ${docTienThanhChu(tong)}.`, { span: 6, italics: true, align: AlignmentType.CENTER })]),
+    ],
+  })
+}
+
 const canCu = () => [
   P(T('- Căn cứ Bộ luật Dân sự số 91/2015/QH13 có hiệu lực từ ngày 01/01/2017 và các văn bản hướng dẫn thi hành.', { size: 22 })),
   P(T('- Căn cứ Luật Thương mại số 36/2005/QH11 có hiệu lực từ ngày 01/01/2006.', { size: 22 })),
@@ -84,8 +123,12 @@ function hopDongAds(hd) {
     P(T('I. BÊN SỬ DỤNG DỊCH VỤ (BÊN A):', { bold: true })),
     dong('Địa chỉ: ', hd.dia_chi),
     dong('MST: ', hd.mst),
-    dong('Đại diện: ', hd.nguoi_dai_dien),
-    dong('Chức vụ: ', hd.chuc_vu),
+    ...(hd.nguoi_dai_dien ? [
+      dong('Đại diện: ', hd.nguoi_dai_dien),
+      dong('Chức vụ: ', hd.chuc_vu),
+    ] : [
+      dong('Tên người xuất hoá đơn: ', hd.ten_khach),
+    ]),
     dong('Số điện thoại: ', hd.sdt),
 
     P(T('II. BÊN CUNG CẤP (BÊN B): CÔNG TY TNHH TUKI ADS', { bold: true })),
@@ -106,10 +149,9 @@ function hopDongAds(hd) {
     ...(noiDung.length ? [P(T('')), bangNoiDung(noiDung), P(T(''))] : []),
 
     P(T('ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG', { bold: true }), { before: 240 }),
-    P([T('Giá trị sản phẩm: ', {}), T(`${dinhDang(giaTri)} VNĐ`, { bold: true })]),
-    P([T('VAT 8%: ', {}), T(`${dinhDang(vat)} VNĐ`, { bold: true })]),
-    P([T('Tổng giá trị hợp đồng: ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
-    P([T('Bằng chữ: ', {}), T(`${docTienThanhChu(tong)}./.`, { italics: true })]),
+    P(T('')),
+    bangGiaTri(hd.ten_goi ? `Dịch vụ SHOPEE ADS (${hd.ten_goi})` : 'Dịch vụ SHOPEE ADS', tong),
+    P(T('')),
     dong('Thời gian dự kiến bắt đầu: ', hd.ngay_bat_dau ? new Date(hd.ngay_bat_dau).toLocaleDateString('vi-VN') : ''),
 
     P(T('ĐIỀU 3: PHƯƠNG THỨC THANH TOÁN', { bold: true }), { before: 240 }),
@@ -165,7 +207,11 @@ function hopDongXayShop(hd) {
     ...canCu(),
 
     P(T(`I. BÊN SỬ DỤNG DỊCH VỤ: ${(hd.ten_khach || '').toUpperCase()}`, { bold: true })),
-    P(T(`Đại diện: ${hd.nguoi_dai_dien || '.....................................'} - Chức vụ: ${hd.chuc_vu || '.....................................'}`)),
+    ...(hd.nguoi_dai_dien ? [
+      P(T(`Đại diện: ${hd.nguoi_dai_dien}${hd.chuc_vu ? ` - Chức vụ: ${hd.chuc_vu}` : ''}`)),
+    ] : [
+      dong('Tên người xuất hoá đơn: ', hd.ten_khach),
+    ]),
     dong('Địa chỉ: ', hd.dia_chi),
     dong('MST: ', hd.mst),
     dong('SĐT: ', hd.sdt),
@@ -189,8 +235,9 @@ function hopDongXayShop(hd) {
     ...(noiDung.length ? [P(T('')), bangNoiDung(noiDung, [`Hạng mục ${soShop} shop`, 'Nội dung']), P(T(''))] : []),
 
     P(T('ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG', { bold: true }), { before: 240 }),
-    P([T('Giá trị hợp đồng (bao gồm VAT): ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
-    P([T('Bằng chữ: ', {}), T(`${docTienThanhChu(tong)}./.`, { italics: true })], { after: 160 }),
+    P(T('')),
+    bangGiaTri(hd.ten_goi || 'Xây dựng gian hàng Shopee', tong),
+    P(T(''), { after: 160 }),
 
     P(T('ĐIỀU 3: PHƯƠNG THỨC THANH TOÁN', { bold: true }), { before: 240 }),
     P([T('3.1. Bên A thanh toán 100% phí dịch vụ khi bắt đầu công việc với số tiền như sau: ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
