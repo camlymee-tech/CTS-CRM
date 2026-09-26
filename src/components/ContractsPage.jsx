@@ -346,6 +346,7 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
     ngay_ky: contract.ngay_ky || new Date().toISOString().slice(0, 10),
     dia_chi: khach?.dia_chi || '',
     mst: khach?.mst || '',
+    ten_tieu_de_bena: '',
     nguoi_dai_dien: '',
     chuc_vu: '',
     email: khach?.email || '',
@@ -391,6 +392,7 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
       ten_khach: khach?.ten_khach,
       sdt: khach?.sdt,
       dia_chi: form.dia_chi, mst: form.mst,
+      ten_tieu_de_bena: form.ten_tieu_de_bena,
       nguoi_dai_dien: form.nguoi_dai_dien, chuc_vu: form.chuc_vu, email: form.email,
       link_shop: form.link_shop,
       so_luong_gian_hang: Number(form.so_luong_gian_hang) || 1,
@@ -468,6 +470,8 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
         </div>
 
         <div className="grid grid-cols-2 gap-4">
+          <Input label="Tên Bên A (dùng ở tiêu đề hợp đồng, để trống nếu là cá nhân)" value={form.ten_tieu_de_bena}
+            onChange={(e) => setForm({ ...form, ten_tieu_de_bena: e.target.value })} />
           <Input label="Người đại diện (Bên A)" value={form.nguoi_dai_dien}
             onChange={(e) => setForm({ ...form, nguoi_dai_dien: e.target.value })} />
           <Input label="Chức vụ" value={form.chuc_vu}

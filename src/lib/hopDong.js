@@ -136,7 +136,7 @@ function hopDongAds(hd) {
     P(T(`Hôm nay, ${ngayVN(hd.ngay_ky).replace('Hà Nội, ', '')}, các bên gồm:`), { after: 160 }),
 
     P(T('I. BÊN SỬ DỤNG DỊCH VỤ (BÊN A):', { bold: true })),
-    P(T('.....................................', { bold: true })),
+    P(T(hd.ten_tieu_de_bena || '.....................................', { bold: true })),
     hopThongTin([
       [`Đại diện : ${hd.nguoi_dai_dien || ''}`, `Chức vụ: ${hd.chuc_vu || ''}`],
       `Địa chỉ : ${hd.dia_chi || ''}`,
@@ -226,7 +226,7 @@ function hopDongXayShop(hd) {
 
     ...canCu(),
 
-    P(T('I. BÊN SỬ DỤNG DỊCH VỤ: .....................................', { bold: true })),
+    P(T(`I. BÊN SỬ DỤNG DỊCH VỤ: ${hd.ten_tieu_de_bena || '.....................................'}`, { bold: true })),
     hopThongTin([
       [`Đại diện : ${hd.nguoi_dai_dien || ''}`, `Chức vụ: ${hd.chuc_vu || ''}`],
       `Địa chỉ : ${hd.dia_chi || ''}`,
