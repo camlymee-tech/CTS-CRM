@@ -39,10 +39,17 @@ function bangNoiDung(rows, headers = ['NỘI DUNG TRIỂN KHAI', 'CHI TIẾT']) 
 
 // Ô thông tin đóng khung (Bên A / Bên B kiểu Seller) — mỗi phần tử là 1 chuỗi (chiếm
 // trọn hàng) hoặc mảng 2 chuỗi (chia 2 cột, dùng cho hàng "Đại diện | Chức vụ")
+// Đánh dấu 1 dòng có nhiều phần với định dạng khác nhau (VD tên người đại diện in đậm
+// giữa 1 câu chữ thường) — để hopThongTin phân biệt với dòng chia 2 cột (mảng 2 chuỗi)
+const damPhan = (...phan) => ({ mix: phan })
+
 function hopThongTin(dongList) {
   const dem = { top: 60, bottom: 60, left: 120, right: 120 }
-  const oFull = (text) => new TableCell({ columnSpan: 2, margins: dem, children: [P(T(text, { size: 22 }), { align: AlignmentType.LEFT, after: 20 })] })
-  const oNua = (text) => new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, margins: dem, children: [P(T(text, { size: 22 }), { align: AlignmentType.LEFT, after: 20 })] })
+  const runs = (d) => (d && d.mix)
+    ? d.mix.map((p) => typeof p === 'string' ? T(p, { size: 22 }) : T(p.text, { size: 22, bold: p.bold }))
+    : T(d, { size: 22 })
+  const oFull = (d) => new TableCell({ columnSpan: 2, margins: dem, children: [P(runs(d), { align: AlignmentType.LEFT, after: 20 })] })
+  const oNua = (d) => new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, margins: dem, children: [P(runs(d), { align: AlignmentType.LEFT, after: 20 })] })
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: dongList.map((d) => new TableRow({ children: Array.isArray(d) ? [oNua(d[0]), oNua(d[1])] : [oFull(d)] })),
@@ -134,12 +141,11 @@ function hopDongAds(hd) {
 
     P(T('I. BÊN SỬ DỤNG DỊCH VỤ (BÊN A):', { bold: true })),
     hopThongTin([
-      `Địa chỉ : ${hd.dia_chi || ''}`,
-      `MST : ${hd.mst || ''}`,
-      // Cá nhân/hộ kinh doanh nhỏ thường không có "người đại diện" riêng — chỉ công ty mới cần
-      ...(hd.nguoi_dai_dien ? [[`Đại diện : ${hd.nguoi_dai_dien}`, `Chức vụ: ${hd.chuc_vu || ''}`]]
-        : [`Tên người xuất hoá đơn : ${hd.ten_khach || ''}`]),
-      `Số điện thoại : ${hd.sdt || ''}`,
+      `Địa chỉ: ${hd.dia_chi || ''}`,
+      `Mã số thuế: ${hd.mst || ''}  |  Điện thoại: ${hd.sdt || ''}`,
+      `Email: ${hd.email || ''}`,
+      `Số tài khoản: `,
+      damPhan('Người đại diện: ', { text: hd.nguoi_dai_dien || '', bold: true }, `  –  Chức vụ: ${hd.chuc_vu || ''}`),
     ]),
     P(T(''), { after: 160 }),
 
@@ -225,13 +231,11 @@ function hopDongXayShop(hd) {
 
     P(T(`I. BÊN SỬ DỤNG DỊCH VỤ: ${(hd.ten_khach || '').toUpperCase()}`, { bold: true })),
     hopThongTin([
-      // Cá nhân/hộ kinh doanh nhỏ thường không có "người đại diện" riêng — chỉ công ty mới cần
-      ...(hd.nguoi_dai_dien ? [[`Đại diện : ${hd.nguoi_dai_dien}`, `Chức vụ: ${hd.chuc_vu || ''}`]]
-        : [`Tên người xuất hoá đơn : ${hd.ten_khach || ''}`]),
-      `Địa chỉ : ${hd.dia_chi || ''}`,
-      `MST : ${hd.mst || ''}`,
-      `SĐT : ${hd.sdt || ''}`,
-      `Gmail : ${hd.email || ''}`,
+      `Địa chỉ: ${hd.dia_chi || ''}`,
+      `Mã số thuế: ${hd.mst || ''}  |  Điện thoại: ${hd.sdt || ''}`,
+      `Email: ${hd.email || ''}`,
+      `Số tài khoản: `,
+      damPhan('Người đại diện: ', { text: hd.nguoi_dai_dien || '', bold: true }, `  –  Chức vụ: ${hd.chuc_vu || ''}`),
     ]),
     P(T('(Sau đây gọi tắt là Bên A)', { italics: true }), { before: 120, after: 200 }),
 
