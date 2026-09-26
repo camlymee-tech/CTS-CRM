@@ -82,7 +82,6 @@ function hopDongAds(hd) {
     P(T(`Hôm nay, ${ngayVN(hd.ngay_ky).replace('Hà Nội, ', '')}, các bên gồm:`), { after: 160 }),
 
     P(T('I. BÊN SỬ DỤNG DỊCH VỤ (BÊN A):', { bold: true })),
-    dong('Tên: ', hd.ten_khach),
     dong('Địa chỉ: ', hd.dia_chi),
     dong('MST: ', hd.mst),
     dong('Đại diện: ', hd.nguoi_dai_dien),
