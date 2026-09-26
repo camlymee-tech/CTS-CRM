@@ -39,10 +39,6 @@ function bangNoiDung(rows, headers = ['NỘI DUNG TRIỂN KHAI', 'CHI TIẾT']) 
 
 // Ô thông tin đóng khung (Bên A / Bên B kiểu Seller) — mỗi phần tử là 1 chuỗi (chiếm
 // trọn hàng) hoặc mảng 2 chuỗi (chia 2 cột, dùng cho hàng "Đại diện | Chức vụ")
-// Đánh dấu 1 dòng có nhiều phần với định dạng khác nhau (VD tên người đại diện in đậm
-// giữa 1 câu chữ thường) — để hopThongTin phân biệt với dòng chia 2 cột (mảng 2 chuỗi)
-const damPhan = (...phan) => ({ mix: phan })
-
 function hopThongTin(dongList) {
   const dem = { top: 60, bottom: 60, left: 120, right: 120 }
   const runs = (d) => (d && d.mix)
@@ -140,12 +136,13 @@ function hopDongAds(hd) {
     P(T(`Hôm nay, ${ngayVN(hd.ngay_ky).replace('Hà Nội, ', '')}, các bên gồm:`), { after: 160 }),
 
     P(T('I. BÊN SỬ DỤNG DỊCH VỤ (BÊN A):', { bold: true })),
+    P(T('.....................................', { bold: true })),
     hopThongTin([
-      `Địa chỉ: ${hd.dia_chi || ''}`,
-      `Mã số thuế: ${hd.mst || ''}  |  Điện thoại: ${hd.sdt || ''}`,
-      `Email: ${hd.email || ''}`,
-      `Số tài khoản: `,
-      damPhan('Người đại diện: ', { text: hd.nguoi_dai_dien || '', bold: true }, `  –  Chức vụ: ${hd.chuc_vu || ''}`),
+      ['Đại diện : .....................................', 'Chức vụ: .....................................'],
+      `Địa chỉ : ${hd.dia_chi || ''}`,
+      `MST : ${hd.mst || ''}`,
+      `SĐT : ${hd.sdt || ''}`,
+      `Số tài khoản : `,
     ]),
     P(T(''), { after: 160 }),
 
@@ -229,13 +226,13 @@ function hopDongXayShop(hd) {
 
     ...canCu(),
 
-    P(T(`I. BÊN SỬ DỤNG DỊCH VỤ: ${(hd.ten_khach || '').toUpperCase()}`, { bold: true })),
+    P(T('I. BÊN SỬ DỤNG DỊCH VỤ: .....................................', { bold: true })),
     hopThongTin([
-      `Địa chỉ: ${hd.dia_chi || ''}`,
-      `Mã số thuế: ${hd.mst || ''}  |  Điện thoại: ${hd.sdt || ''}`,
-      `Email: ${hd.email || ''}`,
-      `Số tài khoản: `,
-      damPhan('Người đại diện: ', { text: hd.nguoi_dai_dien || '', bold: true }, `  –  Chức vụ: ${hd.chuc_vu || ''}`),
+      ['Đại diện : .....................................', 'Chức vụ: .....................................'],
+      `Địa chỉ : ${hd.dia_chi || ''}`,
+      `MST : ${hd.mst || ''}`,
+      `SĐT : ${hd.sdt || ''}`,
+      `Số tài khoản : `,
     ]),
     P(T('(Sau đây gọi tắt là Bên A)', { italics: true }), { before: 120, after: 200 }),
 
