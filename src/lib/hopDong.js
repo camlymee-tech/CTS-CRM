@@ -226,7 +226,15 @@ export async function taoFileHopDong(hd) {
   const children = hd.loai_dich_vu === 'xay_shop' ? hopDongXayShop(hd) : hopDongAds(hd)
   const doc = new Document({
     styles: { default: { document: { run: { font: FONT, size: 24 } } } },
-    sections: [{ properties: { page: { margin: { top: 1134, bottom: 1134, left: 1701, right: 1134 } } }, children }],
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 11906, height: 16838 }, // khổ A4 chuẩn (21cm x 29.7cm) — trước đây thiếu dòng này nên Word tự hiểu là khổ Letter
+          margin: { top: 1134, bottom: 1134, left: 1701, right: 1134 },
+        },
+      },
+      children,
+    }],
   })
   return await Packer.toBlob(doc)
 }
