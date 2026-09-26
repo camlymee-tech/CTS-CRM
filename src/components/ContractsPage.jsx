@@ -346,8 +346,8 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
     ngay_ky: contract.ngay_ky || new Date().toISOString().slice(0, 10),
     dia_chi: khach?.dia_chi || '',
     mst: khach?.mst || '',
-    nguoi_dai_dien: khach?.nguoi_dai_dien || '',
-    chuc_vu: khach?.chuc_vu || '',
+    nguoi_dai_dien: '',
+    chuc_vu: '',
     email: khach?.email || '',
     link_shop: khach?.link_shop || '',
     so_luong_gian_hang: contract.so_luong_gian_hang || 1,
@@ -446,8 +446,7 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
           <p className="font-display font-semibold text-navy-900">{khach?.ten_khach || '—'}</p>
           <p className="text-sm text-ink-600">Giá trị {formatVnd(contract.gia_tri)} (đã gồm VAT)</p>
           <p className="mt-1 text-xs text-ink-400">
-            Thông tin Bên A (địa chỉ, MST, người đại diện, link shop...) lấy từ hồ sơ khách hàng —
-            sửa ở đây sẽ tự cập nhật lại luôn hồ sơ khách để dùng chung cho các hợp đồng sau.
+            Thông tin Bên A (địa chỉ, MST, link shop...) lấy từ hồ sơ khách hàng — sửa ở đây sẽ tự cập nhật lại luôn hồ sơ khách để dùng chung cho các hợp đồng sau. Riêng Người đại diện/Chức vụ cần gõ tay mỗi lần xuất, không tự lấy từ hồ sơ khách.
           </p>
         </div>
 
