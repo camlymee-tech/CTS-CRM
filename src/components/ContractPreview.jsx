@@ -60,11 +60,12 @@ export default function ContractPreview({ hd, onClose }) {
 <title>In hợp đồng</title>
 <style>
   * { box-sizing: border-box; }
+  @page { margin: 2cm 2cm 2cm 3cm; }
   body { margin: 0; padding: 24px; background: #fff; display: flex; justify-content: center; }
   .docx-wrapper { background: #fff !important; padding: 0 !important; }
   .docx { width: 100% !important; max-width: 800px; margin: 0 auto !important; box-shadow: none !important; }
   @media print {
-    body { padding: 0; }
+    body { padding: 0; margin: 0; }
     .docx-wrapper { padding: 0 !important; }
   }
 </style>
@@ -83,6 +84,9 @@ export default function ContractPreview({ hd, onClose }) {
           <Printer size={15} /> In hợp đồng
         </Button>
       </div>
+      <p className="mb-3 text-xs text-ink-400">
+        Ở hộp thoại in, chị bỏ tick mục "Tiêu đề và chân trang" (Headers and footers) để không bị dính ngày giờ/tên trang do trình duyệt tự thêm vào.
+      </p>
       {loading && <p className="mb-2 text-sm text-ink-400">Đang dựng bản xem trước...</p>}
       {error && (
         <div className="mb-2">
