@@ -49,11 +49,50 @@ function hopThongTin(dongList) {
   })
 }
 
+// Bảng "Giá trị hợp đồng" kiểu hoá đơn: 1 dòng dịch vụ, dòng thuế GTGT, dòng tổng, dòng bằng chữ
+function bangGiaTri(tenDichVu, tong) {
+  const gia = Math.round(tong / 1.08)   // giá trước VAT
+  const vat = tong - gia
+  const dem = { top: 100, bottom: 100, left: 120, right: 120 }
+  const o = (children, opt = {}) => new TableCell({
+    columnSpan: opt.span, margins: dem,
+    width: opt.w ? { size: opt.w, type: WidthType.PERCENTAGE } : undefined,
+    children: [P(Array.isArray(children) ? children : T(children, { bold: opt.bold, italics: opt.italics, size: 22 }),
+      { align: opt.align || AlignmentType.LEFT, after: 0 })],
+    shading: opt.header ? { fill: 'D9E2F3' } : undefined,
+  })
+  const hang = (cells) => new TableRow({ children: cells })
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      hang([
+        o('STT', { header: true, bold: true, align: AlignmentType.CENTER, w: 6 }),
+        o('Tên dịch vụ', { header: true, bold: true, align: AlignmentType.CENTER, w: 34 }),
+        o('ĐVT', { header: true, bold: true, align: AlignmentType.CENTER, w: 8 }),
+        o('Số lượng', { header: true, bold: true, align: AlignmentType.CENTER, w: 12 }),
+        o('Đơn giá (VNĐ)', { header: true, bold: true, align: AlignmentType.CENTER, w: 20 }),
+        o('Thành tiền (VNĐ)', { header: true, bold: true, align: AlignmentType.CENTER, w: 20 }),
+      ]),
+      hang([
+        o('1', { align: AlignmentType.CENTER }),
+        o(tenDichVu || 'Dịch vụ'),
+        o('Gói', { align: AlignmentType.CENTER }),
+        o('1', { align: AlignmentType.CENTER }),
+        o(dinhDang(gia), { align: AlignmentType.RIGHT }),
+        o(dinhDang(gia), { align: AlignmentType.RIGHT }),
+      ]),
+      hang([o('Thuế GTGT (8%)', { span: 5, bold: true }), o(dinhDang(vat), { bold: true, align: AlignmentType.RIGHT })]),
+      hang([o('Tổng giá trị hợp đồng', { span: 5, bold: true }), o(dinhDang(tong), { bold: true, align: AlignmentType.RIGHT })]),
+      hang([o(`Số tiền bằng chữ: ${docTienThanhChu(tong)}.`, { span: 6, italics: true, align: AlignmentType.CENTER })]),
+    ],
+  })
+}
+
 const canCu = () => [
-  P(T('- Căn cứ Bộ luật Dân sự số 91/2015/QH13 có hiệu lực từ ngày 01/01/2017 và các văn bản hướng dẫn thi hành.', { size: 22 })),
-  P(T('- Căn cứ Luật Thương mại số 36/2005/QH11 có hiệu lực từ ngày 01/01/2006.', { size: 22 })),
-  P(T('- Căn cứ Luật Công nghệ thông tin số 67/2006/QH11 có hiệu lực từ ngày 01/01/2007.', { size: 22 })),
-  P(T('- Căn cứ vào khả năng và nhu cầu của các bên trong Hợp đồng.', { size: 22, }), { after: 200 }),
+  P(T('- Căn cứ vào Bộ luật Dân sự số 91/2015/QH13 của nước Cộng hòa Xã hội Chủ nghĩa Việt Nam, có hiệu lực kể từ ngày 01/01/2017 và các văn bản hướng dẫn thi hành.', { size: 22, italics: true })),
+  P(T('- Căn cứ vào Luật Thương mại số 36/2005/QH11 của nước Cộng hoà Xã hội Chủ nghĩa Việt nam, có hiệu lực từ ngày 01/01/2006.', { size: 22, italics: true })),
+  P(T('- Căn cứ vào Luật công nghệ thông tin số 67/2006/QH11 của nước Cộng hòa xã hội chủ nghĩa Việt Nam, có hiệu lực từ ngày 01/01/2007.', { size: 22, italics: true })),
+  P(T('- Căn cứ vào khả năng và nhu cầu các bên trong Hợp đồng.', { size: 22, italics: true }), { after: 200 }),
 ]
 
 const kyTen = (tenA, tenB) => new Table({
@@ -94,66 +133,68 @@ function hopDongAds(hd) {
     P(T(`Hôm nay, ${ngayVN(hd.ngay_ky).replace('Hà Nội, ', '')}, các bên gồm:`), { after: 160 }),
 
     P(T('I. BÊN SỬ DỤNG DỊCH VỤ (BÊN A):', { bold: true })),
-    dong('Địa chỉ: ', hd.dia_chi),
-    dong('MST: ', hd.mst),
-    ...(hd.nguoi_dai_dien ? [
-      dong('Đại diện: ', hd.nguoi_dai_dien),
-      dong('Chức vụ: ', hd.chuc_vu),
-    ] : [
-      dong('Tên người xuất hoá đơn: ', hd.ten_khach),
+    hopThongTin([
+      `Địa chỉ : ${hd.dia_chi || ''}`,
+      `MST : ${hd.mst || ''}`,
+      // Cá nhân/hộ kinh doanh nhỏ thường không có "người đại diện" riêng — chỉ công ty mới cần
+      ...(hd.nguoi_dai_dien ? [[`Đại diện : ${hd.nguoi_dai_dien}`, `Chức vụ: ${hd.chuc_vu || ''}`]]
+        : [`Tên người xuất hoá đơn : ${hd.ten_khach || ''}`]),
+      `Số điện thoại : ${hd.sdt || ''}`,
     ]),
-    dong('Số điện thoại: ', hd.sdt),
+    P(T(''), { after: 160 }),
 
     P(T('II. BÊN CUNG CẤP (BÊN B): CÔNG TY TNHH TUKI ADS', { bold: true })),
-    P(T('Địa chỉ: Tầng 3, T2 Times Tower, số 35 đường Lê Văn Lương, Phường Thanh Xuân, TP Hà Nội, Việt Nam')),
-    P(T('Mã số thuế: 0111571658')),
-    P(T('Đại diện ký kết (Người được ủy quyền): (Ông) LÊ DANH TUẤN')),
-    P(T('Chức vụ: Phó phòng Kỹ thuật Ads')),
-    P(T('(Theo Giấy ủy quyền số: 01/UQ-TNHH/2026 ngày 01/08/2026)')),
-    P(T('Chủ tài khoản: CÔNG TY TNHH TUKI ADS')),
-    P(T('Số tài khoản: 3688999 - Ngân hàng TMCP Việt Nam Thịnh Vượng (VPBank)'), { after: 200 }),
+    hopThongTin([
+      'Địa chỉ : Tầng 3, T2 Times Tower, số 35 đường Lê Văn Lương, Phường Thanh Xuân, TP Hà Nội, Việt Nam',
+      'Mã số thuế : 0111571658',
+      ['Đại diện ký kết : (Ông) LÊ DANH TUẤN', 'Chức vụ: Phó phòng Kỹ thuật Ads'],
+      '(Theo Giấy ủy quyền số: 01/UQ-TNHH/2026 ngày 01/08/2026)',
+      'Chủ tài khoản : CÔNG TY TNHH TUKI ADS',
+      'Số tài khoản : 3688999',
+      'Ngân hàng : TMCP Việt Nam Thịnh Vượng (VPBank)',
+    ]),
+    P(T(''), { after: 200 }),
 
     P(T('Sau khi thảo luận, hai bên thống nhất ký Hợp đồng cung ứng dịch vụ Chạy Quảng cáo gian hàng Shopee với các điều khoản sau:'), { after: 160 }),
 
     P(T('ĐIỀU 1: NỘI DUNG HỢP ĐỒNG', { bold: true }), { before: 240 }),
-    P(T(`Bên B cung cấp Gói dịch vụ SHOPEE ADS${hd.ten_goi ? ` (${hd.ten_goi})` : ''} cho bên A với những nội dung sau:`)),
-    dong('- Link Shopee (tên shop): ', hd.link_shop),
+    P(T('Bên B cung cấp Gói dịch vụ SHOPEE ADS (Chạy quảng cáo gian hàng Shopee) cho bên A với những nội dung sau:')),
+    dong('- Link shopee (tên shop): ', hd.link_shop),
     dong('- Tổng số lượng gian hàng: ', String(hd.so_luong_gian_hang || 1)),
     ...(noiDung.length ? [P(T('')), bangNoiDung(noiDung), P(T(''))] : []),
 
     P(T('ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG', { bold: true }), { before: 240 }),
-    P([T('Giá trị sản phẩm: ', {}), T(`${dinhDang(giaTri)} VNĐ`, { bold: true })]),
-    P([T('VAT 8%: ', {}), T(`${dinhDang(vat)} VNĐ`, { bold: true })]),
-    P([T('Tổng giá trị hợp đồng: ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
-    P([T('Bằng chữ: ', {}), T(`${docTienThanhChu(tong)}./.`, { italics: true })]),
+    P(T('')),
+    bangGiaTri(hd.ten_goi ? `Chạy quảng cáo Shopee (${hd.ten_goi})` : 'Chạy quảng cáo Shopee', tong),
+    P(T('')),
     dong('Thời gian dự kiến bắt đầu: ', hd.ngay_bat_dau ? new Date(hd.ngay_bat_dau).toLocaleDateString('vi-VN') : ''),
 
     P(T('ĐIỀU 3: PHƯƠNG THỨC THANH TOÁN', { bold: true }), { before: 240 }),
     P([T('3.1. Bên A sẽ thanh toán chi phí dịch vụ cho bên B với số tiền: ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
     P([T('Bằng chữ: ', {}), T(`${docTienThanhChu(tong)}./.`, { italics: true })]),
     P(T('3.2. Thanh toán bằng hình thức: Chuyển khoản.')),
-    P(T('3.3. Trường hợp Bên A gia hạn Hợp đồng, Bên A thanh toán phí dịch vụ theo chu kỳ từng tháng. Nếu có điều chỉnh giá, hai Bên thống nhất bằng văn bản trước ít nhất 07 ngày.'), { after: 160 }),
+    P(T('3.3. Phương thức thanh toán khi gia hạn hợp đồng:')),
+    P(T('Trường hợp Bên A có gia hạn Hợp đồng, Bên A sẽ thanh toán phí dịch vụ theo chu kỳ từng lần/tháng vào ngày ... hàng tháng, số tiền thanh toán là .... VNĐ (đã bao gồm VAT).')),
+    P(T('Nếu có điều chỉnh về giá dịch vụ, hai Bên phải thống nhất bằng văn bản trước ít nhất 07 ngày trước khi bắt đầu kỳ gia hạn mới.'), { after: 160 }),
 
     P(T('ĐIỀU 4: QUYỀN VÀ NGHĨA VỤ CỦA BÊN A', { bold: true }), { before: 240 }),
-    P(T('4.1. Cung cấp những thông tin cần thiết liên quan đến việc triển khai tổng thể gian hàng Shopee của bên A cho bên B.')),
-    P(T('4.2. Không kéo dài thời gian duyệt kế hoạch, sản phẩm. Quá 05 ngày sau khi bên B bàn giao mà bên A không phản hồi thì xem như đã phê duyệt.')),
-    P(T('4.3. Thanh toán đầy đủ và đúng hạn các khoản nêu tại Điều 2.')),
+    P(T('4.1. Cung cấp những thông tin cần thiết có liên quan đến việc triển khai tổng thể cho gian hàng shopee của bên A cho bên B.')),
+    P(T('4.2. Không kéo dài thời gian duyệt kế hoạch, sản phẩm khi hai bên làm việc để tránh trường hợp rủi ro, ảnh hưởng đến công việc và tiến độ chạy quảng cáo. Trong trường hợp quá 05 ngày sau khi bên B bàn giao, sau khi nhận được mẫu gửi từ bên B mà bên A không có ý kiến phản hồi cụ thể nào đối với Shop quảng cáo được xem như bên A đã phê duyệt.')),
+    P(T('4.3. Có trách nhiệm thanh toán đầy đủ và đúng hạn các khoản thanh toán nêu tại điều 2 của hợp đồng này.')),
     P(T('4.4. Trong trường hợp Bên A đơn phương chấm dứt hợp đồng vì bất kỳ lý do nào không xuất phát từ lỗi của Bên B, Bên B không có nghĩa vụ hoàn trả toàn bộ hoặc một phần giá trị hợp đồng mà Bên A đã thanh toán. Số tiền Bên A đã thanh toán theo Điều 2 sẽ được Bên B xem xét và trao đổi với Bên A để quy đổi sang các dịch vụ khác do Bên B đang cung cấp tại thời điểm phát sinh việc chấm dứt hợp đồng, trên cơ sở khả năng cung cấp dịch vụ thực tế.'), { after: 160 }),
 
     P(T('ĐIỀU 5: QUYỀN VÀ NGHĨA VỤ CỦA BÊN B', { bold: true }), { before: 240 }),
-    P(T('5.1. Chịu trách nhiệm lên kế hoạch chạy quảng cáo theo các đầu mục tại Điều 1.')),
-    P(T('5.2. Đảm bảo đúng quy trình, yêu cầu và tiến độ quy định trong hợp đồng.')),
-    P(T('5.3. Bảo mật thông tin chiến lược kinh doanh, bí mật công nghệ của bên A trong suốt quá trình thực hiện.')),
-    P(T('5.4. Được quyền sử dụng các mẫu chiến dịch quảng cáo với mục đích giới thiệu năng lực.')),
-    P(T('5.5. Trường hợp chấm dứt do đề nghị từ bên B, bên B báo trước bằng văn bản/email (trước 30 ngày), hoàn trả toàn bộ số tiền bên A đã thanh toán.'), { after: 160 }),
+    P(T('5.1. Chịu trách nhiệm lên kế hoạch chạy quảng cáo theo các đầu mục đã nêu tại Điều 1.')),
+    P(T('5.2. Đảm bảo đúng quy trình, yêu cầu và tiến độ được quy định trong hợp đồng.')),
+    P(T('5.3. Bảo mật những thông tin liên quan đến chiến lược kinh doanh, bí mật công nghệ và những thông tin được yêu cầu giữ bí mật của bên A trong suốt quá trình thực hiện hợp đồng.')),
+    P(T('5.4. Bên B được quyền sử dụng các mẫu chiến dịch quảng cáo này với mục đích giới thiệu năng lực của bên B.')),
+    P(T('5.5. Trong trường hợp công việc buộc phải chấm dứt do đề nghị từ phía bên B thì bên B có trách nhiệm báo trước bằng văn bản/email (trước 30 ngày làm việc), đồng thời hoàn trả lại toàn bộ số tiền bên A đã thanh toán.'), { after: 160 }),
 
     P(T('ĐIỀU 6: ĐIỀU KHOẢN CHUNG', { bold: true }), { before: 240 }),
-    P(T('6.1. Hai bên cam kết thực hiện nghiêm túc các điều khoản. Bên vi phạm phải bồi thường. Tranh chấp giải quyết trên tinh thần hòa giải; không thỏa thuận được sẽ đưa ra tòa án có thẩm quyền tại Hà Nội.')),
-    P(T('6.2. Nếu bổ sung hạng mục so với hợp đồng, hai bên thống nhất chi phí phát sinh bằng 01 phụ lục kèm theo.')),
-    P(T('6.3. Trường hợp bất khả kháng (thiên tai, dịch bệnh, hỏa hoạn, chiến tranh, thay đổi chính sách/pháp luật của Nhà nước hoặc chính sách của sàn thương mại điện tử...) khiến một bên không thể thực hiện nghĩa vụ, bên đó không bị coi là vi phạm hợp đồng nhưng phải thông báo ngay cho bên còn lại và hai bên cùng bàn bạc phương án xử lý phù hợp.')),
-    P(T('6.4. Mọi sửa đổi, bổ sung nội dung hợp đồng chỉ có hiệu lực khi được lập thành văn bản (hoặc phụ lục) và có xác nhận của cả hai bên.')),
-    P(T('6.5. Hợp đồng có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán.')),
-    P(T('6.6. Hợp đồng lập thành 02 bản Tiếng Việt có giá trị như nhau, mỗi bên giữ 01 bản.'), { after: 300 }),
+    P(T('6.1. Hai bên cam kết thực hiện nghiêm túc tất cả các điều khoản trong Hợp đồng này, Bên nào vi phạm sẽ phải bồi thường thiệt hại cho Bên kia. Trường hợp có tranh chấp hai bên sẽ giải quyết trên tinh thần thỏa thuận hòa giải, hợp tác. Trong trường hợp hai Bên không thể thỏa thuận được thì tranh chấp sẽ được đưa ra toà án có thẩm quyền tại thành phố Hà Nội, Việt Nam để phán xử.')),
+    P(T('6.2. Trong trường hợp bên A muốn bổ sung thêm các hạng mục thiết kế so với nội dung quy định tại hợp đồng này, hai bên sẽ thống nhất chi phí phát sinh, thời gian thực hiện và các thông tin liên quan bằng 01 phụ lục hợp đồng kèm theo.')),
+    P(T('6.3. Hợp đồng này có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán và hoàn tất thủ tục thanh lý khi hai bên đạt được các điều khoản trong hợp đồng.')),
+    P(T('6.4. Hợp đồng này gồm 03 (bốn) trang bản Tiếng Việt có giá trị như nhau được lập thành 02 (hai) bản, mỗi bên giữ 01 (một) bản để thực hiện.'), { after: 300 }),
 
     kyTen(hd.ten_khach, 'LÊ DANH TUẤN'),
   ]
@@ -213,8 +254,9 @@ function hopDongXayShop(hd) {
     ...(noiDung.length ? [P(T('')), bangNoiDung(noiDung, [`Hạng mục ${soShop} shop`, 'Nội dung']), P(T(''))] : []),
 
     P(T('ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG', { bold: true }), { before: 240 }),
-    P([T('Giá trị hợp đồng (bao gồm VAT): ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
-    P([T('Bằng chữ: ', {}), T(`${docTienThanhChu(tong)}./.`, { italics: true })], { after: 160 }),
+    P(T('')),
+    bangGiaTri(hd.ten_goi || 'Xây dựng gian hàng Shopee', tong),
+    P(T(''), { after: 160 }),
 
     P(T('ĐIỀU 3: PHƯƠNG THỨC THANH TOÁN', { bold: true }), { before: 240 }),
     P([T('3.1. Bên A thanh toán 100% phí dịch vụ khi bắt đầu công việc với số tiền như sau: ', {}), T(`${dinhDang(tong)} VNĐ`, { bold: true })]),
@@ -222,27 +264,25 @@ function hopDongXayShop(hd) {
     P(T('3.2. Thanh toán bằng hình thức: Chuyển khoản.'), { after: 160 }),
 
     P(T('ĐIỀU 4: QUYỀN VÀ NGHĨA VỤ CỦA BÊN A', { bold: true }), { before: 240 }),
-    P(T('4.1. Cung cấp những thông tin cần thiết liên quan đến việc triển khai tổng thể gian hàng Shopee của bên A cho bên B.')),
-    P(T('4.2. Không kéo dài thời gian duyệt mẫu. Quá 10 ngày sau khi bên B bàn giao mà bên A không phản hồi thì xem như đã phê duyệt.')),
-    P(T('4.3. Thanh toán đầy đủ và đúng hạn các khoản nêu tại Điều 2.')),
-    P(T('4.4. Trường hợp bên A vi phạm buộc phải chấm dứt hợp đồng, bên B không hoàn trả toàn bộ giá trị hợp đồng đã thanh toán.'), { after: 160 }),
+    P(T('4.1. Cung cấp những thông tin cần thiết có liên quan đến việc triển khai tổng thể cho gian hàng shopee của bên A cho bên B.')),
+    P(T('4.2. Không kéo dài thời gian duyệt mẫu, sản phẩm khi hai bên làm việc để tránh trường hợp rủi ro, ảnh hưởng đến công việc và tiến độ thiết kế. Trong trường hợp quá 10 ngày sau khi bên B bàn giao, sau khi nhận được mẫu gửi từ bên B mà bên A không có ý kiến phản hồi cụ thể nào đối với Shop thiết kế thì mặc nhiên mẫu thiết kế được xem như bên A đã phê duyệt.')),
+    P(T('4.3. Có trách nhiệm thanh toán đầy đủ và đúng hạn các khoản thanh toán nêu tại điều 2 của hợp đồng này.')),
+    P(T('4.5. Trong trường hợp bên A vi phạm và buộc phải chấm dứt hợp đồng, bên B sẽ không hoàn trả cho bên A toàn bộ giá trị hợp đồng mà bên A đã thanh toán.'), { after: 160 }),
 
     P(T('ĐIỀU 5: QUYỀN VÀ NGHĨA VỤ CỦA BÊN B', { bold: true }), { before: 240 }),
     P(T('5.1. Chịu trách nhiệm thiết kế sáng tạo.')),
-    P(T('5.2. Đảm bảo đúng quy trình, yêu cầu và tiến độ. Bàn giao shop trong tối đa 20 ngày từ khi bên A cung cấp đủ dữ liệu.')),
-    P(T('5.3. Bảo mật thông tin của bên A trong suốt quá trình thực hiện và sau khi bàn giao.')),
-    P(T('5.4. Chuyển giao kết quả sản phẩm thiết kế, tài liệu và hóa đơn tài chính sau khi bên A thanh toán đầy đủ.')),
-    P(T('5.5. Được quyền sử dụng các mẫu thiết kế với mục đích giới thiệu năng lực.')),
-    P(T('5.6. Trường hợp chấm dứt do đề nghị từ bên B, báo trước bằng văn bản/email (trước 30 ngày), hoàn trả toàn bộ số tiền đã thanh toán.')),
-    P(T(`5.7. Nếu bên A chưa cung cấp đủ ${soSP} sản phẩm, bên B bảo lưu số lượng còn lại và hỗ trợ triển khai đủ khi có thêm sản phẩm.`), { after: 160 }),
+    P(T('5.2. Đảm bảo đúng quy trình, yêu cầu và tiến độ được quy định trong hợp đồng. Bàn giao shop trong tối đa 20 ngày từ khi bên A cung cấp đủ dữ liệu triển khai công việc.')),
+    P(T('5.3. Bảo mật những thông tin liên quan đến chiến lược kinh doanh, bí mật công nghệ và những thông tin được yêu cầu giữ bí mật của bên A trong suốt quá trình thực hiện hợp đồng và sau khi bàn giao shop.')),
+    P(T('5.4. Chuyển giao cho bên A kết quả sản phẩm thiết kế, tài liệu và hóa đơn tài chính sau khi bên A thanh toán đầy đủ các chi phí theo nội dung của hợp đồng này.')),
+    P(T('5.5. Bên B được quyền sử dụng các mẫu thiết kế này với mục đích giới thiệu năng lực của bên B.')),
+    P(T('5.6. Trong trường hợp công việc buộc phải chấm dứt do đề nghị từ phía bên B thì bên B có trách nhiệm báo trước bằng văn bản/email (trước 30 ngày làm việc), đồng thời hoàn trả lại toàn bộ số tiền bên A đã thanh toán.')),
+    P(T(`5.7. Trong trường hợp bên A chưa cung cấp đầy đủ số lượng ${soSP} sản phẩm để thiết kế, bên B sẽ hỗ trợ bảo lưu số lượng sản phẩm còn lại trong gói và hỗ trợ bên A triển khai đủ số lượng sản phẩm trong gói đã đăng kí khi có thêm sản phẩm.`), { after: 160 }),
 
     P(T('ĐIỀU 6: ĐIỀU KHOẢN CHUNG', { bold: true }), { before: 240 }),
-    P(T('6.1. Hai bên cam kết thực hiện nghiêm túc các điều khoản. Bên vi phạm phải bồi thường. Tranh chấp giải quyết trên tinh thần hòa giải; không thỏa thuận được sẽ đưa ra tòa án có thẩm quyền tại Hà Nội.')),
-    P(T('6.2. Nếu bổ sung mục thiết kế so với hợp đồng, hai bên thống nhất chi phí phát sinh bằng 01 phụ lục kèm theo.')),
-    P(T('6.3. Trường hợp bất khả kháng (thiên tai, dịch bệnh, hỏa hoạn, chiến tranh, thay đổi chính sách/pháp luật của Nhà nước hoặc chính sách của sàn thương mại điện tử...) khiến một bên không thể thực hiện nghĩa vụ, bên đó không bị coi là vi phạm hợp đồng nhưng phải thông báo ngay cho bên còn lại và hai bên cùng bàn bạc phương án xử lý phù hợp.')),
-    P(T('6.4. Mọi sửa đổi, bổ sung nội dung hợp đồng chỉ có hiệu lực khi được lập thành văn bản (hoặc phụ lục) và có xác nhận của cả hai bên.')),
-    P(T('6.5. Hợp đồng có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán.')),
-    P(T('6.6. Hợp đồng lập thành 02 bản Tiếng Việt có giá trị như nhau, mỗi bên giữ 01 bản.'), { after: 300 }),
+    P(T('6.1. Hai bên cam kết thực hiện nghiêm túc tất cả các điều khoản trong Hợp đồng này, Bên nào vi phạm sẽ phải bồi thường thiệt hại cho Bên kia. Trường hợp có tranh chấp hai bên sẽ giải quyết trên tinh thần thỏa thuận hòa giải, hợp tác. Trong trường hợp hai Bên không thể thỏa thuận được thì tranh chấp sẽ được đưa ra toà án có thẩm quyền tại thành phố Hà Nội, Việt Nam để phán xử.')),
+    P(T('6.2. Trong trường hợp Bên A muốn bổ sung thêm các mục thiết kế so với nội dung quy định tại hợp đồng này, hai bên sẽ thống nhất chi phí phát sinh, thời gian thực hiện và các thông tin liên quan bằng 01 phụ lục hợp đồng kèm theo.')),
+    P(T('6.3. Hợp đồng này có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán và hoàn tất thủ tục thanh lý khi hai bên đạt được các điều khoản trong hợp đồng.')),
+    P(T('6.4. Hợp đồng này gồm 03 (ba) trang bản Tiếng Việt có giá trị như nhau được lập thành 02 (hai) bản, mỗi bên giữ 01 (một) bản để thực hiện.'), { after: 300 }),
 
     kyTen(hd.ten_khach, 'NGUYỄN TRUNG KIÊN'),
   ]
