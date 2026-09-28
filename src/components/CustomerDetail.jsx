@@ -10,6 +10,8 @@ import { useTrangThai } from '../lib/StatusContext'
 import { XuatHopDongForm, hdTuHopDongDaLuu } from './ContractsPage'
 import ContractPreview from './ContractPreview'
 import OrderForm from './OrderForm'
+import BenBModal from './BenBModal'
+import { useBenB } from '../lib/benB'
 import {
   LOAI_TUONG_TAC_OPTIONS, NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, LOAI_KHACH_OPTIONS,
@@ -41,6 +43,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const cuaMinh = customer.sale_id === currentProfile?.id
   const chung = laKhachChung(customer)
   const isAdmin = currentProfile?.role === 'admin'
+  const { benB, taiLai: taiLaiBenB } = useBenB()
+  const [moBenB, setMoBenB] = useState(false)
   const suaDuoc = cuaMinh || isAdmin || chung || !customer.sale_id
 
   useEffect(() => { load() }, [customer.id])
@@ -139,8 +143,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     nguoi_dai_dien: customer.nguoi_dai_dien || '',
     chuc_vu: customer.chuc_vu || '',
     mst: customer.mst || '',
-    email: customer.email || '',
     dia_chi: customer.dia_chi || '',
+    so_tai_khoan: customer.so_tai_khoan || '',
   })
   const [dangLuuTT, setDangLuuTT] = useState(false)
   const [luuXongTT, setLuuXongTT] = useState('')
@@ -290,8 +294,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                       <Input label="Tên khách hàng" value={formTT.ten_khach}
                         onChange={(e) => setFormTT({ ...formTT, ten_khach: e.target.value })} />
-                      <Input label="Số điện thoại" value={formTT.sdt}
-                        onChange={(e) => setFormTT({ ...formTT, sdt: e.target.value })} />
                       <Input label="Link Facebook" value={formTT.link_fb}
                         onChange={(e) => setFormTT({ ...formTT, link_fb: e.target.value })} />
                       <Input label="Link shop" value={formTT.link_shop}
@@ -348,15 +350,16 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                     </div>
 
                     <div>
-                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">
-                        Thông tin pháp lý (dùng khi lên hợp đồng)
+                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-400">
+                        Thông tin Bên A (dùng khi lên hợp đồng)
                       </p>
+                      <p className="mb-2 text-xs text-ink-400">Ô nào để trống thì hợp đồng sẽ không hiện dòng đó.</p>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                         <div className="col-span-2">
-                          <Input label="Tên Bên A (dùng ở tiêu đề hợp đồng, để trống nếu là cá nhân)" value={formTT.ten_tieu_de_bena}
+                          <Input label="Bên sử dụng dịch vụ (tên công ty / hộ kinh doanh)" value={formTT.ten_tieu_de_bena}
                             onChange={(e) => setFormTT({ ...formTT, ten_tieu_de_bena: e.target.value })} />
                         </div>
-                        <Input label="Người đại diện" value={formTT.nguoi_dai_dien}
+                        <Input label="Đại diện" value={formTT.nguoi_dai_dien}
                           onChange={(e) => setFormTT({ ...formTT, nguoi_dai_dien: e.target.value })} />
                         <Input label="Chức vụ" value={formTT.chuc_vu}
                           onChange={(e) => setFormTT({ ...formTT, chuc_vu: e.target.value })} />
@@ -364,10 +367,14 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                           <Input label="Địa chỉ" value={formTT.dia_chi}
                             onChange={(e) => setFormTT({ ...formTT, dia_chi: e.target.value })} />
                         </div>
-                        <Input label="Mã số thuế" value={formTT.mst}
+                        <Input label="MST" value={formTT.mst}
                           onChange={(e) => setFormTT({ ...formTT, mst: e.target.value })} />
-                        <Input label="Email" value={formTT.email}
-                          onChange={(e) => setFormTT({ ...formTT, email: e.target.value })} />
+                        <Input label="SĐT" value={formTT.sdt}
+                          onChange={(e) => setFormTT({ ...formTT, sdt: e.target.value })} />
+                        <div className="col-span-2">
+                          <Input label="Số tài khoản" value={formTT.so_tai_khoan}
+                            onChange={(e) => setFormTT({ ...formTT, so_tai_khoan: e.target.value })} />
+                        </div>
                       </div>
                     </div>
 
@@ -387,15 +394,16 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                     </div>
                     <div>
                       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">
-                        Thông tin pháp lý (dùng khi lên hợp đồng)
+                        Thông tin Bên A (dùng khi lên hợp đồng)
                       </p>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                        <div className="col-span-2"><Field label="Tên Bên A" value={customer.ten_tieu_de_bena} /></div>
-                        <Field label="Người đại diện" value={customer.nguoi_dai_dien} />
+                        <div className="col-span-2"><Field label="Bên sử dụng dịch vụ" value={customer.ten_tieu_de_bena} /></div>
+                        <Field label="Đại diện" value={customer.nguoi_dai_dien} />
                         <Field label="Chức vụ" value={customer.chuc_vu} />
                         <div className="col-span-2"><Field label="Địa chỉ" value={customer.dia_chi} /></div>
-                        <Field label="Mã số thuế" value={customer.mst} />
-                        <Field label="Email" value={customer.email} />
+                        <Field label="MST" value={customer.mst} />
+                        <Field label="SĐT" value={customer.sdt} />
+                        <div className="col-span-2"><Field label="Số tài khoản" value={customer.so_tai_khoan} /></div>
                       </div>
                     </div>
                   </div>
@@ -464,7 +472,14 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
               )}
 
               {tab === 'hop_dong' && (
-                hopDong.length === 0 ? (
+                <>
+                  {isAdmin && (
+                    <button type="button" onClick={() => setMoBenB(true)}
+                      className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-navy-700 hover:bg-slate-50">
+                      Sửa thông tin Bên B (bên cung cấp dịch vụ)
+                    </button>
+                  )}
+                {hopDong.length === 0 ? (
                   <p className="text-sm text-ink-400">Khách chưa có hợp đồng nào.</p>
                 ) : (
                   <div className="space-y-3">
@@ -516,7 +531,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                       )
                     })}
                   </div>
-                )
+                )}
+                </>
               )}
 
               {tab === 'cham_soc' && (
@@ -597,6 +613,10 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
         />
       )}
 
+      {moBenB && (
+        <BenBModal benB={benB} onClose={() => setMoBenB(false)} onSaved={taiLaiBenB} />
+      )}
+
       {xuatHD && (
         <XuatHopDongForm
           contract={xuatHD.hd}
@@ -611,7 +631,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
       {xemHD && (
         <ContractPreview
-          hd={hdTuHopDongDaLuu(xemHD, customer)}
+          hd={hdTuHopDongDaLuu(xemHD, customer, benB)}
           onClose={() => setXemHD(null)}
         />
       )}

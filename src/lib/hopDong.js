@@ -3,6 +3,7 @@ import {
   WidthType, AlignmentType, BorderStyle,
 } from 'docx'
 import { docTienThanhChu } from './docSo'
+import { BEN_B_MAC_DINH } from './benBMacDinh'
 
 const FONT = 'Times New Roman'
 const dinhDang = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(Number(n) || 0))
@@ -13,6 +14,44 @@ const P = (children, o = {}) => new Paragraph({
   alignment: o.align || AlignmentType.JUSTIFIED, spacing: { after: o.after ?? 120, line: 300 }, ...o,
 })
 const dong = (nhan, giaTri, o = {}) => P([T(nhan, { bold: o.bold }), T(giaTri || '.....................................')])
+
+// ===== Thông tin Bên A / Bên B: dòng nào không có giá trị thì KHÔNG hiện trong hợp đồng =====
+const coGiaTri = (v) => !!(v && String(v).trim())
+const dongNeuCo = (nhan, giaTri) => coGiaTri(giaTri) ? [P(T(`${nhan}: ${String(giaTri).trim()}`))] : []
+const tieuDeBen = (tieuDe, ten) => coGiaTri(ten) ? `${tieuDe} ${String(ten).trim().toUpperCase()}` : tieuDe
+
+function khoiBenA(hd) {
+  const daiDien = []
+  if (coGiaTri(hd.nguoi_dai_dien)) daiDien.push(`Đại diện: ${String(hd.nguoi_dai_dien).trim()}`)
+  if (coGiaTri(hd.chuc_vu)) daiDien.push(`Chức vụ: ${String(hd.chuc_vu).trim()}`)
+  return [
+    ...(daiDien.length ? [P(T(daiDien.join('  –  ')))] : []),
+    ...dongNeuCo('Địa chỉ', hd.dia_chi),
+    ...dongNeuCo('MST', hd.mst),
+    ...dongNeuCo('SĐT', hd.sdt),
+    ...dongNeuCo('Số tài khoản', hd.so_tai_khoan),
+  ]
+}
+
+function khoiBenB(b) {
+  const nhanDD = coGiaTri(b.giay_uy_quyen) ? 'Đại diện ký kết (Người được ủy quyền)' : 'Đại diện'
+  const daiDien = []
+  if (coGiaTri(b.dai_dien)) daiDien.push(`${nhanDD}: ${String(b.dai_dien).trim()}`)
+  if (coGiaTri(b.chuc_vu)) daiDien.push(`Chức vụ: ${String(b.chuc_vu).trim()}`)
+  return [
+    ...(daiDien.length ? [P(T(daiDien.join('  –  ')))] : []),
+    ...(coGiaTri(b.giay_uy_quyen) ? [P(T(`(Theo Giấy ủy quyền số: ${String(b.giay_uy_quyen).trim()})`))] : []),
+    ...dongNeuCo('Địa chỉ', b.dia_chi),
+    ...dongNeuCo('MST', b.mst),
+    ...dongNeuCo('SĐT', b.sdt),
+    ...dongNeuCo('Chủ tài khoản', b.chu_tai_khoan),
+    ...dongNeuCo('Số tài khoản', b.so_tai_khoan),
+    ...dongNeuCo('Ngân hàng', b.ngan_hang),
+  ]
+}
+
+// Tên người ký bên B (bỏ phần "(Ông)/(Bà)" nếu có), in hoa
+const tenKyBenB = (b) => String(b.dai_dien || '').replace(/^\(.*?\)\s*/, '').toUpperCase()
 
 function bangNoiDung(rows, headers = ['NỘI DUNG TRIỂN KHAI', 'CHI TIẾT']) {
   const dem = { top: 100, bottom: 100, left: 120, right: 120 }
@@ -39,19 +78,6 @@ function bangNoiDung(rows, headers = ['NỘI DUNG TRIỂN KHAI', 'CHI TIẾT']) 
 
 // Ô thông tin đóng khung (Bên A / Bên B kiểu Seller) — mỗi phần tử là 1 chuỗi (chiếm
 // trọn hàng) hoặc mảng 2 chuỗi (chia 2 cột, dùng cho hàng "Đại diện | Chức vụ")
-function hopThongTin(dongList) {
-  const dem = { top: 60, bottom: 60, left: 120, right: 120 }
-  const runs = (d) => (d && d.mix)
-    ? d.mix.map((p) => typeof p === 'string' ? T(p, { size: 22 }) : T(p.text, { size: 22, bold: p.bold }))
-    : T(d, { size: 22 })
-  const oFull = (d) => new TableCell({ columnSpan: 2, margins: dem, children: [P(runs(d), { align: AlignmentType.LEFT, after: 20 })] })
-  const oNua = (d) => new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, margins: dem, children: [P(runs(d), { align: AlignmentType.LEFT, after: 20 })] })
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: dongList.map((d) => new TableRow({ children: Array.isArray(d) ? [oNua(d[0]), oNua(d[1])] : [oFull(d)] })),
-  })
-}
-
 // Bảng "Giá trị hợp đồng" kiểu hoá đơn: 1 dòng dịch vụ, dòng thuế GTGT, dòng tổng, dòng bằng chữ
 function bangGiaTri(tenDichVu, tong) {
   const gia = Math.round(tong / 1.08)   // giá trước VAT
@@ -116,6 +142,7 @@ function ngayVN(d) {
 
 // ---------------- HỢP ĐỒNG QUẢNG CÁO ----------------
 function hopDongAds(hd) {
+  const b = { ...BEN_B_MAC_DINH.ads, ...(hd.ben_b || {}) }
   const tong = Math.round(Number(hd.gia_tri) || 0)   // giá trị đơn đã bao gồm VAT
   const giaTri = Math.round(tong / 1.08)              // tách ngược ra giá trước VAT để hiển thị
   const vat = tong - giaTri
@@ -123,7 +150,7 @@ function hopDongAds(hd) {
   const soSP = hd.so_san_pham || 30
 
   return [
-    P([T('CÔNG TY TNHH TUKI ADS', { bold: true, size: 22 })], { align: AlignmentType.LEFT, after: 0 }),
+    P([T(String(b.ten || '').toUpperCase(), { bold: true, size: 22 })], { align: AlignmentType.LEFT, after: 0 }),
     P([T('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', { bold: true, size: 22 })], { align: AlignmentType.CENTER, after: 0 }),
     P([T('Độc lập – Tự do – Hạnh phúc', { bold: true, size: 22, underline: {} })], { align: AlignmentType.CENTER, after: 200 }),
     P(T(ngayVN(hd.ngay_ky), { italics: true }), { align: AlignmentType.RIGHT, after: 200 }),
@@ -135,27 +162,13 @@ function hopDongAds(hd) {
 
     P(T(`Hôm nay, ${ngayVN(hd.ngay_ky).replace('Hà Nội, ', '')}, các bên gồm:`), { after: 160 }),
 
-    P(T(`I. BÊN SỬ DỤNG DỊCH VỤ (BÊN A): ${hd.ten_tieu_de_bena || '.....................................'}`, { bold: true })),
-    hopThongTin([
-      [`Đại diện : ${hd.nguoi_dai_dien || ''}`, `Chức vụ: ${hd.chuc_vu || ''}`],
-      `Địa chỉ : ${hd.dia_chi || ''}`,
-      `MST : ${hd.mst || ''}`,
-      `SĐT : ${hd.sdt || ''}`,
-      `Số tài khoản : `,
-    ]),
-    P(T(''), { after: 160 }),
+    P(T(tieuDeBen('I. BÊN SỬ DỤNG DỊCH VỤ (BÊN A):', hd.ten_tieu_de_bena), { bold: true })),
+    ...khoiBenA(hd),
+    P(T(''), { after: 60 }),
 
-    P(T('II. BÊN CUNG CẤP (BÊN B): CÔNG TY TNHH TUKI ADS', { bold: true })),
-    hopThongTin([
-      'Địa chỉ : Tầng 3, T2 Times Tower, số 35 đường Lê Văn Lương, Phường Thanh Xuân, TP Hà Nội, Việt Nam',
-      'Mã số thuế : 0111571658',
-      ['Đại diện ký kết : (Ông) LÊ DANH TUẤN', 'Chức vụ: Phó phòng Kỹ thuật Ads'],
-      '(Theo Giấy ủy quyền số: 01/UQ-TNHH/2026 ngày 01/08/2026)',
-      'Chủ tài khoản : CÔNG TY TNHH TUKI ADS',
-      'Số tài khoản : 3688999',
-      'Ngân hàng : TMCP Việt Nam Thịnh Vượng (VPBank)',
-    ]),
-    P(T(''), { after: 200 }),
+    P(T(`II. BÊN CUNG CẤP (BÊN B): ${b.ten}`, { bold: true })),
+    ...khoiBenB(b),
+    P(T(''), { after: 60 }),
 
     P(T('Sau khi thảo luận, hai bên thống nhất ký Hợp đồng cung ứng dịch vụ Chạy Quảng cáo gian hàng Shopee với các điều khoản sau:'), { after: 160 }),
 
@@ -198,12 +211,13 @@ function hopDongAds(hd) {
     P(T('6.3. Hợp đồng này có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán và hoàn tất thủ tục thanh lý khi hai bên đạt được các điều khoản trong hợp đồng.')),
     P(T('6.4. Hợp đồng này gồm 03 (bốn) trang bản Tiếng Việt có giá trị như nhau được lập thành 02 (hai) bản, mỗi bên giữ 01 (một) bản để thực hiện.'), { after: 300 }),
 
-    kyTen('', 'LÊ DANH TUẤN'),
+    kyTen('', tenKyBenB(b)),
   ]
 }
 
 // ---------------- HỢP ĐỒNG XÂY SHOP ----------------
 function hopDongXayShop(hd) {
+  const b = { ...BEN_B_MAC_DINH.xay_shop, ...(hd.ben_b || {}) }
   const tong = Number(hd.gia_tri) || 0          // đã gồm VAT
   const noiDung = hd.rows_noi_dung || []
   const soSP = hd.so_san_pham || 30
@@ -225,25 +239,13 @@ function hopDongXayShop(hd) {
 
     ...canCu(),
 
-    P(T(`I. BÊN SỬ DỤNG DỊCH VỤ: ${hd.ten_tieu_de_bena || '.....................................'}`, { bold: true })),
-    hopThongTin([
-      [`Đại diện : ${hd.nguoi_dai_dien || ''}`, `Chức vụ: ${hd.chuc_vu || ''}`],
-      `Địa chỉ : ${hd.dia_chi || ''}`,
-      `MST : ${hd.mst || ''}`,
-      `SĐT : ${hd.sdt || ''}`,
-      `Số tài khoản : `,
-    ]),
-    P(T('(Sau đây gọi tắt là Bên A)', { italics: true }), { before: 120, after: 200 }),
+    P(T(tieuDeBen('I. BÊN SỬ DỤNG DỊCH VỤ:', hd.ten_tieu_de_bena), { bold: true })),
+    ...khoiBenA(hd),
+    P(T('(Sau đây gọi tắt là Bên A)', { italics: true }), { after: 200 }),
 
-    P(T('II. BÊN CUNG CẤP DỊCH VỤ: CÔNG TY CỔ PHẦN TẬP ĐOÀN TUKIGROUP', { bold: true })),
-    hopThongTin([
-      ['Đại diện : NGUYỄN TRUNG KIÊN', 'Chức vụ: Chủ tịch HĐQT'],
-      'Địa chỉ : Tầng 3, T2 Times Tower, số 35 đường Lê Văn Lương, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam',
-      'MST : 0109789110',
-      'SĐT : 0868.388.862',
-      'Số tài khoản : 86286888888 tại Ngân hàng Thương mại cổ phần Á Châu (ACB)',
-    ]),
-    P(T('(Sau đây gọi tắt là Bên B)', { italics: true }), { before: 120, after: 200 }),
+    P(T(`II. BÊN CUNG CẤP DỊCH VỤ: ${b.ten}`, { bold: true })),
+    ...khoiBenB(b),
+    P(T('(Sau đây gọi tắt là Bên B)', { italics: true }), { after: 200 }),
 
     P(T('Cùng nhau thoả thuận và thống nhất ký kết Hợp đồng dịch vụ thương mại điện tử (sau đây được gọi là Hợp đồng) với những điều khoản sau:'), { after: 160 }),
 
@@ -284,7 +286,7 @@ function hopDongXayShop(hd) {
     P(T('6.3. Hợp đồng này có hiệu lực kể từ ngày Bên B nhận được tiền thanh toán và hoàn tất thủ tục thanh lý khi hai bên đạt được các điều khoản trong hợp đồng.')),
     P(T('6.4. Hợp đồng này gồm 03 (ba) trang bản Tiếng Việt có giá trị như nhau được lập thành 02 (hai) bản, mỗi bên giữ 01 (một) bản để thực hiện.'), { after: 300 }),
 
-    kyTen('', 'NGUYỄN TRUNG KIÊN'),
+    kyTen('', tenKyBenB(b)),
   ]
 }
 

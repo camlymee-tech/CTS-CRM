@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search, Pencil, Trash2, AlertTriangle, Tags } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { Button, Input, Select, Badge } from './ui'
+import { Button, Input, Select, Badge, Phantrang } from './ui'
 import OrderForm from './OrderForm'
 import CustomerDetail from './CustomerDetail'
 import PackagesModal from './PackagesModal'
@@ -67,6 +67,10 @@ export default function OrdersPage({ currentProfile }) {
     return true
   }), [orders, items, customers, search, filterTT, filterSale])
 
+  const [trang, setTrang] = useState(1)
+  useEffect(() => { setTrang(1) }, [search, filterTT, filterSale])
+  const phanTrang = useMemo(() => filtered.slice((trang - 1) * 20, trang * 20), [filtered, trang])
+
   // Khách đã chuyển sang "Chốt hợp đồng" nhưng chưa có đơn dịch vụ nào
   const chuaCoDon = useMemo(() => {
     const coDon = new Set(orders.map((o) => o.customer_id))
@@ -93,6 +97,9 @@ export default function OrdersPage({ currentProfile }) {
     .filter((o) => o.trang_thai !== 'huy')
     .reduce((s, o) => s + giaTruocVat(o.gia_tri), 0)
 
+  const soDonMoi = filtered.filter((o) => o.loai_don !== 'tai_ky').length
+  const soDonTaiKy = filtered.filter((o) => o.loai_don === 'tai_ky').length
+
   function closeForm() {
     setShowForm(false)
     setEditing(null)
@@ -116,7 +123,7 @@ export default function OrdersPage({ currentProfile }) {
         </div>
       </header>
 
-      <div className="grid grid-cols-4 gap-4 px-8 pt-6">
+      <div className="grid grid-cols-3 gap-4 px-8 pt-6">
         <StatCard
           label={`Doanh số tháng ${new Date().getMonth() + 1} (chưa VAT)`}
           value={formatVnd(doanhSoThang.nay)}
@@ -127,6 +134,8 @@ export default function OrdersPage({ currentProfile }) {
           noteUp={doanhSoThang.nay >= doanhSoThang.truoc}
           phamVi={`${doanhSoThang.soDon} đơn trong tháng`} />
         <StatCard label="Số đơn" value={filtered.length} phamVi="Theo bộ lọc" />
+        <StatCard label="Đơn mới" value={soDonMoi} phamVi="Theo bộ lọc" />
+        <StatCard label="Tái ký" value={soDonTaiKy} accent="teal" phamVi="Theo bộ lọc" />
         <StatCard label="Tổng giá trị (trừ đơn huỷ, chưa VAT)" value={formatVnd(tongDoanhSo)} phamVi="Theo bộ lọc" />
         <StatCard label="Đơn đang triển khai"
           value={filtered.filter((o) => khachCua(o.customer_id)?.trang_thai_cham_soc === 'dang_trien_khai').length}
@@ -161,6 +170,7 @@ export default function OrdersPage({ currentProfile }) {
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
               <th className="px-5 py-3">Mã đơn</th>
+              <th className="px-5 py-3">Loại</th>
               <th className="px-5 py-3">Khách hàng</th>
               <th className="px-5 py-3">Dịch vụ</th>
               <th className="px-5 py-3 text-right">Giá trị</th>
@@ -176,6 +186,9 @@ export default function OrdersPage({ currentProfile }) {
               <tr key={`cho-${c.id}`}
                 onClick={() => setXemKhach(c)}
                 className="cursor-pointer border-b border-slate-50 bg-amber-50/60 last:border-0 hover:bg-amber-100/60">
+                <td className="px-5 py-3">
+                  <span className="text-ink-400">—</span>
+                </td>
                 <td className="px-5 py-3">
                   <span className="text-ink-400">—</span>
                 </td>
@@ -203,16 +216,21 @@ export default function OrdersPage({ currentProfile }) {
             ))}
 
             {loading ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
+              <tr><td colSpan={9} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : filtered.length === 0 && chuaCoDon.length === 0 ? (
-              <tr><td colSpan={8} className="px-5 py-8 text-center text-ink-400">
+              <tr><td colSpan={9} className="px-5 py-8 text-center text-ink-400">
                 {orders.length === 0 ? 'Chưa có đơn dịch vụ nào.' : 'Không tìm thấy đơn phù hợp.'}
               </td></tr>
-            ) : filtered.map((o) => (
+            ) : phanTrang.map((o) => (
               <tr key={o.id}
                 onClick={() => { const k = khachCua(o.customer_id); if (k) setXemKhach(k) }}
                 className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50">
                 <td className="px-5 py-3 font-medium text-navy-900">{o.ma_don}</td>
+                <td className="px-5 py-3">
+                  {o.loai_don === 'tai_ky'
+                    ? <Badge className="bg-teal-50 text-teal-600">Tái ký</Badge>
+                    : <Badge className="bg-coral-50 text-coral-600">Mới</Badge>}
+                </td>
                 <td className="px-5 py-3">
                   <p className="text-navy-900">{nameOf(o.customer_id, customers, 'ten_khach')}</p>
                   <p className="text-xs text-ink-400">{nameOf(o.customer_id, customers, 'ma_khach')}</p>
@@ -248,6 +266,7 @@ export default function OrdersPage({ currentProfile }) {
           </tbody>
         </table>
       </div>
+      <Phantrang trang={trang} setTrang={setTrang} tong={filtered.length} />
 
       {xemGoi && <PackagesModal onClose={() => setXemGoi(false)} />}
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, Columns3 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { Button, Input, Select, Badge } from './ui'
+import { Button, Input, Select, Badge, Phantrang } from './ui'
 import CustomerForm from './CustomerForm'
 import CustomerDetail from './CustomerDetail'
 import OrderForm from './OrderForm'
@@ -190,6 +190,10 @@ export default function CustomerList({ currentProfile }) {
   }, [nenDem, TRANG_THAI])
 
 
+  const [trang, setTrang] = useState(1)
+  useEffect(() => { setTrang(1) }, [search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, locTheoNgay, tuNgay, denNgay])
+  const phanTrang = useMemo(() => filtered.slice((trang - 1) * 20, trang * 20), [filtered, trang])
+
   const profileName = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
   return (
@@ -331,7 +335,8 @@ export default function CustomerList({ currentProfile }) {
               <tr><td colSpan={soCot} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={soCot} className="px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
-            ) : filtered.map((c, idx) => {
+            ) : phanTrang.map((c, idxTrang) => {
+              const idx = (trang - 1) * 20 + idxTrang
               const chung = laKhachChung(c)
               const cuaMinh = c.sale_id === currentProfile?.id
               return (
@@ -439,6 +444,7 @@ export default function CustomerList({ currentProfile }) {
           </tbody>
         </table>
       </div>
+      <Phantrang trang={trang} setTrang={setTrang} tong={filtered.length} />
 
       {quanLyTT && <StatusesModal onClose={() => setQuanLyTT(false)} />}
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { X } from 'lucide-react'
 
 export function Button({ variant = 'primary', className = '', children, ...props }) {
@@ -58,6 +59,57 @@ export function Badge({ className = '', children }) {
     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${className}`}>
       {children}
     </span>
+  )
+}
+
+// Phân trang dùng chung cho các bảng (Khách hàng, Đơn hàng, Hợp đồng...).
+// tong = tổng số dòng, moiTrang = số dòng/trang (mặc định 20), trang = trang hiện tại (bắt đầu từ 1).
+export function Phantrang({ trang, setTrang, tong, moiTrang = 20 }) {
+  const soTrang = Math.max(1, Math.ceil(tong / moiTrang))
+  const [oNhap, setONhap] = useState('')
+
+  if (soTrang <= 1) return null
+
+  // Danh sách số trang hiện ra: luôn có trang đầu/cuối, quanh trang hiện tại, còn lại là "..."
+  const items = []
+  for (let i = 1; i <= soTrang; i++) {
+    if (i === 1 || i === soTrang || Math.abs(i - trang) <= 1) items.push(i)
+    else if (items[items.length - 1] !== '...') items.push('...')
+  }
+
+  function toiTrang() {
+    const n = parseInt(oNhap, 10)
+    if (n >= 1 && n <= soTrang) { setTrang(n); setONhap('') }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2 py-4 text-sm">
+      <button onClick={() => setTrang(Math.max(1, trang - 1))} disabled={trang === 1}
+        className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-navy-700 hover:bg-slate-100 disabled:text-ink-300 disabled:hover:bg-transparent">
+        ← Trước
+      </button>
+      {items.map((it, i) => it === '...' ? (
+        <span key={`e${i}`} className="px-1 text-ink-400">…</span>
+      ) : (
+        <button key={it} onClick={() => setTrang(it)}
+          className={`h-8 min-w-[2rem] rounded-lg px-2 font-medium transition ${
+            it === trang ? 'bg-blue-600 text-white' : 'text-navy-700 hover:bg-slate-100'
+          }`}>
+          {it}
+        </button>
+      ))}
+      <button onClick={() => setTrang(Math.min(soTrang, trang + 1))} disabled={trang === soTrang}
+        className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-blue-600 hover:bg-slate-100 disabled:text-ink-300 disabled:hover:bg-transparent">
+        Sau →
+      </button>
+      <span className="ml-2 text-ink-400">Tới trang</span>
+      <input type="number" min={1} max={soTrang} value={oNhap} onChange={(e) => setONhap(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && toiTrang()}
+        className="h-8 w-14 rounded-lg border border-slate-200 px-2 text-center outline-none focus:border-blue-500" />
+      <button onClick={toiTrang} className="h-8 rounded-lg bg-blue-600 px-3 font-medium text-white hover:bg-blue-700">
+        Đi
+      </button>
+    </div>
   )
 }
 

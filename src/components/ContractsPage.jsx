@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye, Printer, Download, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { Button, Input, Select, Badge, Modal, Textarea } from './ui'
+import { Button, Input, Select, Badge, Modal, Textarea, Phantrang } from './ui'
 import { TRANG_THAI_HD_OPTIONS, classOf, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
 import { taoSoHopDong, laSoChuan, vietTat } from '../lib/docSo'
 import ContractPreview from './ContractPreview'
+import { useBenB } from '../lib/benB'
 
 // Chuỗi "Tên | Chi tiết" mỗi dòng -> mảng [ [tên, chi tiết], ... ] cho bảng nội dung hợp đồng
 function parseNoiDung(text) {
@@ -27,7 +28,7 @@ function timGoiKhop(loaiDV, dichVu, packages) {
 
 // Dựng lại dữ liệu hợp đồng (đúng cấu trúc taoFileHopDong cần) từ 1 hợp đồng đã lưu,
 // dùng để xem trước ngay từ danh sách mà không cần mở lại form xuất file
-export function hdTuHopDongDaLuu(c, khach) {
+export function hdTuHopDongDaLuu(c, khach, benB) {
   // Xem/In cũng phải theo đúng quy tắc số hợp đồng (DDMMYY/HĐDV/...) như lúc Xuất —
   // nếu số đang lưu vẫn là số tạm (HD-YYYYMM-NNN) thì tính lại cho khớp, không hiện số cũ
   const soHD = laSoChuan(c.so_hop_dong) ? c.so_hop_dong : taoSoHopDong({
@@ -41,7 +42,9 @@ export function hdTuHopDongDaLuu(c, khach) {
     sdt: khach?.sdt,
     dia_chi: khach?.dia_chi, mst: khach?.mst,
     ten_tieu_de_bena: khach?.ten_tieu_de_bena,
-    nguoi_dai_dien: khach?.nguoi_dai_dien, chuc_vu: khach?.chuc_vu, email: khach?.email,
+    nguoi_dai_dien: khach?.nguoi_dai_dien, chuc_vu: khach?.chuc_vu,
+    so_tai_khoan: khach?.so_tai_khoan,
+    ben_b: benB?.[c.loai_dich_vu || 'ads'],
     link_shop: khach?.link_shop,
     so_luong_gian_hang: c.so_luong_gian_hang || 1,
     so_san_pham: c.so_san_pham,
@@ -109,6 +112,10 @@ export default function ContractsPage({ currentProfile }) {
     }
     return true
   }), [contracts, customers, orders, items, search, filterTT, filterSale, tuNgay, denNgay])
+
+  const [trang, setTrang] = useState(1)
+  useEffect(() => { setTrang(1) }, [search, filterTT, filterSale, tuNgay, denNgay])
+  const phanTrang = useMemo(() => filtered.slice((trang - 1) * 20, trang * 20), [filtered, trang])
 
   const tongGiaTri = filtered.filter((c) => c.trang_thai !== 'da_huy')
     .reduce((s, c) => s + (Number(c.gia_tri) || 0), 0)
@@ -236,7 +243,7 @@ export default function ContractsPage({ currentProfile }) {
                   ? 'Chưa có hợp đồng nào. Hợp đồng sẽ tự tạo khi bạn tạo đơn dịch vụ.'
                   : 'Không tìm thấy hợp đồng phù hợp.'}
               </td></tr>
-            ) : filtered.map((c) => {
+            ) : phanTrang.map((c) => {
               const k = khach(c.customer_id)
               const d = don(c.order_id)
               const hetHanSom = c.trang_thai === 'hieu_luc' && c.ngay_het_han && c.ngay_het_han < homNay
@@ -310,6 +317,7 @@ export default function ContractsPage({ currentProfile }) {
           </tbody>
         </table>
       </div>
+      <Phantrang trang={trang} setTrang={setTrang} tong={filtered.length} />
 
       {xuatHD && (
         <XuatHopDongForm
@@ -341,6 +349,7 @@ export default function ContractsPage({ currentProfile }) {
 export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSaved }) {
   const laXayShop = (dichVu || []).some((d) => /xây shop|tối ưu/i.test(d.ten_dich_vu))
   const [loaiDV, setLoaiDV] = useState(contract.loai_dich_vu || (laXayShop ? 'xay_shop' : 'ads'))
+  const { benB } = useBenB()
   const [vtat, setVtat] = useState(khach?.ten_viet_tat || vietTat(khach?.ten_khach))
   const goiKhop0 = timGoiKhop(loaiDV, dichVu, packages)
   const [form, setForm] = useState({
@@ -348,9 +357,10 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
     dia_chi: khach?.dia_chi || '',
     mst: khach?.mst || '',
     ten_tieu_de_bena: khach?.ten_tieu_de_bena || '',
-    nguoi_dai_dien: '',
-    chuc_vu: '',
-    email: khach?.email || '',
+    nguoi_dai_dien: khach?.nguoi_dai_dien || '',
+    chuc_vu: khach?.chuc_vu || '',
+    sdt: khach?.sdt || '',
+    so_tai_khoan: khach?.so_tai_khoan || '',
     link_shop: khach?.link_shop || '',
     so_luong_gian_hang: contract.so_luong_gian_hang || 1,
     so_san_pham: contract.so_san_pham || goiKhop0?.so_san_pham || '',
@@ -391,10 +401,12 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
       so_hop_dong: soHD,
       ngay_ky: form.ngay_ky,
       ten_khach: khach?.ten_khach,
-      sdt: khach?.sdt,
+      sdt: form.sdt,
       dia_chi: form.dia_chi, mst: form.mst,
       ten_tieu_de_bena: form.ten_tieu_de_bena,
-      nguoi_dai_dien: form.nguoi_dai_dien, chuc_vu: form.chuc_vu, email: form.email,
+      nguoi_dai_dien: form.nguoi_dai_dien, chuc_vu: form.chuc_vu,
+      so_tai_khoan: form.so_tai_khoan,
+      ben_b: benB?.[loaiDV],
       link_shop: form.link_shop,
       so_luong_gian_hang: Number(form.so_luong_gian_hang) || 1,
       so_san_pham: form.so_san_pham ? Number(form.so_san_pham) : null,
@@ -412,8 +424,11 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
       dia_chi: form.dia_chi || null, mst: form.mst || null,
       ten_tieu_de_bena: form.ten_tieu_de_bena || null,
       nguoi_dai_dien: form.nguoi_dai_dien || null, chuc_vu: form.chuc_vu || null,
-      email: form.email || null, ten_viet_tat: vtat || null,
+      so_tai_khoan: form.so_tai_khoan || null, ten_viet_tat: vtat || null,
     }).eq('id', khach.id)
+    if ((form.sdt || '') !== (khach.sdt || '')) {
+      await supabase.from('customers').update({ sdt: form.sdt || null }).eq('id', khach.id)
+    }
     await supabase.from('contracts').update({
       so_hop_dong: soHD, loai_dich_vu: loaiDV,
       so_luong_gian_hang: Number(form.so_luong_gian_hang) || 1,
@@ -450,7 +465,7 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
           <p className="font-display font-semibold text-navy-900">{khach?.ten_khach || '—'}</p>
           <p className="text-sm text-ink-600">Giá trị {formatVnd(contract.gia_tri)} (đã gồm VAT)</p>
           <p className="mt-1 text-xs text-ink-400">
-            Thông tin Bên A (địa chỉ, MST, link shop...) lấy từ hồ sơ khách hàng — sửa ở đây sẽ tự cập nhật lại luôn hồ sơ khách để dùng chung cho các hợp đồng sau. Riêng Người đại diện/Chức vụ cần gõ tay mỗi lần xuất, không tự lấy từ hồ sơ khách.
+            Thông tin Bên A lấy từ hồ sơ khách hàng — sửa ở đây sẽ tự cập nhật lại luôn hồ sơ khách để dùng cho các hợp đồng sau. Thông tin Bên B (bên mình) sửa ở tab Hợp đồng của khách (dành cho quản trị).
           </p>
         </div>
 
@@ -473,10 +488,10 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <Input label="Tên Bên A (dùng ở tiêu đề hợp đồng, để trống nếu là cá nhân)" value={form.ten_tieu_de_bena}
+            <Input label="Bên sử dụng dịch vụ (tên công ty / hộ kinh doanh)" value={form.ten_tieu_de_bena}
               onChange={(e) => setForm({ ...form, ten_tieu_de_bena: e.target.value })} />
           </div>
-          <Input label="Người đại diện (Bên A)" value={form.nguoi_dai_dien}
+          <Input label="Đại diện" value={form.nguoi_dai_dien}
             onChange={(e) => setForm({ ...form, nguoi_dai_dien: e.target.value })} />
           <Input label="Chức vụ" value={form.chuc_vu}
             onChange={(e) => setForm({ ...form, chuc_vu: e.target.value })} />
@@ -484,12 +499,15 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
             <Input label="Địa chỉ" value={form.dia_chi}
               onChange={(e) => setForm({ ...form, dia_chi: e.target.value })} />
           </div>
-          <Input label="Mã số thuế" value={form.mst}
+          <Input label="MST" value={form.mst}
             onChange={(e) => setForm({ ...form, mst: e.target.value })} />
-          {loaiDV === 'xay_shop' && (
-            <Input label="Email" value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          )}
+          <Input label="SĐT" value={form.sdt}
+            onChange={(e) => setForm({ ...form, sdt: e.target.value })} />
+          <div className="col-span-2">
+            <Input label="Số tài khoản" value={form.so_tai_khoan}
+              onChange={(e) => setForm({ ...form, so_tai_khoan: e.target.value })} />
+          </div>
+          <p className="col-span-2 -mt-2 text-xs text-ink-400">Ô nào để trống thì hợp đồng sẽ không hiện dòng đó.</p>
           <Input label="Link shop" value={form.link_shop}
             onChange={(e) => setForm({ ...form, link_shop: e.target.value })} />
           <Input label="Số lượng gian hàng" type="number" min="1" value={form.so_luong_gian_hang}
