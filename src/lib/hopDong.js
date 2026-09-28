@@ -140,6 +140,12 @@ function ngayVN(d) {
   return `Hà Nội, ngày ${x.getDate()} tháng ${x.getMonth() + 1} năm ${x.getFullYear()}`
 }
 
+// Ngày thanh toán khi gia hạn = cùng ngày ký của tháng kế tiếp, lặp lại hàng tháng -> chỉ cần lấy số ngày trong ngày ký
+function ngayThanhToanHangThang(ngayKy) {
+  const n = parseInt(String(ngayKy || '').slice(8, 10), 10)
+  return n >= 1 && n <= 31 ? String(n) : '...'
+}
+
 // ---------------- HỢP ĐỒNG QUẢNG CÁO ----------------
 function hopDongAds(hd) {
   const b = { ...BEN_B_MAC_DINH.ads, ...(hd.ben_b || {}) }
@@ -189,7 +195,7 @@ function hopDongAds(hd) {
     P([T('Bằng chữ: ', {}), T(`${docTienThanhChu(tong)}./.`, { italics: true })]),
     P(T('3.2. Thanh toán bằng hình thức: Chuyển khoản.')),
     P(T('3.3. Phương thức thanh toán khi gia hạn hợp đồng:')),
-    P(T('Trường hợp Bên A có gia hạn Hợp đồng, Bên A sẽ thanh toán phí dịch vụ theo chu kỳ từng lần/tháng vào ngày ... hàng tháng, số tiền thanh toán là .... VNĐ (đã bao gồm VAT).')),
+    P(T(`Trường hợp Bên A có gia hạn Hợp đồng, Bên A sẽ thanh toán phí dịch vụ theo chu kỳ từng lần/tháng vào ngày ${ngayThanhToanHangThang(hd.ngay_ky)} hàng tháng.`)),
     P(T('Nếu có điều chỉnh về giá dịch vụ, hai Bên phải thống nhất bằng văn bản trước ít nhất 07 ngày trước khi bắt đầu kỳ gia hạn mới.'), { after: 160 }),
 
     P(T('ĐIỀU 4: QUYỀN VÀ NGHĨA VỤ CỦA BÊN A', { bold: true }), { before: 240 }),
