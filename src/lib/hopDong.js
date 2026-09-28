@@ -146,6 +146,53 @@ function ngayThanhToanHangThang(ngayKy) {
   return n >= 1 && n <= 31 ? String(n) : '...'
 }
 
+// ===== Đầu trang: bên trái tên công ty (gạch ngắn dưới), bên phải Quốc hiệu - Tiêu ngữ (gạch dưới) + ngày tháng =====
+// Tách "CÔNG TY TNHH TUKI ADS" thành 2 dòng: "CÔNG TY TNHH" / "TUKI ADS"
+function tachTenCongTy(ten) {
+  const s = String(ten || '').trim().toUpperCase()
+  const m = s.match(/^(CÔNG TY (?:TNHH|CỔ PHẦN|TRÁCH NHIỆM HỮU HẠN))\s+(.+)$/)
+  return m ? [m[1], m[2]] : [s, '']
+}
+
+// Đường kẻ ngắn nằm giữa ô (dùng viền dưới của 1 đoạn trống, thụt 2 bên để đường kẻ chỉ dài vừa phải)
+const duongKe = (thut) => P(T('', { size: 4 }), {
+  align: AlignmentType.CENTER, after: 0,
+  indent: { left: thut, right: thut },
+  border: { bottom: { style: BorderStyle.SINGLE, size: 6, space: 1, color: '000000' } },
+})
+
+function dauTrang(tenCongTy, ngayKy) {
+  const [d1, d2] = tachTenCongTy(tenCongTy)
+  const KHONG = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+  const khongVien = { top: KHONG, bottom: KHONG, left: KHONG, right: KHONG }
+  const RONG_TRAI = 3810, RONG_PHAI = 5261   // tổng 9071 twips = bề rộng vùng chữ (A4, lề trái 3cm, phải 2cm)
+  const giua = (text, o = {}) => P(T(text, { bold: true, size: 22, ...o }), { align: AlignmentType.CENTER, after: 0 })
+  return [
+    new Table({
+      width: { size: RONG_TRAI + RONG_PHAI, type: WidthType.DXA },
+      columnWidths: [RONG_TRAI, RONG_PHAI],
+      borders: { ...khongVien, insideHorizontal: KHONG, insideVertical: KHONG },
+      rows: [new TableRow({ children: [
+        new TableCell({
+          width: { size: RONG_TRAI, type: WidthType.DXA }, borders: khongVien,
+          children: [giua(d1), ...(d2 ? [giua(d2)] : []), duongKe(1150)],
+        }),
+        new TableCell({
+          width: { size: RONG_PHAI, type: WidthType.DXA }, borders: khongVien,
+          children: [
+            giua('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM'),
+            giua('Độc lập – Tự do – Hạnh phúc'),
+            duongKe(1150),
+            P(T('', { size: 12 }), { after: 0 }),
+            P(T(ngayVN(ngayKy), { italics: true }), { align: AlignmentType.CENTER, after: 0 }),
+          ],
+        }),
+      ] })],
+    }),
+    P(T(''), { after: 120 }),
+  ]
+}
+
 // ---------------- HỢP ĐỒNG QUẢNG CÁO ----------------
 function hopDongAds(hd) {
   const b = { ...BEN_B_MAC_DINH.ads, ...(hd.ben_b || {}) }
@@ -156,10 +203,7 @@ function hopDongAds(hd) {
   const soSP = hd.so_san_pham || 30
 
   return [
-    P([T(String(b.ten || '').toUpperCase(), { bold: true, size: 22 })], { align: AlignmentType.LEFT, after: 0 }),
-    P([T('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', { bold: true, size: 22 })], { align: AlignmentType.CENTER, after: 0 }),
-    P([T('Độc lập – Tự do – Hạnh phúc', { bold: true, size: 22, underline: {} })], { align: AlignmentType.CENTER, after: 200 }),
-    P(T(ngayVN(hd.ngay_ky), { italics: true }), { align: AlignmentType.RIGHT, after: 200 }),
+    ...dauTrang(b.ten, hd.ngay_ky),
 
     P(T('HỢP ĐỒNG CUNG CẤP DỊCH VỤ THƯƠNG MẠI ĐIỆN TỬ', { bold: true, size: 32 }), { align: AlignmentType.CENTER, after: 60 }),
     P(T(`Số: ${hd.so_hop_dong}`, { bold: true }), { align: AlignmentType.CENTER, after: 200 }),
@@ -232,16 +276,12 @@ function hopDongXayShop(hd) {
   const linkShop = hd.link_shop || 'Chưa có link shop'
 
   return [
-    P(T('CÔNG TY CỔ PHẦN', { bold: true, size: 22 }), { after: 0 }),
-    P([T('TẬP ĐOÀN TUKIGROUP', { bold: true, size: 22 })], { after: 0 }),
-    P([T('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', { bold: true, size: 22 })], { align: AlignmentType.CENTER, after: 0 }),
-    P([T('Độc lập – Tự do – Hạnh phúc', { bold: true, size: 22, underline: {} })], { align: AlignmentType.CENTER, after: 200 }),
+    ...dauTrang(b.ten, hd.ngay_ky),
 
     P(T('HỢP ĐỒNG CUNG CẤP DỊCH VỤ', { bold: true, size: 32 }), { align: AlignmentType.CENTER, after: 0 }),
     P(T('THƯƠNG MẠI ĐIỆN TỬ', { bold: true, size: 32 }), { align: AlignmentType.CENTER, after: 200 }),
 
-    P(T(`Số: ${hd.so_hop_dong}`, { bold: true }), { align: AlignmentType.CENTER, after: 60 }),
-    P(T(ngayVN(hd.ngay_ky), { italics: true }), { align: AlignmentType.CENTER, after: 200 }),
+    P(T(`Số: ${hd.so_hop_dong}`, { bold: true }), { align: AlignmentType.CENTER, after: 200 }),
 
     ...canCu(),
 
