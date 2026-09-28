@@ -133,7 +133,7 @@ export default function ReportsPage() {
           {/* Thẻ tổng quan */}
           {loai === 'chung' || loai === 'dich_vu' ? (
             <div className="grid grid-cols-3 gap-4">
-              <Card label="Tổng doanh số" value={formatVnd(tongChung.tong)} sub={`${tongChung.soDon} đơn`} />
+              <Card label="Tổng doanh số" mau="text-indigo-700" value={formatVnd(tongChung.tong)} sub={`${tongChung.soDon} đơn`} />
               <Card label="Đơn mới" mau="text-coral-500" value={formatVnd(tongChung.moi)}
                 sub={`${tongChung.soDonMoi} đơn · ${phanTram(tongChung.moi, tongChung.tong)}`} />
               <Card label="Tái ký" mau="text-teal-500" value={formatVnd(tongChung.tai_ky)}
@@ -141,8 +141,8 @@ export default function ReportsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-4">
-              <Card label={loai === 'moi' ? 'Doanh số đơn mới' : 'Doanh số tái ký'}
-                mau={loai === 'moi' ? 'text-coral-500' : 'text-teal-500'} value={formatVnd(tong.tong)} />
+              <Card label={loai === 'moi' ? 'Tổng doanh số đơn mới' : 'Tổng doanh số tái ký'}
+                mau="text-indigo-700" value={formatVnd(tong.tong)} />
               <Card label="Số đơn" value={tong.soDon} />
               <Card label="Giá trị trung bình / đơn" value={formatVnd(tong.soDon ? tong.tong / tong.soDon : 0)} />
             </div>
@@ -183,13 +183,13 @@ export default function ReportsPage() {
                           <td className="py-2.5 text-right text-ink-400">{phanTram(s.tong, tong.tong)}</td>
                         </tr>
                       ))}
-                      <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-navy-900">
+                      <tr className="border-t-2 border-slate-200 bg-indigo-50 font-bold text-indigo-700">
                         <td className="py-2.5 pl-2">TỔNG</td>
                         <td className="py-2.5 text-right">{tong.soDon}</td>
                         {loai === 'chung' ? (
                           <>
-                            <td className="py-2.5 text-right text-coral-600">{formatVnd(tong.moi)}</td>
-                            <td className="py-2.5 text-right text-teal-600">{formatVnd(tong.tai_ky)}</td>
+                            <td className="py-2.5 text-right">{formatVnd(tong.moi)}</td>
+                            <td className="py-2.5 text-right">{formatVnd(tong.tai_ky)}</td>
                           </>
                         ) : NHOM.map((n) => <td key={n} className="py-2.5 text-right">{formatVnd(tong[n])}</td>)}
                         <td className="py-2.5 text-right">{formatVnd(tong.tong)}</td>
@@ -265,7 +265,7 @@ export default function ReportsPage() {
                       return [
                         <tr key={`h-${n}`} className="border-t border-slate-200 bg-slate-50 font-semibold">
                           <td className="py-2 pl-2"><span className={`rounded-full px-2.5 py-1 text-xs ${NHOM_MAU[n]}`}>{NHOM_TEN[n]}</span></td>
-                          <Cells mL={c.mL} mT={c.mT} kL={c.kL} kT={c.kT} dam />
+                          <Cells mL={c.mL} mT={c.mT} kL={c.kL} kT={c.kT} tong="nhom" />
                         </tr>,
                         ...dsNhom.map((r) => (
                           <tr key={`${n}-${r.ten}`} className="border-t border-slate-100">
@@ -275,12 +275,12 @@ export default function ReportsPage() {
                         )),
                       ]
                     })}
-                    <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-navy-900">
+                    <tr className="border-t-2 border-slate-200 bg-indigo-50 font-bold text-indigo-700">
                       <td className="py-2.5 pl-2">TỔNG CỘNG</td>
                       <Cells
                         mL={theoDichVu.reduce((s, r) => s + r.moi.luot, 0)} mT={theoDichVu.reduce((s, r) => s + r.moi.tien, 0)}
                         kL={theoDichVu.reduce((s, r) => s + r.tai_ky.luot, 0)} kT={theoDichVu.reduce((s, r) => s + r.tai_ky.tien, 0)}
-                        dam />
+                        tong="cong" />
                     </tr>
                   </tbody>
                 </table>
@@ -304,17 +304,23 @@ function FragmentTieuDe() {
   )
 }
 
-// 3 cặp ô "lượt | doanh số": Đơn mới, Tái ký, Tổng
-function Cells({ mL, mT, kL, kT, dam = false }) {
-  const w = dam ? 'font-semibold' : ''
+// 3 cặp ô "lượt | doanh số": Đơn mới, Tái ký, Tổng.
+// tong = 'nhom' (dòng cộng của nhóm) hoặc 'cong' (tổng cộng) -> dùng màu riêng cho số tổng, không dùng màu cam/xanh của dòng thường
+function Cells({ mL, mT, kL, kT, tong }) {
+  const mauTong = tong === 'cong' ? 'text-indigo-700 font-bold' : tong === 'nhom' ? 'text-indigo-600 font-semibold' : null
+  const cMoiL = mauTong || 'text-ink-600'
+  const cMoiT = mauTong || 'text-coral-600'
+  const cKyL = mauTong || 'text-ink-600'
+  const cKyT = mauTong || 'text-teal-600'
+  const cTong = mauTong || 'text-navy-900 font-semibold'
   return (
     <>
-      <td className={`border-l border-slate-100 py-2.5 text-right text-ink-600 ${w}`}>{mL || '—'}</td>
-      <td className={`py-2.5 text-right text-coral-600 ${w}`}>{mT ? formatVnd(mT) : '—'}</td>
-      <td className={`border-l border-slate-100 py-2.5 text-right text-ink-600 ${w}`}>{kL || '—'}</td>
-      <td className={`py-2.5 text-right text-teal-600 ${w}`}>{kT ? formatVnd(kT) : '—'}</td>
-      <td className={`border-l border-slate-100 py-2.5 text-right text-navy-900 ${w}`}>{mL + kL}</td>
-      <td className={`py-2.5 pr-2 text-right font-semibold text-navy-900`}>{formatVnd(mT + kT)}</td>
+      <td className={`border-l border-slate-100 py-2.5 text-right ${cMoiL}`}>{mL || '—'}</td>
+      <td className={`py-2.5 text-right ${cMoiT}`}>{mT ? formatVnd(mT) : '—'}</td>
+      <td className={`border-l border-slate-100 py-2.5 text-right ${cKyL}`}>{kL || '—'}</td>
+      <td className={`py-2.5 text-right ${cKyT}`}>{kT ? formatVnd(kT) : '—'}</td>
+      <td className={`border-l border-slate-100 py-2.5 text-right ${cTong}`}>{mL + kL}</td>
+      <td className={`py-2.5 pr-2 text-right ${cTong}`}>{formatVnd(mT + kT)}</td>
     </>
   )
 }

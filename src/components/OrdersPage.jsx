@@ -7,18 +7,22 @@ import CustomerDetail from './CustomerDetail'
 import PackagesModal from './PackagesModal'
 import { DICH_VU_OPTIONS, classOf, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
+import { khoangNgay } from '../lib/doanhSo'
 
 // Trang báo cáo đơn dịch vụ — tạo đơn mới làm trong panel Khách hàng,
 // trang này chỉ để xem, lọc, sửa số liệu và xoá khi cần.
 export default function OrdersPage({ currentProfile }) {
-  const { options: TRANG_THAI, tenTrangThai, classTrangThai, maDaChot, maTaoDon } = useTrangThai()
+  const { tenTrangThai, classTrangThai, maTaoDon } = useTrangThai()
   const [orders, setOrders] = useState([])
   const [items, setItems] = useState({})
   const [customers, setCustomers] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterTT, setFilterTT] = useState('')
+  const [filterLoai, setFilterLoai] = useState('')   // '' | 'moi' | 'tai_ky'
+  const [ky, setKy] = useState('tat_ca')
+  const [tu, setTu] = useState('')
+  const [den, setDen] = useState('')
   const [filterSale, setFilterSale] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -56,8 +60,13 @@ export default function OrdersPage({ currentProfile }) {
   const nameOf = (id, list, key) => list.find((x) => x.id === id)?.[key] || '—'
   const khachCua = (id) => customers.find((c) => c.id === id)
 
+  const [tuNgay, denNgay] = useMemo(() => khoangNgay(ky, tu, den), [ky, tu, den])
+
   const filtered = useMemo(() => orders.filter((o) => {
-    if (filterTT && khachCua(o.customer_id)?.trang_thai_cham_soc !== filterTT) return false
+    const loaiDon = o.loai_don === 'tai_ky' ? 'tai_ky' : 'moi'
+    if (filterLoai && loaiDon !== filterLoai) return false
+    if (tuNgay && (!o.ngay_chot || o.ngay_chot < tuNgay)) return false
+    if (denNgay && (!o.ngay_chot || o.ngay_chot > denNgay)) return false
     if (filterSale && o.sale_id !== filterSale) return false
     if (search) {
       const tenKhach = nameOf(o.customer_id, customers, 'ten_khach')
@@ -65,10 +74,10 @@ export default function OrdersPage({ currentProfile }) {
       if (!`${o.ma_don} ${tenKhach} ${dv}`.toLowerCase().includes(search.toLowerCase())) return false
     }
     return true
-  }), [orders, items, customers, search, filterTT, filterSale])
+  }), [orders, items, customers, search, filterLoai, tuNgay, denNgay, filterSale])
 
   const [trang, setTrang] = useState(1)
-  useEffect(() => { setTrang(1) }, [search, filterTT, filterSale])
+  useEffect(() => { setTrang(1) }, [search, filterLoai, ky, tu, den, filterSale])
   const phanTrang = useMemo(() => filtered.slice((trang - 1) * 20, trang * 20), [filtered, trang])
 
   // Khách đã chuyển sang "Chốt hợp đồng" nhưng chưa có đơn dịch vụ nào
@@ -97,8 +106,12 @@ export default function OrdersPage({ currentProfile }) {
     .filter((o) => o.trang_thai !== 'huy')
     .reduce((s, o) => s + giaTruocVat(o.gia_tri), 0)
 
-  const soDonMoi = filtered.filter((o) => o.loai_don !== 'tai_ky').length
-  const soDonTaiKy = filtered.filter((o) => o.loai_don === 'tai_ky').length
+  const donMoi = filtered.filter((o) => o.loai_don !== 'tai_ky' && o.trang_thai !== 'huy')
+  const donTaiKy = filtered.filter((o) => o.loai_don === 'tai_ky' && o.trang_thai !== 'huy')
+  const soDonMoi = donMoi.length
+  const soDonTaiKy = donTaiKy.length
+  const doanhSoMoi = donMoi.reduce((s, o) => s + giaTruocVat(o.gia_tri), 0)
+  const doanhSoTaiKy = donTaiKy.reduce((s, o) => s + giaTruocVat(o.gia_tri), 0)
 
   function closeForm() {
     setShowForm(false)
@@ -123,23 +136,23 @@ export default function OrdersPage({ currentProfile }) {
         </div>
       </header>
 
-      <div className="grid grid-cols-3 gap-4 px-8 pt-6">
-        <StatCard
+      <div className="grid grid-cols-6 gap-4 px-8 pt-6">
+        <StatCard className="col-span-2"
           label={`Doanh số tháng ${new Date().getMonth() + 1} (chưa VAT)`}
           value={formatVnd(doanhSoThang.nay)}
-          accent="coral"
+          accent="indigo"
           note={doanhSoThang.truoc > 0
             ? `${doanhSoThang.nay >= doanhSoThang.truoc ? '▲' : '▼'} ${Math.abs(Math.round(((doanhSoThang.nay - doanhSoThang.truoc) / doanhSoThang.truoc) * 100))}% so tháng trước`
             : null}
           noteUp={doanhSoThang.nay >= doanhSoThang.truoc}
           phamVi={`${doanhSoThang.soDon} đơn trong tháng`} />
-        <StatCard label="Số đơn" value={filtered.length} phamVi="Theo bộ lọc" />
-        <StatCard label="Đơn mới" value={soDonMoi} phamVi="Theo bộ lọc" />
-        <StatCard label="Tái ký" value={soDonTaiKy} accent="teal" phamVi="Theo bộ lọc" />
-        <StatCard label="Tổng giá trị (trừ đơn huỷ, chưa VAT)" value={formatVnd(tongDoanhSo)} phamVi="Theo bộ lọc" />
-        <StatCard label="Đơn đang triển khai"
-          value={filtered.filter((o) => khachCua(o.customer_id)?.trang_thai_cham_soc === 'dang_trien_khai').length}
-          accent="teal" phamVi="Theo bộ lọc" />
+        <StatCard className="col-span-2" label="Tổng giá trị (trừ đơn huỷ, chưa VAT)" value={formatVnd(tongDoanhSo)}
+          accent="indigo" phamVi="Theo bộ lọc" />
+        <StatCard className="col-span-2" label="Số đơn" value={filtered.length} phamVi="Theo bộ lọc" />
+        <StatCard className="col-span-3" label="Đơn mới" value={formatVnd(doanhSoMoi)} accent="coral"
+          phamVi={`${soDonMoi} đơn · chưa VAT, trừ đơn huỷ`} />
+        <StatCard className="col-span-3" label="Tái ký" value={formatVnd(doanhSoTaiKy)} accent="teal"
+          phamVi={`${soDonTaiKy} đơn · chưa VAT, trừ đơn huỷ`} />
       </div>
 
       {chuaCoDon.length > 0 && (
@@ -155,10 +168,26 @@ export default function OrdersPage({ currentProfile }) {
           <Input placeholder="Tìm theo mã đơn, khách hàng, dịch vụ..." value={search}
             onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Select value={filterTT} onChange={(e) => setFilterTT(e.target.value)} className="w-44">
-          <option value="">Tất cả trạng thái</option>
-          {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
+        <Select value={filterLoai} onChange={(e) => setFilterLoai(e.target.value)} className="w-40">
+          <option value="">Tất cả phân loại</option>
+          <option value="moi">Đơn mới</option>
+          <option value="tai_ky">Tái ký</option>
         </Select>
+        <Select value={ky} onChange={(e) => setKy(e.target.value)} className="w-40">
+          <option value="tat_ca">Tất cả thời gian</option>
+          <option value="thang_nay">Tháng này</option>
+          <option value="thang_truoc">Tháng trước</option>
+          <option value="quy_nay">Quý này</option>
+          <option value="nam_nay">Năm nay</option>
+          <option value="tuy_chon">Chọn ngày...</option>
+        </Select>
+        {ky === 'tuy_chon' && (
+          <>
+            <Input type="date" value={tu} onChange={(e) => setTu(e.target.value)} className="w-40" title="Từ ngày chốt" />
+            <span className="text-ink-400">→</span>
+            <Input type="date" value={den} onChange={(e) => setDen(e.target.value)} className="w-40" title="Đến ngày chốt" />
+          </>
+        )}
         <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
           <option value="">Tất cả sale</option>
           {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
@@ -228,8 +257,8 @@ export default function OrdersPage({ currentProfile }) {
                 <td className="px-5 py-3 font-medium text-navy-900">{o.ma_don}</td>
                 <td className="px-5 py-3">
                   {o.loai_don === 'tai_ky'
-                    ? <Badge className="bg-teal-50 text-teal-600">Tái ký</Badge>
-                    : <Badge className="bg-coral-50 text-coral-600">Mới</Badge>}
+                    ? <Badge className="whitespace-nowrap bg-teal-50 text-teal-600">Tái ký</Badge>
+                    : <Badge className="whitespace-nowrap bg-coral-50 text-coral-600">Mới</Badge>}
                 </td>
                 <td className="px-5 py-3">
                   <p className="text-navy-900">{nameOf(o.customer_id, customers, 'ten_khach')}</p>
@@ -294,10 +323,10 @@ export default function OrdersPage({ currentProfile }) {
   )
 }
 
-function StatCard({ label, value, accent = 'navy', note, noteUp, phamVi }) {
-  const accents = { navy: 'text-navy-900', coral: 'text-coral-500', teal: 'text-teal-500' }
+function StatCard({ label, value, accent = 'navy', note, noteUp, phamVi, className = '' }) {
+  const accents = { navy: 'text-navy-900', coral: 'text-coral-500', teal: 'text-teal-500', indigo: 'text-indigo-700' }
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
+    <div className={`rounded-2xl bg-white p-4 shadow-sm ${className}`}>
       <p className="text-xs font-medium uppercase tracking-wide text-ink-400">{label}</p>
       <p className={`mt-1 font-display text-2xl font-bold ${accents[accent]}`}>{value}</p>
       {note && (
