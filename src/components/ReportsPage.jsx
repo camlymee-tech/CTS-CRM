@@ -1,22 +1,45 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { Select } from './ui'
-import { formatVnd, giaTruocVat } from '../lib/constants'
+import { Select, Input } from './ui'
+import { formatVnd } from '../lib/constants'
+import { NHOM, khoangNgay, taoDong, gom, cong, gomDichVu } from '../lib/doanhSo'
 
-// Xây shop + Tối ưu sản phẩm gộp thành 1 nhóm "Seller"; Chạy quảng cáo là "ADS"; còn lại là "Bổ sung"
-function nhomDichVu(ten) {
-  if (/xây shop|tối ưu/i.test(ten || '')) return 'Seller'
-  if (/quảng cáo/i.test(ten || '')) return 'ADS'
-  return 'Bổ sung'
-}
+const BAO_CAO = [
+  { key: 'chung', label: '1. Doanh số chung (mới + tái ký) — từng sale và tổng' },
+  { key: 'tai_ky', label: '2. Doanh số tái ký — từng sale và tổng' },
+  { key: 'moi', label: '3. Doanh số đơn mới — từng sale và tổng' },
+  { key: 'dich_vu', label: '4. Doanh số từng dịch vụ (mới / tái ký)' },
+]
+
+const KY = [
+  { key: 'nam_nay', label: 'Năm nay' },
+  { key: 'thang_nay', label: 'Tháng này' },
+  { key: 'thang_truoc', label: 'Tháng trước' },
+  { key: 'quy_nay', label: 'Quý này' },
+  { key: 'tat_ca', label: 'Tất cả thời gian' },
+  { key: 'tuy_chon', label: 'Chọn ngày...' },
+]
+
+const NHOM_TEN = { Seller: 'Seller (Xây shop + Tối ưu SP)', ADS: 'Chạy quảng cáo (ADS)', 'Bổ sung': 'Dịch vụ bổ sung' }
+const NHOM_MAU = { Seller: 'bg-amber-50 text-amber-700', ADS: 'bg-violet-50 text-violet-700', 'Bổ sung': 'bg-slate-100 text-slate-600' }
+
+const phanTram = (x, tong) => (tong > 0 ? `${Math.round((x / tong) * 1000) / 10}%` : '—')
+const ngayHienThi = (s) => (s ? s.split('-').reverse().join('/') : '')
+const thangHienThi = (s) => s.split('-').reverse().join('/')
 
 export default function ReportsPage() {
   const [orders, setOrders] = useState([])
   const [items, setItems] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
-  const [nam, setNam] = useState(String(new Date().getFullYear()))
-  const [thang, setThang] = useState('')
+
+  const [loai, setLoai] = useState('chung')
+  const [ky, setKy] = useState('nam_nay')
+  const [tu, setTu] = useState('')
+  const [den, setDen] = useState('')
+  const [filterSale, setFilterSale] = useState('')
+  const [filterNhom, setFilterNhom] = useState('')
+  const [chiTietGoi, setChiTietGoi] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -33,253 +56,275 @@ export default function ReportsPage() {
     setLoading(false)
   }
 
-  const donLoc = useMemo(() => orders.filter((o) => {
-    if (!o.ngay_chot) return false
-    const [y, m] = o.ngay_chot.split('-')
-    if (nam && y !== nam) return false
-    if (thang && m !== thang) return false
-    return true
-  }), [orders, nam, thang])
+  const [tuNgay, denNgay] = useMemo(() => khoangNgay(ky, tu, den), [ky, tu, den])
+  const tenSale = (id) => (id === 'chua_gan' ? 'Chưa gán sale' : profiles.find((p) => p.id === id)?.full_name || 'Không rõ')
+  const coDonChuaGan = useMemo(() => orders.some((o) => !o.sale_id), [orders])
 
-  const idLoc = useMemo(() => new Set(donLoc.map((o) => o.id)), [donLoc])
+  // Mọi dòng doanh số (chưa VAT) sau khi lọc kỳ / sale / nhóm dịch vụ
+  const dong = useMemo(
+    () => taoDong({ orders, items, tuNgay, denNgay, sale: filterSale, nhom: filterNhom }),
+    [orders, items, tuNgay, denNgay, filterSale, filterNhom],
+  )
+  // Báo cáo 2, 3 chỉ lấy đơn tái ký / đơn mới
+  const dongBaoCao = useMemo(
+    () => (loai === 'moi' || loai === 'tai_ky' ? dong.filter((r) => r.loai === loai) : dong),
+    [dong, loai],
+  )
 
-  const tongDoanhSo = donLoc.reduce((s, o) => s + giaTruocVat(o.gia_tri), 0)
+  const theoSale = useMemo(() => gom(dongBaoCao, (r) => r.sale).sort((a, b) => b.tong - a.tong), [dongBaoCao])
+  const theoThang = useMemo(() => gom(dongBaoCao, (r) => r.thang).sort((a, b) => a.key.localeCompare(b.key)), [dongBaoCao])
+  const tong = useMemo(() => cong(theoSale), [theoSale])
+  const theoDichVu = useMemo(() => gomDichVu(dong, chiTietGoi), [dong, chiTietGoi])
+  const tongChung = useMemo(() => cong(gom(dong, () => 'x')), [dong])  // tổng mọi dòng đang lọc (mới + tái ký)
 
-  const theoSale = useMemo(() => {
-    const m = {}
-    for (const o of donLoc) {
-      const key = o.sale_id || 'chua_gan'
-      m[key] = m[key] || { soDon: 0, doanhSo: 0 }
-      m[key].soDon += 1
-      m[key].doanhSo += giaTruocVat(o.gia_tri)
-    }
-    return Object.entries(m)
-      .map(([id, v]) => ({ id, ten: profiles.find((p) => p.id === id)?.full_name || 'Chưa gán sale', ...v }))
-      .sort((a, b) => b.doanhSo - a.doanhSo)
-  }, [donLoc, profiles])
-
-  // Seller = Xây shop + Tối ưu sản phẩm (theo đúng quy ước: 2 dịch vụ này gộp là 1 mảng Seller)
-  const theoNhom = useMemo(() => {
-    const m = { Seller: { ten: 'Seller (Xây shop + Tối ưu sản phẩm)', doanhSo: 0, soLuong: 0 },
-      ADS: { ten: 'Chạy quảng cáo (ADS)', doanhSo: 0, soLuong: 0 },
-      'Bổ sung': { ten: 'Dịch vụ bổ sung', doanhSo: 0, soLuong: 0 } }
-    for (const it of items) {
-      if (!idLoc.has(it.order_id)) continue
-      const nhom = nhomDichVu(it.ten_dich_vu)
-      m[nhom].doanhSo += giaTruocVat(it.gia)
-      m[nhom].soLuong += 1
-    }
-    return Object.values(m)
-  }, [items, idLoc])
-
-  // Ma trận doanh số theo từng sale x từng nhóm dịch vụ
-  const theoSaleNhom = useMemo(() => {
-    const m = {}
-    for (const it of items) {
-      if (!idLoc.has(it.order_id)) continue
-      const don = orders.find((o) => o.id === it.order_id)
-      const saleId = don?.sale_id || 'chua_gan'
-      const nhom = nhomDichVu(it.ten_dich_vu)
-      m[saleId] = m[saleId] || { Seller: 0, ADS: 0, 'Bổ sung': 0 }
-      m[saleId][nhom] += giaTruocVat(it.gia)
-    }
-    return Object.entries(m)
-      .map(([id, v]) => ({
-        id, ten: profiles.find((p) => p.id === id)?.full_name || 'Chưa gán sale', ...v,
-        tong: v.Seller + v.ADS + v['Bổ sung'],
-      }))
-      .sort((a, b) => b.tong - a.tong)
-  }, [items, idLoc, orders, profiles])
-
-  // Tách doanh số theo loại đơn: Mới (tự sinh hợp đồng) và Tái ký (chỉ thêm đơn, dùng lại HĐ)
-  const theoLoaiDon = useMemo(() => {
-    const m = { moi: { ma: 'moi', ten: 'Đơn mới', soDon: 0, doanhSo: 0 }, tai_ky: { ma: 'tai_ky', ten: 'Tái ký', soDon: 0, doanhSo: 0 } }
-    for (const o of donLoc) {
-      const key = o.loai_don === 'tai_ky' ? 'tai_ky' : 'moi'
-      m[key].soDon += 1
-      m[key].doanhSo += giaTruocVat(o.gia_tri)
-    }
-    return Object.values(m)
-  }, [donLoc])
-
-  const theoDichVu = useMemo(() => {
-    const m = {}
-    for (const it of items) {
-      if (!idLoc.has(it.order_id)) continue
-      m[it.ten_dich_vu] = m[it.ten_dich_vu] || { soLuong: 0, doanhSo: 0 }
-      m[it.ten_dich_vu].soLuong += 1
-      m[it.ten_dich_vu].doanhSo += giaTruocVat(it.gia)
-    }
-    return Object.entries(m).map(([ten, v]) => ({ ten, ...v })).sort((a, b) => b.doanhSo - a.doanhSo)
-  }, [items, idLoc])
-
-  const theoThang = useMemo(() => {
-    const m = {}
-    for (const o of orders) {
-      if (!o.ngay_chot) continue
-      const [y, mm] = o.ngay_chot.split('-')
-      if (nam && y !== nam) continue
-      m[mm] = (m[mm] || 0) + giaTruocVat(o.gia_tri)
-    }
-    return Array.from({ length: 12 }, (_, i) => {
-      const mm = String(i + 1).padStart(2, '0')
-      return { thang: `Tháng ${i + 1}`, doanhSo: m[mm] || 0 }
-    })
-  }, [orders, nam])
-
-  const maxThang = Math.max(...theoThang.map((t) => t.doanhSo), 1)
-  const namCoData = [...new Set(orders.map((o) => o.ngay_chot?.slice(0, 4)).filter(Boolean))].sort().reverse()
+  const moTaKy = ky === 'tat_ca' ? 'Tất cả thời gian'
+    : `${ngayHienThi(tuNgay) || '...'} → ${ngayHienThi(denNgay) || '...'}`
+  const loaiHienTai = BAO_CAO.find((b) => b.key === loai)
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
-        <div>
-          <h1 className="font-display text-xl font-bold text-navy-900">Tổng kết doanh số</h1>
-          <p className="text-sm text-ink-600">Doanh số theo sale, theo dịch vụ và theo tháng (không tính đơn huỷ, số liệu chưa gồm VAT)</p>
-        </div>
-        <div className="flex gap-2">
-          <Select value={nam} onChange={(e) => setNam(e.target.value)} className="w-28">
-            {(namCoData.length ? namCoData : [String(new Date().getFullYear())]).map((y) =>
-              <option key={y} value={y}>Năm {y}</option>)}
-          </Select>
-          <Select value={thang} onChange={(e) => setThang(e.target.value)} className="w-36">
-            <option value="">Cả năm</option>
-            {Array.from({ length: 12 }, (_, i) => {
-              const mm = String(i + 1).padStart(2, '0')
-              return <option key={mm} value={mm}>Tháng {i + 1}</option>
-            })}
-          </Select>
-        </div>
+      <header className="border-b border-slate-200 bg-white px-8 py-5">
+        <h1 className="font-display text-xl font-bold text-navy-900">Báo cáo doanh số</h1>
+        <p className="text-sm text-ink-600">
+          Chọn loại báo cáo và bộ lọc bên dưới · không tính đơn huỷ · số liệu chưa gồm VAT
+        </p>
       </header>
+
+      {/* Bộ lọc */}
+      <div className="mx-8 mt-6 flex flex-wrap items-end gap-3 rounded-2xl bg-white p-4 shadow-sm">
+        <div className="min-w-[280px] flex-1">
+          <Select label="Loại báo cáo" value={loai} onChange={(e) => setLoai(e.target.value)} className="font-medium">
+            {BAO_CAO.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
+          </Select>
+        </div>
+        <Select label="Kỳ" value={ky} onChange={(e) => setKy(e.target.value)}>
+          {KY.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
+        </Select>
+        {ky === 'tuy_chon' && (
+          <>
+            <Input label="Từ ngày" type="date" value={tu} onChange={(e) => setTu(e.target.value)} />
+            <Input label="Đến ngày" type="date" value={den} onChange={(e) => setDen(e.target.value)} />
+          </>
+        )}
+        <Select label="Sale" value={filterSale} onChange={(e) => setFilterSale(e.target.value)}>
+          <option value="">Tất cả sale</option>
+          {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+          {coDonChuaGan && <option value="chua_gan">Chưa gán sale</option>}
+        </Select>
+        <Select label="Dịch vụ" value={filterNhom} onChange={(e) => setFilterNhom(e.target.value)}>
+          <option value="">Tất cả dịch vụ</option>
+          {NHOM.map((n) => <option key={n} value={n}>{NHOM_TEN[n]}</option>)}
+        </Select>
+        {loai === 'dich_vu' && (
+          <label className="flex items-center gap-2 pb-2.5 text-sm text-ink-600">
+            <input type="checkbox" checked={chiTietGoi} onChange={(e) => setChiTietGoi(e.target.checked)} />
+            Tách theo gói
+          </label>
+        )}
+      </div>
+      <p className="mx-8 mt-2 text-xs text-ink-400">Đang xem: {loaiHienTai?.label.replace(/^\d\.\s*/, '')} · {moTaKy}</p>
 
       {loading ? (
         <p className="py-16 text-center text-ink-400">Đang tải...</p>
+      ) : dong.length === 0 ? (
+        <p className="py-16 text-center text-ink-400">Không có đơn nào trong bộ lọc này.</p>
       ) : (
-        <>
-          <div className="grid grid-cols-3 gap-4 px-8 pt-6">
-            <StatCard label="Tổng doanh số (chưa VAT)" value={formatVnd(tongDoanhSo)} accent="coral" />
-            <StatCard label="Số đơn chốt" value={donLoc.length} />
-            <StatCard label="Giá trị trung bình / đơn (chưa VAT)"
-              value={formatVnd(donLoc.length ? tongDoanhSo / donLoc.length : 0)} accent="teal" />
-          </div>
+        <div className="space-y-6 px-8 py-6">
+          {/* Thẻ tổng quan */}
+          {loai === 'chung' || loai === 'dich_vu' ? (
+            <div className="grid grid-cols-3 gap-4">
+              <Card label="Tổng doanh số" value={formatVnd(tongChung.tong)} sub={`${tongChung.soDon} đơn`} />
+              <Card label="Đơn mới" mau="text-coral-500" value={formatVnd(tongChung.moi)}
+                sub={`${tongChung.soDonMoi} đơn · ${phanTram(tongChung.moi, tongChung.tong)}`} />
+              <Card label="Tái ký" mau="text-teal-500" value={formatVnd(tongChung.tai_ky)}
+                sub={`${tongChung.soDonTaiKy} đơn · ${phanTram(tongChung.tai_ky, tongChung.tong)}`} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              <Card label={loai === 'moi' ? 'Doanh số đơn mới' : 'Doanh số tái ký'}
+                mau={loai === 'moi' ? 'text-coral-500' : 'text-teal-500'} value={formatVnd(tong.tong)} />
+              <Card label="Số đơn" value={tong.soDon} />
+              <Card label="Giá trị trung bình / đơn" value={formatVnd(tong.soDon ? tong.tong / tong.soDon : 0)} />
+            </div>
+          )}
 
-          <div className="mx-8 mt-6 grid grid-cols-2 gap-4">
-            {theoLoaiDon.map((l) => (
-              <Panel key={l.ma} title={l.ten}>
-                <p className={`font-display text-2xl font-bold ${l.ma === 'moi' ? 'text-coral-500' : 'text-teal-500'}`}>
-                  {formatVnd(l.doanhSo)}
-                </p>
-                <p className="mt-1 text-sm text-ink-400">{l.soDon} đơn</p>
+          {/* Báo cáo 1-3: theo sale + theo tháng */}
+          {loai !== 'dich_vu' && (
+            <>
+              <Panel title="Theo từng sale">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
+                        <th className="pb-2">Sale</th>
+                        <th className="pb-2 text-right">Số đơn</th>
+                        {loai === 'chung' ? (
+                          <>
+                            <th className="pb-2 text-right">Đơn mới</th>
+                            <th className="pb-2 text-right">Tái ký</th>
+                          </>
+                        ) : NHOM.map((n) => <th key={n} className="pb-2 text-right">{n}</th>)}
+                        <th className="pb-2 text-right">Tổng</th>
+                        <th className="pb-2 text-right">Tỷ trọng</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {theoSale.map((s) => (
+                        <tr key={s.key} className="border-t border-slate-100">
+                          <td className="py-2.5 font-medium text-navy-900">{tenSale(s.key)}</td>
+                          <td className="py-2.5 text-right text-ink-600">{s.soDon}</td>
+                          {loai === 'chung' ? (
+                            <>
+                              <td className="py-2.5 text-right text-coral-600">{formatVnd(s.moi)}</td>
+                              <td className="py-2.5 text-right text-teal-600">{formatVnd(s.tai_ky)}</td>
+                            </>
+                          ) : NHOM.map((n) => <td key={n} className="py-2.5 text-right text-ink-600">{formatVnd(s[n])}</td>)}
+                          <td className="py-2.5 text-right font-semibold text-navy-900">{formatVnd(s.tong)}</td>
+                          <td className="py-2.5 text-right text-ink-400">{phanTram(s.tong, tong.tong)}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-navy-900">
+                        <td className="py-2.5 pl-2">TỔNG</td>
+                        <td className="py-2.5 text-right">{tong.soDon}</td>
+                        {loai === 'chung' ? (
+                          <>
+                            <td className="py-2.5 text-right text-coral-600">{formatVnd(tong.moi)}</td>
+                            <td className="py-2.5 text-right text-teal-600">{formatVnd(tong.tai_ky)}</td>
+                          </>
+                        ) : NHOM.map((n) => <td key={n} className="py-2.5 text-right">{formatVnd(tong[n])}</td>)}
+                        <td className="py-2.5 text-right">{formatVnd(tong.tong)}</td>
+                        <td className="py-2.5 pr-2 text-right">100%</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </Panel>
-            ))}
-          </div>
 
-          <div className="mx-8 mt-6 grid grid-cols-3 gap-4">
-            {theoNhom.map((n) => (
-              <Panel key={n.ten} title={n.ten}>
-                <p className="font-display text-2xl font-bold text-navy-900">{formatVnd(n.doanhSo)}</p>
-                <p className="mt-1 text-sm text-ink-400">{n.soLuong} lượt bán</p>
+              <Panel title="Theo tháng">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
+                        <th className="pb-2">Tháng</th>
+                        <th className="pb-2 text-right">Số đơn</th>
+                        {loai === 'chung' && (
+                          <>
+                            <th className="pb-2 text-right">Đơn mới</th>
+                            <th className="pb-2 text-right">Tái ký</th>
+                          </>
+                        )}
+                        <th className="pb-2 text-right">Tổng</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {theoThang.map((t) => (
+                        <tr key={t.key} className="border-t border-slate-100">
+                          <td className="py-2.5 font-medium text-navy-900">{thangHienThi(t.key)}</td>
+                          <td className="py-2.5 text-right text-ink-600">{t.soDon}</td>
+                          {loai === 'chung' && (
+                            <>
+                              <td className="py-2.5 text-right text-coral-600">{formatVnd(t.moi)}</td>
+                              <td className="py-2.5 text-right text-teal-600">{formatVnd(t.tai_ky)}</td>
+                            </>
+                          )}
+                          <td className="py-2.5 text-right font-semibold text-navy-900">{formatVnd(t.tong)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </Panel>
-            ))}
-          </div>
+            </>
+          )}
 
-          <div className="mx-8 mt-6">
-            <Panel title="Doanh số theo sale — theo từng nhóm dịch vụ">
-              {theoSaleNhom.length === 0 ? <Empty /> : (
+          {/* Báo cáo 4: từng dịch vụ, tách rõ mới / tái ký, gom theo nhóm */}
+          {loai === 'dich_vu' && (
+            <Panel title="Doanh số từng dịch vụ">
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
-                      <th className="pb-2">Sale</th>
-                      <th className="pb-2 text-right">Seller</th>
-                      <th className="pb-2 text-right">ADS</th>
-                      <th className="pb-2 text-right">Bổ sung</th>
-                      <th className="pb-2 text-right">Tổng</th>
+                    <tr className="text-xs uppercase tracking-wide text-ink-400">
+                      <th rowSpan={2} className="pb-2 text-left align-bottom">Dịch vụ</th>
+                      <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-coral-600">Đơn mới</th>
+                      <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-teal-600">Tái ký</th>
+                      <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-navy-900">Tổng</th>
+                    </tr>
+                    <tr className="text-xs uppercase tracking-wide text-ink-400">
+                      {[0, 1, 2].map((i) => (
+                        <FragmentTieuDe key={i} />
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {theoSaleNhom.map((s) => (
-                      <tr key={s.id} className="border-t border-slate-50">
-                        <td className="py-2.5 font-medium text-navy-900">{s.ten}</td>
-                        <td className="py-2.5 text-right text-ink-600">{formatVnd(s.Seller)}</td>
-                        <td className="py-2.5 text-right text-ink-600">{formatVnd(s.ADS)}</td>
-                        <td className="py-2.5 text-right text-ink-600">{formatVnd(s['Bổ sung'])}</td>
-                        <td className="py-2.5 text-right font-semibold text-navy-900">{formatVnd(s.tong)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </Panel>
-          </div>
-
-          <div className="mx-8 mt-6 grid grid-cols-2 gap-4">
-            <Panel title="Doanh số theo sale">
-              {theoSale.length === 0 ? <Empty /> : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
-                      <th className="pb-2">Sale</th>
-                      <th className="pb-2 text-right">Số đơn</th>
-                      <th className="pb-2 text-right">Doanh số</th>
+                    {NHOM.map((n) => {
+                      const dsNhom = theoDichVu.filter((r) => r.nhom === n).sort((a, b) => b.tien - a.tien)
+                      if (dsNhom.length === 0) return null
+                      const c = dsNhom.reduce((s, r) => ({
+                        mL: s.mL + r.moi.luot, mT: s.mT + r.moi.tien, kL: s.kL + r.tai_ky.luot, kT: s.kT + r.tai_ky.tien,
+                      }), { mL: 0, mT: 0, kL: 0, kT: 0 })
+                      return [
+                        <tr key={`h-${n}`} className="border-t border-slate-200 bg-slate-50 font-semibold">
+                          <td className="py-2 pl-2"><span className={`rounded-full px-2.5 py-1 text-xs ${NHOM_MAU[n]}`}>{NHOM_TEN[n]}</span></td>
+                          <Cells mL={c.mL} mT={c.mT} kL={c.kL} kT={c.kT} dam />
+                        </tr>,
+                        ...dsNhom.map((r) => (
+                          <tr key={`${n}-${r.ten}`} className="border-t border-slate-100">
+                            <td className="py-2.5 pl-6 text-navy-900">{r.ten}</td>
+                            <Cells mL={r.moi.luot} mT={r.moi.tien} kL={r.tai_ky.luot} kT={r.tai_ky.tien} />
+                          </tr>
+                        )),
+                      ]
+                    })}
+                    <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-navy-900">
+                      <td className="py-2.5 pl-2">TỔNG CỘNG</td>
+                      <Cells
+                        mL={theoDichVu.reduce((s, r) => s + r.moi.luot, 0)} mT={theoDichVu.reduce((s, r) => s + r.moi.tien, 0)}
+                        kL={theoDichVu.reduce((s, r) => s + r.tai_ky.luot, 0)} kT={theoDichVu.reduce((s, r) => s + r.tai_ky.tien, 0)}
+                        dam />
                     </tr>
-                  </thead>
-                  <tbody>
-                    {theoSale.map((s) => (
-                      <tr key={s.id} className="border-t border-slate-50">
-                        <td className="py-2.5 font-medium text-navy-900">{s.ten}</td>
-                        <td className="py-2.5 text-right text-ink-600">{s.soDon}</td>
-                        <td className="py-2.5 text-right font-medium text-navy-900">{formatVnd(s.doanhSo)}</td>
-                      </tr>
-                    ))}
                   </tbody>
                 </table>
-              )}
-            </Panel>
-
-            <Panel title="Doanh số theo dịch vụ">
-              {theoDichVu.length === 0 ? <Empty /> : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
-                      <th className="pb-2">Dịch vụ</th>
-                      <th className="pb-2 text-right">Lượt bán</th>
-                      <th className="pb-2 text-right">Doanh số</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {theoDichVu.map((d) => (
-                      <tr key={d.ten} className="border-t border-slate-50">
-                        <td className="py-2.5 font-medium text-navy-900">{d.ten}</td>
-                        <td className="py-2.5 text-right text-ink-600">{d.soLuong}</td>
-                        <td className="py-2.5 text-right font-medium text-navy-900">{formatVnd(d.doanhSo)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </Panel>
-          </div>
-
-          <div className="mx-8 my-6">
-            <Panel title={`Doanh số theo tháng — năm ${nam}`}>
-              <div className="space-y-2">
-                {theoThang.map((t) => (
-                  <div key={t.thang} className="flex items-center gap-3">
-                    <span className="w-20 flex-none text-sm text-ink-600">{t.thang}</span>
-                    <div className="h-6 flex-1 overflow-hidden rounded-lg bg-slate-100">
-                      <div className="h-full rounded-lg bg-coral-500 transition-all"
-                        style={{ width: `${(t.doanhSo / maxThang) * 100}%` }} />
-                    </div>
-                    <span className="w-36 flex-none text-right text-sm font-medium text-navy-900">
-                      {t.doanhSo ? formatVnd(t.doanhSo) : '—'}
-                    </span>
-                  </div>
-                ))}
               </div>
+              <p className="mt-3 text-xs text-ink-400">"Lượt" = số lần dịch vụ đó được bán. Một đơn có thể gồm nhiều dịch vụ.</p>
             </Panel>
-          </div>
-        </>
+          )}
+        </div>
       )}
+    </div>
+  )
+}
+
+// Hàng tiêu đề phụ "Lượt | Doanh số" cho mỗi nhóm cột
+function FragmentTieuDe() {
+  return (
+    <>
+      <th className="border-l border-slate-100 pb-2 text-right font-medium">Lượt</th>
+      <th className="pb-2 text-right font-medium">Doanh số</th>
+    </>
+  )
+}
+
+// 3 cặp ô "lượt | doanh số": Đơn mới, Tái ký, Tổng
+function Cells({ mL, mT, kL, kT, dam = false }) {
+  const w = dam ? 'font-semibold' : ''
+  return (
+    <>
+      <td className={`border-l border-slate-100 py-2.5 text-right text-ink-600 ${w}`}>{mL || '—'}</td>
+      <td className={`py-2.5 text-right text-coral-600 ${w}`}>{mT ? formatVnd(mT) : '—'}</td>
+      <td className={`border-l border-slate-100 py-2.5 text-right text-ink-600 ${w}`}>{kL || '—'}</td>
+      <td className={`py-2.5 text-right text-teal-600 ${w}`}>{kT ? formatVnd(kT) : '—'}</td>
+      <td className={`border-l border-slate-100 py-2.5 text-right text-navy-900 ${w}`}>{mL + kL}</td>
+      <td className={`py-2.5 pr-2 text-right font-semibold text-navy-900`}>{formatVnd(mT + kT)}</td>
+    </>
+  )
+}
+
+function Card({ label, value, sub, mau = 'text-navy-900' }) {
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-ink-400">{label}</p>
+      <p className={`mt-1 font-display text-2xl font-bold ${mau}`}>{value}</p>
+      {sub && <p className="mt-0.5 text-sm text-ink-400">{sub}</p>}
     </div>
   )
 }
@@ -289,20 +334,6 @@ function Panel({ title, children }) {
     <div className="rounded-2xl bg-white p-5 shadow-sm">
       <h2 className="mb-3 font-display font-semibold text-navy-900">{title}</h2>
       {children}
-    </div>
-  )
-}
-
-function Empty() {
-  return <p className="py-6 text-center text-sm text-ink-400">Chưa có dữ liệu trong kỳ này.</p>
-}
-
-function StatCard({ label, value, accent = 'navy' }) {
-  const accents = { navy: 'text-navy-900', coral: 'text-coral-500', teal: 'text-teal-500' }
-  return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-400">{label}</p>
-      <p className={`mt-1 font-display text-2xl font-bold ${accents[accent]}`}>{value}</p>
     </div>
   )
 }
