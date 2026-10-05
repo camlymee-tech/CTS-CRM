@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, Columns3 } from 'lucide-react'
+import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Phantrang } from './ui'
 import CustomerForm from './CustomerForm'
@@ -7,13 +7,16 @@ import CustomerDetail from './CustomerDetail'
 import OrderForm from './OrderForm'
 import StatusesModal from './StatusesModal'
 import { useTrangThai } from '../lib/StatusContext'
+import { ngayLocal, gioNgay, traoDoiGanNhat, demLuotChamSoc, tongDoanhThu, sapXepKhach } from '../lib/danhSachKhach'
 import {
   NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS,
   LOAI_KHACH_OPTIONS,
   NGUON_KHACH_OPTIONS,
+  LOAI_TUONG_TAC_OPTIONS,
   classOf,
   labelOf,
+  formatVnd,
 } from '../lib/constants'
 
 // Khách "chung" — cả team đều xem được (khớp với hàm la_khach_chung trong database)
@@ -27,31 +30,41 @@ export default function CustomerList({ currentProfile }) {
   const [quanLyTT, setQuanLyTT] = useState(false)
   const [donMoiKhach, setDonMoiKhach] = useState(null)
 
-  // Các cột có thể bật/tắt (Khách hàng và Thao tác luôn hiển thị)
+  // Các cột có thể bật/tắt (Khách hàng và Thao tác luôn hiển thị). sapXep = bấm tiêu đề để sắp xếp.
+  // Mặc định hiện đúng bộ cột như mẫu: STT, SĐT, Người phụ trách, Trao đổi gần nhất, Vấn đề, Nguồn, Tổng doanh thu
+  // + cột "Chăm sóc" (trạng thái, lịch hẹn tiếp theo, số lượt đã chăm sóc)
   const COT = [
-    { key: 'stt', label: 'STT' },
-    { key: 'sdt', label: 'Số điện thoại' },
-    { key: 'nen_tang', label: 'Nền tảng' },
-    { key: 'dich_vu', label: 'Dịch vụ' },
-    { key: 'nguon', label: 'Nguồn' },
-    { key: 'loai', label: 'Loại' },
-    { key: 'trang_thai', label: 'Trạng thái' },
-    { key: 'sale', label: 'Sale phụ trách' },
-    { key: 'ngay_tao', label: 'Ngày tạo data' },
-    { key: 'lien_he', label: 'Liên hệ gần nhất' },
-    { key: 'van_de', label: 'Vấn đề', macDinh: false },
+    { key: 'stt', label: '#' },
+    { key: 'sdt', label: 'Điện thoại', sapXep: 'sdt' },
+    { key: 'sale', label: 'Người phụ trách', sapXep: 'sale' },
+    { key: 'trao_doi', label: 'Trao đổi gần nhất', sapXep: 'trao_doi' },
+    { key: 'cham_soc', label: 'Chăm sóc' },
+    { key: 'van_de', label: 'Vấn đề KH', sapXep: 'van_de' },
+    { key: 'nguon', label: 'Nguồn khách hàng', sapXep: 'nguon' },
+    { key: 'doanh_thu', label: 'Tổng doanh thu', sapXep: 'doanh_thu' },
+    { key: 'nen_tang', label: 'Nền tảng', macDinh: false },
+    { key: 'dich_vu', label: 'Dịch vụ', macDinh: false },
+    { key: 'loai', label: 'Loại', macDinh: false },
+    { key: 'trang_thai', label: 'Trạng thái', macDinh: false },
+    { key: 'ngay_tao', label: 'Ngày tạo data', macDinh: false },
+    { key: 'lien_he', label: 'Liên hệ gần nhất', macDinh: false },
     { key: 'giai_phap', label: 'Giải pháp', macDinh: false },
     { key: 'nhat_ky', label: 'Cập nhật gần nhất', macDinh: false },
   ]
+  const KHOA_LUU_COT = 'tuki_cot_khach_v2'   // đổi khoá để áp bộ cột mặc định mới 1 lần
   const [cotHien, setCotHien] = useState(() => {
     try {
-      const luu = JSON.parse(localStorage.getItem('tuki_cot_khach') || 'null')
+      const luu = JSON.parse(localStorage.getItem(KHOA_LUU_COT) || 'null')
       if (luu) return luu
     } catch { /* bo qua */ }
     return Object.fromEntries(COT.map((c) => [c.key, c.macDinh !== false]))
   })
   const [moChonCot, setMoChonCot] = useState(false)
   const [nhatKyGanNhat, setNhatKyGanNhat] = useState({})
+  const [interactions, setInteractions] = useState([])
+  const [donHang, setDonHang] = useState([])
+  const [sapXep, setSapXep] = useState({ cot: '', dir: 'desc' })
+  const [daChon, setDaChon] = useState(() => new Set())
   const [doRong, setDoRong] = useState(() => {
     try { return JSON.parse(localStorage.getItem('tuki_do_rong_cot') || '{}') } catch { return {} }
   })
@@ -66,9 +79,9 @@ export default function CustomerList({ currentProfile }) {
   function toggleCot(k) {
     const moi = { ...cotHien, [k]: !hien(k) }
     setCotHien(moi)
-    try { localStorage.setItem('tuki_cot_khach', JSON.stringify(moi)) } catch { /* bo qua */ }
+    try { localStorage.setItem(KHOA_LUU_COT, JSON.stringify(moi)) } catch { /* bo qua */ }
   }
-  const soCot = 2 + COT.filter((c) => hien(c.key)).length  // Khách hàng + Thao tác + cột bật
+  const soCot = 3 + COT.filter((c) => hien(c.key)).length  // ô chọn + Khách hàng + Thao tác + cột bật
   const [customers, setCustomers] = useState([])
   const [phoneHits, setPhoneHits] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -79,7 +92,6 @@ export default function CustomerList({ currentProfile }) {
   const [filterSale, setFilterSale] = useState('')
   const [filterDichVu, setFilterDichVu] = useState('')
   const [filterNguon, setFilterNguon] = useState('')
-  const [locTheoNgay, setLocTheoNgay] = useState('lien_he')
   const [tuNgay, setTuNgay] = useState('')
   const [denNgay, setDenNgay] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -137,6 +149,16 @@ export default function CustomerList({ currentProfile }) {
     const map = {}
     for (const l of logs || []) if (!map[l.customer_id]) map[l.customer_id] = l
     setNhatKyGanNhat(map)
+    // Lịch sử chăm sóc (cho cột Trao đổi gần nhất / Chăm sóc) và đơn hàng (cho Tổng doanh thu)
+    const [{ data: its }, { data: dh }] = await Promise.all([
+      supabase.from('customer_interactions')
+        .select('customer_id, sale_id, loai, noi_dung, ngay_thuc_hien, created_at')
+        .order('ngay_thuc_hien', { ascending: false })
+        .limit(5000),
+      supabase.from('orders').select('customer_id, gia_tri, trang_thai'),
+    ])
+    setInteractions(its || [])
+    setDonHang(dh || [])
   }
 
   const isAdmin = currentProfile?.role === 'admin'
@@ -158,12 +180,12 @@ export default function CustomerList({ currentProfile }) {
       if (filterSale && c.sale_id !== filterSale) return false
       if (filterDichVu && !(c.dich_vu || []).includes(filterDichVu)) return false
       if (filterNguon && c.nguon_khach !== filterNguon) return false
-      const ngayLoc = locTheoNgay === 'tao' ? (c.created_at || '').slice(0, 10) : c.ngay_lien_he_gan_nhat
-      if (tuNgay && (!ngayLoc || ngayLoc < tuNgay)) return false
-      if (denNgay && (!ngayLoc || ngayLoc > denNgay)) return false
+      const ngayTao = ngayLocal(c.created_at)
+      if (tuNgay && (!ngayTao || ngayTao < tuNgay)) return false
+      if (denNgay && (!ngayTao || ngayTao > denNgay)) return false
       return true
     })
-  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, locTheoNgay, tuNgay, denNgay, isAdmin, currentProfile?.id])
+  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay, isAdmin, currentProfile?.id])
 
   // Danh sách áp dụng mọi bộ lọc TRỪ bộ lọc trạng thái,
   // để mỗi thẻ trạng thái vẫn hiện đúng số khi đang chọn một trạng thái
@@ -176,11 +198,11 @@ export default function CustomerList({ currentProfile }) {
     if (filterSale && c.sale_id !== filterSale) return false
     if (filterDichVu && !(c.dich_vu || []).includes(filterDichVu)) return false
     if (filterNguon && c.nguon_khach !== filterNguon) return false
-    const ngayLoc = locTheoNgay === 'tao' ? (c.created_at || '').slice(0, 10) : c.ngay_lien_he_gan_nhat
-    if (tuNgay && (!ngayLoc || ngayLoc < tuNgay)) return false
-    if (denNgay && (!ngayLoc || ngayLoc > denNgay)) return false
+    const ngayTao = ngayLocal(c.created_at)
+    if (tuNgay && (!ngayTao || ngayTao < tuNgay)) return false
+    if (denNgay && (!ngayTao || ngayTao > denNgay)) return false
     return true
-  }), [nguon, isAdmin, currentProfile?.id, search, filterLoai, filterSale, filterDichVu, filterNguon, locTheoNgay, tuNgay, denNgay])
+  }), [nguon, isAdmin, currentProfile?.id, search, filterLoai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay])
 
   const demTheoTrangThai = useMemo(() => {
     const m = {}
@@ -190,11 +212,70 @@ export default function CustomerList({ currentProfile }) {
   }, [nenDem, TRANG_THAI])
 
 
-  const [trang, setTrang] = useState(1)
-  useEffect(() => { setTrang(1) }, [search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, locTheoNgay, tuNgay, denNgay])
-  const phanTrang = useMemo(() => filtered.slice((trang - 1) * 20, trang * 20), [filtered, trang])
-
   const profileName = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
+
+  const traoDoi = useMemo(() => traoDoiGanNhat(interactions, Object.values(nhatKyGanNhat)), [interactions, nhatKyGanNhat])
+  const luotCS = useMemo(() => demLuotChamSoc(interactions), [interactions])
+  const doanhThu = useMemo(() => tongDoanhThu(donHang), [donHang])
+
+  const daSapXep = useMemo(
+    () => sapXepKhach(filtered, sapXep.cot, sapXep.dir, {
+      tenSale: (id) => profiles.find((p) => p.id === id)?.full_name || '',
+      tenNguon: (v) => labelOf(NGUON_KHACH_OPTIONS, v) || '',
+      traoDoi, doanhThu, luotCS,
+    }),
+    [filtered, sapXep, profiles, traoDoi, doanhThu, luotCS],
+  )
+
+  function doiSapXep(cot) {
+    setSapXep((s) => (s.cot === cot ? { cot, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { cot, dir: cot === 'doanh_thu' || cot === 'trao_doi' ? 'desc' : 'asc' }))
+  }
+
+  const [trang, setTrang] = useState(1)
+  useEffect(() => { setTrang(1) }, [search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay, sapXep])
+  const phanTrang = useMemo(() => daSapXep.slice((trang - 1) * 20, trang * 20), [daSapXep, trang])
+
+  // Tải Excel: các khách đã tích chọn, hoặc toàn bộ kết quả đang lọc nếu chưa chọn khách nào
+  async function taiExcel() {
+    const ds = daChon.size > 0 ? daSapXep.filter((c) => daChon.has(c.id)) : daSapXep
+    const XLSX = await import('xlsx')
+    const rows = ds.map((c, i) => {
+      const td = traoDoi[c.id]
+      return {
+        '#': i + 1,
+        'Mã KH': c.ma_khach,
+        'Tên khách hàng': c.ten_khach,
+        'Điện thoại': c.sdt || '',
+        'Người phụ trách': profileName(c.sale_id),
+        'Trạng thái': tenTrangThai(c.trang_thai_cham_soc),
+        'Hẹn chăm sóc tiếp': c.ngay_cham_soc_tiep_theo || '',
+        'Số lượt chăm sóc': luotCS[c.id] || 0,
+        'Trao đổi gần nhất': td ? `${profileName(td.nguoi)} (${gioNgay(td.thoiGian)}): ${td.noiDung}` : '',
+        'Vấn đề KH': c.van_de || '',
+        'Nguồn khách hàng': labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '',
+        'Ngày tạo': ngayLocal(c.created_at),
+        'Tổng doanh thu (chưa VAT)': doanhThu[c.id] || 0,
+      }
+    })
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Khach hang')
+    XLSX.writeFile(wb, `KhachHang_${ngayLocal(new Date())}.xlsx`)
+  }
+
+  // Chọn nhiều khách (ô tích đầu dòng)
+  const chonTatCaTrang = phanTrang.length > 0 && phanTrang.every((c) => daChon.has(c.id))
+  function toggleChon(id) {
+    setDaChon((cu) => { const m = new Set(cu); m.has(id) ? m.delete(id) : m.add(id); return m })
+  }
+  function toggleChonTrang() {
+    setDaChon((cu) => {
+      const m = new Set(cu)
+      if (chonTatCaTrang) phanTrang.forEach((c) => m.delete(c.id))
+      else phanTrang.forEach((c) => m.add(c.id))
+      return m
+    })
+  }
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -266,10 +347,7 @@ export default function CustomerList({ currentProfile }) {
             {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </Select>
           <div className="flex items-center gap-2 text-sm text-ink-600">
-            <Select value={locTheoNgay} onChange={(e) => setLocTheoNgay(e.target.value)} className="w-36">
-              <option value="lien_he">Ngày liên hệ</option>
-              <option value="tao">Ngày tạo data</option>
-            </Select>
+            <span className="font-medium text-navy-900">Ngày tạo</span>
             <span>từ</span>
             <Input type="date" value={tuNgay} onChange={(e) => setTuNgay(e.target.value)} className="w-40" />
             <span>đến</span>
@@ -277,7 +355,7 @@ export default function CustomerList({ currentProfile }) {
           </div>
           {(search || filterLoai || filterTrangThai || filterSale || filterDichVu || filterNguon || tuNgay || denNgay) && (
             <button
-              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setFilterNguon(''); setLocTheoNgay('lien_he'); setTuNgay(''); setDenNgay('') }}
+              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setFilterNguon(''); setTuNgay(''); setDenNgay('') }}
               className="text-sm text-ink-600 hover:text-coral-500">
               Xoá bộ lọc
             </button>
@@ -285,7 +363,21 @@ export default function CustomerList({ currentProfile }) {
         </div>
       </div>
 
-      <div className="mx-8 mt-4 flex items-center justify-end">
+      <div className="mx-8 mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink-600">
+          <b className="text-navy-900">{filtered.length}</b> khách
+          {daChon.size > 0 && (
+            <>
+              {' · '}đã chọn <b className="text-coral-600">{daChon.size}</b>
+              <button type="button" onClick={() => setDaChon(new Set())} className="ml-2 text-xs text-ink-400 hover:text-coral-500">Bỏ chọn</button>
+            </>
+          )}
+        </p>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={taiExcel}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-ink-600 hover:border-coral-500 hover:text-coral-500">
+            <Download size={15} /> {daChon.size > 0 ? `Tải Excel (${daChon.size} khách)` : 'Tải Excel'}
+          </button>
         <div className="relative">
           <button onClick={() => setMoChonCot((v) => !v)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-ink-600 hover:border-coral-500 hover:text-coral-500">
@@ -307,26 +399,27 @@ export default function CustomerList({ currentProfile }) {
             </>
           )}
         </div>
+        </div>
       </div>
 
       <div className="mx-8 mb-6 mt-2 overflow-x-auto rounded-2xl bg-white shadow-sm">
         <table className="w-full text-sm" style={{ tableLayout: 'auto' }}>
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
-              {hien('stt') && <ThResize colKey="stt" doRong={doRong} onResize={luuDoRong}>STT</ThResize>}
-              <ThResize colKey="ten" doRong={doRong} onResize={luuDoRong}>Khách hàng</ThResize>
-              {hien('sdt') && <ThResize colKey="sdt" doRong={doRong} onResize={luuDoRong}>Số điện thoại</ThResize>}
-              {hien('nen_tang') && <ThResize colKey="nen_tang" doRong={doRong} onResize={luuDoRong}>Nền tảng</ThResize>}
-              {hien('dich_vu') && <ThResize colKey="dich_vu" doRong={doRong} onResize={luuDoRong}>Dịch vụ</ThResize>}
-              {hien('nguon') && <ThResize colKey="nguon" doRong={doRong} onResize={luuDoRong}>Nguồn</ThResize>}
-              {hien('loai') && <ThResize colKey="loai" doRong={doRong} onResize={luuDoRong}>Loại</ThResize>}
-              {hien('trang_thai') && <ThResize colKey="trang_thai" doRong={doRong} onResize={luuDoRong}>Trạng thái</ThResize>}
-              {hien('sale') && <ThResize colKey="sale" doRong={doRong} onResize={luuDoRong}>Sale phụ trách</ThResize>}
-              {hien('ngay_tao') && <ThResize colKey="ngay_tao" doRong={doRong} onResize={luuDoRong}>Ngày tạo data</ThResize>}
-              {hien('lien_he') && <ThResize colKey="lien_he" doRong={doRong} onResize={luuDoRong}>Liên hệ gần nhất</ThResize>}
-              {hien('van_de') && <ThResize colKey="van_de" doRong={doRong} onResize={luuDoRong}>Vấn đề</ThResize>}
-              {hien('giai_phap') && <ThResize colKey="giai_phap" doRong={doRong} onResize={luuDoRong}>Giải pháp</ThResize>}
-              {hien('nhat_ky') && <ThResize colKey="nhat_ky" doRong={doRong} onResize={luuDoRong}>Cập nhật gần nhất</ThResize>}
+            <tr className="border-b border-slate-200 bg-slate-100 text-left text-sm font-semibold text-navy-900">
+              <th className="w-10 px-4 py-3">
+                <input type="checkbox" checked={chonTatCaTrang} onChange={toggleChonTrang}
+                  className="h-4 w-4 rounded border-slate-300" title="Chọn / bỏ chọn các khách trên trang này" />
+              </th>
+              {hien('stt') && <ThResize colKey="stt" doRong={doRong} onResize={luuDoRong}>#</ThResize>}
+              <ThResize colKey="ten" doRong={doRong} onResize={luuDoRong}>Tên khách hàng</ThResize>
+              {COT.filter((c) => c.key !== 'stt' && hien(c.key)).map((c) => (
+                <ThResize key={c.key} colKey={c.key} doRong={doRong} onResize={luuDoRong}
+                  sapXep={c.sapXep} dangSapXep={sapXep.cot === c.sapXep ? sapXep.dir : null}
+                  onSapXep={() => doiSapXep(c.sapXep)}
+                  tieuDeNho={c.key === 'doanh_thu' ? 'Chưa VAT, trừ đơn huỷ' : undefined}>
+                  {c.label}
+                </ThResize>
+              ))}
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -339,39 +432,105 @@ export default function CustomerList({ currentProfile }) {
               const idx = (trang - 1) * 20 + idxTrang
               const chung = laKhachChung(c)
               const cuaMinh = c.sale_id === currentProfile?.id
+              const dongChon = daChon.has(c.id)
+              const mauTT = TRANG_THAI.find((o) => o.ma === c.trang_thai_cham_soc)?.mau
+              const td = traoDoi[c.id]
+              const soCS = luotCS[c.id] || 0
+              const hen = c.ngay_cham_soc_tiep_theo
+              const homNay = ngayLocal(new Date())
               return (
                 <tr key={c.id}
-                  className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-coral-50/40 ${
-                    idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'
+                  className={`cursor-pointer border-b border-slate-200 last:border-0 hover:bg-sky-50/60 ${
+                    dongChon ? 'bg-sky-50' : idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'
                   }`}
                   onClick={() => setViewingCustomer(c)}>
-                  {hien('stt') && <td className="px-4 py-3 text-ink-400">{idx + 1}</td>}
+                  <td className={`relative w-10 border-l-4 px-4 py-3 ${VIEN_TRANG_THAI[mauTT] || 'border-slate-300'}`}
+                    onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={dongChon} onChange={() => toggleChon(c.id)}
+                      className="h-4 w-4 rounded border-slate-300" />
+                  </td>
+                  {hien('stt') && <td className="px-4 py-3 text-ink-600">{idx + 1}</td>}
                   <td className="px-4 py-3" style={doRong.ten ? { maxWidth: doRong.ten } : undefined}>
-                    <div className="flex items-center gap-2">
-                      <p className="truncate font-medium text-navy-900">{c.ten_khach}</p>
-                      {chung && !cuaMinh && (
-                        <span title="Khách chung — cả team đều xem được">
-                          <Users2 size={13} className="text-amber-500" />
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-ink-400">
-                      <span>{c.ma_khach}</span>
-                      {c.link_fb && (
-                        <a href={c.link_fb} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-0.5 text-teal-500 hover:underline">
-                          <Link2 size={10} /> FB
-                        </a>
-                      )}
-                      {c.link_shop && (
-                        <a href={c.link_shop} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-0.5 text-teal-500 hover:underline">
-                          <Store size={10} /> Shop
-                        </a>
-                      )}
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-300">
+                        <User size={24} fill="currentColor" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate font-medium text-indigo-800">{c.ten_khach}</p>
+                          {soCS > 0 && (
+                            <span title={`${soCS} lượt chăm sóc đã ghi`}
+                              className="inline-flex h-5 min-w-[1.25rem] flex-none items-center justify-center rounded-full bg-coral-500 px-1.5 text-[11px] font-semibold text-white">
+                              {soCS}
+                            </span>
+                          )}
+                          {chung && !cuaMinh && (
+                            <span title="Khách chung — cả team đều xem được">
+                              <Users2 size={13} className="text-amber-500" />
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-ink-400">
+                          <span>{c.ma_khach}</span>
+                          {c.link_fb && (
+                            <a href={c.link_fb} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-0.5 text-teal-500 hover:underline">
+                              <Link2 size={10} /> FB
+                            </a>
+                          )}
+                          {c.link_shop && (
+                            <a href={c.link_shop} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-0.5 text-teal-500 hover:underline">
+                              <Store size={10} /> Shop
+                            </a>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </td>
-                  {hien('sdt') && <td className="px-4 py-3 text-ink-600">{c.sdt || '—'}</td>}
+                  {hien('sdt') && <td className="px-4 py-3 font-medium text-indigo-800">{c.sdt || <span className="text-ink-400">—</span>}</td>}
+                  {hien('sale') && <td className="px-4 py-3 text-navy-900">{profileName(c.sale_id)}</td>}
+                  {hien('trao_doi') && (
+                    <td className="px-4 py-3" style={{ minWidth: 300, maxWidth: doRong.trao_doi || 360 }}>
+                      {!td ? <span className="text-ink-400">—</span> : (
+                        <div>
+                          <div className="flex items-baseline justify-between gap-3">
+                            <span className="font-semibold text-indigo-800">{profileName(td.nguoi)}</span>
+                            <span className="flex-none whitespace-nowrap text-xs text-ink-600">{gioNgay(td.thoiGian)}</span>
+                          </div>
+                          <p className="mt-0.5 line-clamp-2 whitespace-pre-wrap text-navy-900">
+                            {td.loai !== 'nhat_ky' && (
+                              <span className="mr-1 text-xs font-medium text-teal-600">
+                                [{labelOf(LOAI_TUONG_TAC_OPTIONS, td.loai)}]
+                              </span>
+                            )}
+                            {td.noiDung}
+                          </p>
+                        </div>
+                      )}
+                    </td>
+                  )}
+                  {hien('cham_soc') && (
+                    <td className="px-4 py-3" style={{ minWidth: 150 }}>
+                      <Badge className={`whitespace-nowrap ${classTrangThai(c.trang_thai_cham_soc)}`}>{tenTrangThai(c.trang_thai_cham_soc)}</Badge>
+                      <p className="mt-1 whitespace-nowrap text-xs text-ink-600">
+                        {hen
+                          ? <span className={hen < homNay ? 'font-medium text-rose-600' : hen === homNay ? 'font-medium text-coral-600' : ''}>
+                              Hẹn {hen.split('-').reverse().join('/')}{hen < homNay ? ' · trễ' : hen === homNay ? ' · hôm nay' : ''}
+                            </span>
+                          : <span className="text-ink-400">Chưa đặt lịch hẹn</span>}
+                      </p>
+                    </td>
+                  )}
+                  {hien('van_de') && (
+                    <td className="px-4 py-3 text-navy-900" style={{ minWidth: 200, maxWidth: doRong.van_de || 280 }}>
+                      <p className="line-clamp-3 whitespace-pre-wrap">{c.van_de || <span className="text-ink-400">—</span>}</p>
+                    </td>
+                  )}
+                  {hien('nguon') && <td className="px-4 py-3 text-navy-900">{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '—'}</td>}
+                  {hien('doanh_thu') && (
+                    <td className="px-4 py-3 font-bold text-orange-500">{formatVnd(doanhThu[c.id] || 0)}</td>
+                  )}
                   {hien('nen_tang') && (
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
@@ -388,7 +547,6 @@ export default function CustomerList({ currentProfile }) {
                       ))}
                     </div>
                   </td>)}
-                  {hien('nguon') && <td className="px-4 py-3 text-ink-600">{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '—'}</td>}
                   {hien('loai') && (
                   <td className="px-4 py-3">
                     <Badge className={c.loai_khach === 'moi' ? 'bg-coral-50 text-coral-600' : 'bg-slate-100 text-slate-600'}>
@@ -401,14 +559,8 @@ export default function CustomerList({ currentProfile }) {
                       {tenTrangThai(c.trang_thai_cham_soc)}
                     </Badge>
                   </td>)}
-                  {hien('sale') && <td className="px-4 py-3 text-ink-600">{profileName(c.sale_id)}</td>}
-                  {hien('ngay_tao') && <td className="px-4 py-3 text-ink-600">{(c.created_at || '').slice(0, 10) || '—'}</td>}
+                  {hien('ngay_tao') && <td className="px-4 py-3 text-ink-600">{ngayLocal(c.created_at) || '—'}</td>}
                   {hien('lien_he') && <td className="px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>}
-                  {hien('van_de') && (
-                    <td className="px-4 py-3 text-ink-600" style={{ maxWidth: doRong.van_de || 220 }}>
-                      <p className="line-clamp-2 whitespace-pre-wrap">{c.van_de || '—'}</p>
-                    </td>
-                  )}
                   {hien('giai_phap') && (
                     <td className="px-4 py-3 text-ink-600" style={{ maxWidth: doRong.giai_phap || 220 }}>
                       <p className="line-clamp-2 whitespace-pre-wrap">{c.giai_phap || '—'}</p>
@@ -484,7 +636,14 @@ export default function CustomerList({ currentProfile }) {
   )
 }
 
-function ThResize({ colKey, doRong, onResize, children }) {
+// Màu vạch dọc bên trái mỗi dòng theo trạng thái chăm sóc (giống vạch xanh ở mẫu)
+const VIEN_TRANG_THAI = {
+  slate: 'border-slate-300', orange: 'border-orange-400', amber: 'border-amber-400', emerald: 'border-emerald-500',
+  teal: 'border-teal-500', violet: 'border-violet-500', rose: 'border-rose-500', coral: 'border-coral-500',
+  sky: 'border-sky-500', navy: 'border-navy-900',
+}
+
+function ThResize({ colKey, doRong, onResize, children, sapXep, dangSapXep, onSapXep, tieuDeNho }) {
   const rong = doRong[colKey]
   function batDauKeo(e) {
     e.preventDefault()
@@ -505,10 +664,19 @@ function ThResize({ colKey, doRong, onResize, children }) {
     document.addEventListener('mousemove', keo)
     document.addEventListener('mouseup', thoi)
   }
+  const Mui = dangSapXep === 'asc' ? ArrowUp : dangSapXep === 'desc' ? ArrowDown : ArrowUpDown
   return (
     <th className="relative select-none px-4 py-3"
-      style={rong ? { width: rong, maxWidth: rong } : undefined}>
-      <span className="block truncate pr-2">{children}</span>
+      style={rong ? { width: rong, maxWidth: rong } : undefined}
+      title={tieuDeNho}>
+      {sapXep ? (
+        <button type="button" onClick={onSapXep} className="inline-flex items-center gap-1.5 pr-2 hover:text-coral-600">
+          <span className="truncate">{children}</span>
+          <Mui size={14} className={dangSapXep ? 'text-coral-500' : 'text-ink-400'} />
+        </button>
+      ) : (
+        <span className="block truncate pr-2">{children}</span>
+      )}
       <span onMouseDown={batDauKeo}
         className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-coral-500/40"
         title="Kéo để chỉnh độ rộng" />
