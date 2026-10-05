@@ -20,7 +20,9 @@ function goiChinhCuaDon(items, packages) {
   }
 }
 
-export default function OrderForm({ order, customer, customers = [], profiles = [], currentProfile, onClose, onSaved }) {
+// loaiBanDau / taiKyHopDongId: mở sẵn ở chế độ Tái ký cho 1 hợp đồng (dùng khi bấm "Tái ký" từ nhắc hết hạn)
+// saoChepTuDonId: điền sẵn dịch vụ theo 1 đơn trước đó của khách để tái ký nhanh
+export default function OrderForm({ order, customer, customers = [], profiles = [], currentProfile, onClose, onSaved, loaiBanDau, taiKyHopDongId, saoChepTuDonId }) {
   const isEdit = !!order
   const [services, setServices] = useState([])
   const [packages, setPackages] = useState([])
@@ -31,20 +33,37 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
     ngay_chot: order?.ngay_chot || new Date().toISOString().slice(0, 10),
     so_thang: order?.so_thang || '',
     ghi_chu: order?.ghi_chu || '',
-    loai_don: order?.loai_don || 'moi',
-    tai_ky_hop_dong_id: order?.tai_ky_hop_dong_id || '',
+    loai_don: order?.loai_don || loaiBanDau || 'moi',
+    tai_ky_hop_dong_id: order?.tai_ky_hop_dong_id || taiKyHopDongId || '',
   })
   const [items, setItems] = useState([{ service_id: '', package_id: '', ten_dich_vu: '', ten_goi: '', gia: '', so_thang: '' }])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [daDienSan, setDaDienSan] = useState(false)
 
   useEffect(() => {
     supabase.from('services').select('*').eq('active', true).order('ten_dich_vu')
       .then(({ data }) => setServices(data || []))
     supabase.from('service_packages').select('*').eq('active', true).order('thu_tu')
       .then(({ data }) => setPackages(data || []))
-    supabase.from('contracts').select('id, so_hop_dong, customer_id, loai_dich_vu, ten_goi')
+    supabase.from('contracts').select('*')
       .then(({ data }) => setContracts(data || []))
+    if (!isEdit && saoChepTuDonId) {
+      Promise.all([
+        supabase.from('order_items').select('*').eq('order_id', saoChepTuDonId),
+        supabase.from('orders').select('so_thang').eq('id', saoChepTuDonId).maybeSingle(),
+      ]).then(([{ data: its }, { data: dn }]) => {
+        if (its?.length) {
+          setItems(its.map((i) => ({
+            service_id: i.service_id || '', package_id: i.package_id || '',
+            ten_dich_vu: i.ten_dich_vu, ten_goi: i.ten_goi || '',
+            gia: i.gia, so_thang: i.so_thang || '',
+          })))
+          if (dn?.so_thang) setForm((f) => ({ ...f, so_thang: String(dn.so_thang) }))
+          setDaDienSan(true)
+        }
+      })
+    }
     if (isEdit) {
       supabase.from('order_items').select('*').eq('order_id', order.id)
         .then(({ data }) => {
@@ -147,7 +166,7 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
   const tenKhach = customer?.ten_khach || customers.find((c) => c.id === form.customer_id)?.ten_khach
 
   return (
-    <Modal title={isEdit ? `Sửa đơn ${order.ma_don || ''}` : 'Tạo đơn dịch vụ'} onClose={onClose} wide>
+    <Modal title={isEdit ? `Sửa đơn ${order.ma_don || ''}` : (loaiBanDau === 'tai_ky' ? 'Tạo đơn tái ký' : 'Tạo đơn dịch vụ')} onClose={onClose} wide>
       <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
         {customer ? (
           <div className="col-span-2 rounded-xl bg-emerald-50 px-4 py-3">
@@ -189,6 +208,12 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
             </p>
           )}
         </div>
+
+        {daDienSan && (
+          <p className="col-span-2 -mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Đã điền sẵn dịch vụ theo đơn trước của khách — kiểm tra lại gói, giá và thời hạn trước khi lưu.
+          </p>
+        )}
 
         <div className="col-span-2">
           <p className="mb-2 text-sm font-medium text-navy-900">Dịch vụ khách mua *</p>

@@ -12,6 +12,7 @@ import ContractPreview from './ContractPreview'
 import OrderForm from './OrderForm'
 import BenBModal from './BenBModal'
 import { useBenB } from '../lib/benB'
+import { nhacChoHopDong, hanDichVu, dinhDangNgay, moTaConLai } from '../lib/taiKy'
 import {
   LOAI_TUONG_TAC_OPTIONS, NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, LOAI_KHACH_OPTIONS,
@@ -39,6 +40,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const [xuatHD, setXuatHD] = useState(null)   // { hd, don }
   const [xemHD, setXemHD] = useState(null)
   const [donMoi, setDonMoi] = useState(false)
+  const [taiKyPreset, setTaiKyPreset] = useState(null)   // { hd, donGanNhat } — mở form tái ký cho 1 hợp đồng
 
   const cuaMinh = customer.sale_id === currentProfile?.id
   const chung = laKhachChung(customer)
@@ -485,6 +487,10 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                   <div className="space-y-3">
                     {hopDong.map((hd) => {
                       const donGoc = donHang.find((o) => o.id === hd.order_id)
+                      const itemsPhang = Object.values(dvTheoDon).flat()
+                      const nhac = nhacChoHopDong(hd, donHang, itemsPhang)
+                      const hanHienTai = hanDichVu(hd, donHang) || hd.ngay_het_han
+                      const daTaiKy = !!hd.ngay_het_han && !!hanHienTai && hanHienTai !== String(hd.ngay_het_han).slice(0, 10)
                       return (
                         <div key={hd.id} className="rounded-xl border border-slate-100 p-4">
                           <div className="flex items-start justify-between gap-3">
@@ -495,6 +501,12 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                                 <Badge className={classOf(TRANG_THAI_HD_OPTIONS, hd.trang_thai)}>
                                   {labelOf(TRANG_THAI_HD_OPTIONS, hd.trang_thai)}
                                 </Badge>
+                                {nhac && (
+                                  <Badge className={nhac.muc === 'qua_han' ? 'bg-rose-100 text-rose-600'
+                                    : nhac.muc === 'hom_nay' ? 'bg-coral-50 text-coral-600' : 'bg-amber-100 text-amber-700'}>
+                                    Nhắc tái ký · {moTaConLai(nhac.conLai)}
+                                  </Badge>
+                                )}
                               </div>
                               {donGoc && <p className="mt-1 text-xs text-ink-400">Từ đơn {donGoc.ma_don}</p>}
                             </div>
@@ -509,7 +521,11 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
                           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-50 pt-3 text-xs text-ink-600">
                             <span>Ký: <b className="text-navy-900">{hd.ngay_ky || '—'}</b></span>
-                            {hd.ngay_het_han && <span>Hết hạn: <b className="text-navy-900">{hd.ngay_het_han}</b></span>}
+                            {hanHienTai && (
+                              <span>Hết hạn: <b className="text-navy-900">{dinhDangNgay(hanHienTai)}</b>
+                                {daTaiKy && <span className="text-teal-600"> (đã gia hạn theo các lần tái ký)</span>}
+                              </span>
+                            )}
                             {hd.file_url && (
                               <a href={hd.file_url} target="_blank" rel="noreferrer"
                                 className="text-teal-500 hover:underline">Mở file</a>
@@ -518,6 +534,12 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                               <button type="button" onClick={() => setXemHD(hd)}
                                 className="inline-flex items-center gap-1 text-navy-700 hover:text-navy-900">
                                 <Eye size={12} /> Xem
+                              </button>
+                            )}
+                            {nhac && (
+                              <button type="button" onClick={() => setTaiKyPreset({ hd, donGanNhat: nhac.donGanNhat })}
+                                className="inline-flex items-center gap-1 rounded-md bg-coral-500 px-2 py-1 font-medium text-white hover:bg-coral-600">
+                                Tạo đơn tái ký
                               </button>
                             )}
                             {donGoc && (
@@ -603,13 +625,18 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
         </div>
       </div>
 
-      {donMoi && (
+      {(donMoi || taiKyPreset) && (
         <OrderForm
           customer={customer}
           profiles={profiles}
           currentProfile={currentProfile}
-          onClose={() => setDonMoi(false)}
-          onSaved={() => { setDonMoi(false); load(); onChanged?.() }}
+          {...(taiKyPreset ? {
+            loaiBanDau: 'tai_ky',
+            taiKyHopDongId: taiKyPreset.hd.id,
+            saoChepTuDonId: taiKyPreset.donGanNhat?.id,
+          } : {})}
+          onClose={() => { setDonMoi(false); setTaiKyPreset(null) }}
+          onSaved={() => { setDonMoi(false); setTaiKyPreset(null); load(); onChanged?.() }}
         />
       )}
 

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Phone, CalendarCheck, CalendarClock, CircleAlert, CircleCheck } from 'lucide-react'
+import { Phone, CalendarCheck, CalendarClock, CircleAlert, CircleCheck, RefreshCw } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Select, Badge } from './ui'
 import CustomerDetail from './CustomerDetail'
+import OrderForm from './OrderForm'
 import ChecklistTasks from './ChecklistTasks'
 import { DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, classOf, labelOf } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
+import { danhSachNhacTaiKy, homNayLocal, dinhDangNgay, moTaConLai, SO_NGAY_NHAC } from '../lib/taiKy'
 
 export default function ChecklistPage({ currentProfile }) {
   const { tenTrangThai, classTrangThai, maDaChot } = useTrangThai()
@@ -14,6 +16,11 @@ export default function ChecklistPage({ currentProfile }) {
   const [loading, setLoading] = useState(true)
   const [filterSale, setFilterSale] = useState('')
   const [xemKhach, setXemKhach] = useState(null)
+  const [hopDong, setHopDong] = useState([])
+  const [don, setDon] = useState([])
+  const [itemsDon, setItemsDon] = useState([])
+  const [taiKy, setTaiKy] = useState(null)   // { khach, muc } đang mở form tái ký
+  const [dangDong, setDangDong] = useState('')
 
   const isAdmin = currentProfile?.role === 'admin'
   const homNay = new Date().toISOString().slice(0, 10)
@@ -22,11 +29,15 @@ export default function ChecklistPage({ currentProfile }) {
 
   async function load() {
     setLoading(true)
-    const [{ data: c }, { data: p }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: hd }, { data: dn }, { data: it }] = await Promise.all([
       supabase.from('customers').select('*').order('ngay_cham_soc_tiep_theo'),
       supabase.from('profiles').select('id, full_name').order('full_name'),
+      supabase.from('contracts').select('*').eq('trang_thai', 'hieu_luc'),
+      supabase.from('orders').select('*').neq('trang_thai', 'huy'),
+      supabase.from('order_items').select('order_id, ten_dich_vu'),
     ])
     setCustomers(c || []); setProfiles(p || [])
+    setHopDong(hd || []); setDon(dn || []); setItemsDon(it || [])
     setLoading(false)
   }
 
@@ -41,6 +52,26 @@ export default function ChecklistPage({ currentProfile }) {
     if (filterSale && c.sale_id !== filterSale) return false
     return true
   }), [customers, homNay, isAdmin, currentProfile?.id, filterSale, maDaChot])
+
+  // Hợp đồng ADS sắp / đã hết hạn cần nhắc tái ký (sale chỉ thấy của mình, admin thấy cả team)
+  const nhacTaiKy = useMemo(() => {
+    const khachTheoId = new Map(customers.map((c) => [c.id, c]))
+    const saleCua = (r) => r.donGoc?.sale_id || khachTheoId.get(r.hd.customer_id)?.sale_id
+    return danhSachNhacTaiKy({ hopDong, don, items: itemsDon })
+      .map((r) => ({ ...r, khach: khachTheoId.get(r.hd.customer_id), saleId: saleCua(r) }))
+      .filter((r) => r.khach)
+      .filter((r) => isAdmin || r.saleId === currentProfile?.id)
+      .filter((r) => !filterSale || r.saleId === filterSale)
+  }, [hopDong, don, itemsDon, customers, isAdmin, currentProfile?.id, filterSale])
+
+  async function khongTaiKy(r) {
+    if (!window.confirm(`Đánh dấu hợp đồng ${r.hd.so_hop_dong} của ${r.khach.ten_khach} là HẾT HẠN, khách không tái ký?\nNhắc tái ký sẽ biến mất.`)) return
+    setDangDong(r.hd.id)
+    const { error } = await supabase.from('contracts').update({ trang_thai: 'het_han' }).eq('id', r.hd.id)
+    setDangDong('')
+    if (error) { window.alert('Không cập nhật được: ' + error.message); return }
+    load()
+  }
 
   const quaHan = canLam.filter((c) => c.ngay_cham_soc_tiep_theo < homNay)
   const dungHomNay = canLam.filter((c) => c.ngay_cham_soc_tiep_theo === homNay)
@@ -82,6 +113,11 @@ export default function ChecklistPage({ currentProfile }) {
       ) : (
         <div className="space-y-4 p-8">
           <ChecklistTasks currentProfile={currentProfile} />
+
+          {nhacTaiKy.length > 0 && (
+            <NhacTaiKy ds={nhacTaiKy} tenSale={tenSale} onMoKhach={setXemKhach}
+              onTaiKy={(r) => setTaiKy(r)} onKhongTaiKy={khongTaiKy} dangDong={dangDong} />
+          )}
 
           {canLam.length === 0 ? (
             <div className="rounded-2xl bg-white p-10 text-center shadow-sm">
@@ -126,6 +162,19 @@ export default function ChecklistPage({ currentProfile }) {
         </div>
       )}
 
+      {taiKy && (
+        <OrderForm
+          customer={taiKy.khach}
+          profiles={profiles}
+          currentProfile={currentProfile}
+          loaiBanDau="tai_ky"
+          taiKyHopDongId={taiKy.hd.id}
+          saoChepTuDonId={taiKy.donGanNhat?.id}
+          onClose={() => setTaiKy(null)}
+          onSaved={() => { setTaiKy(null); load() }}
+        />
+      )}
+
       {xemKhach && (
         <CustomerDetail
           customer={xemKhach}
@@ -134,6 +183,69 @@ export default function ChecklistPage({ currentProfile }) {
           onChanged={load}
         />
       )}
+    </div>
+  )
+}
+
+// Nhắc tái ký hợp đồng ADS: quá hạn / hôm nay / sắp hết hạn
+function NhacTaiKy({ ds, tenSale, onMoKhach, onTaiKy, onKhongTaiKy, dangDong }) {
+  const quaHan = ds.filter((r) => r.muc === 'qua_han').length
+  const mau = {
+    qua_han: 'bg-rose-100 text-rose-600',
+    hom_nay: 'bg-coral-50 text-coral-600',
+    sap_het: 'bg-amber-100 text-amber-700',
+  }
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <RefreshCw size={18} className={quaHan > 0 ? 'text-rose-500' : 'text-amber-600'} />
+        <h2 className="font-display font-semibold text-navy-900">Nhắc tái ký hợp đồng ADS ({ds.length})</h2>
+        <span className="text-xs text-ink-400">· hết hạn trong {SO_NGAY_NHAC} ngày tới hoặc đã hết hạn mà chưa tái ký</span>
+      </div>
+
+      <div className="space-y-2">
+        {ds.map((r) => (
+          <div key={r.hd.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 px-4 py-3">
+            <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onMoKhach(r.khach)}>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium text-navy-900">{r.khach.ten_khach}</p>
+                <span className="text-xs text-ink-400">{r.khach.ma_khach}</span>
+                <Badge className={mau[r.muc]}>{moTaConLai(r.conLai)}</Badge>
+                {r.soLanTaiKy > 0 && <Badge className="bg-teal-50 text-teal-600">Đã tái ký {r.soLanTaiKy} lần</Badge>}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-600">
+                <span>{r.hd.so_hop_dong}</span>
+                {r.hd.ten_goi && <><span className="text-ink-400">·</span><span>{r.hd.ten_goi}</span></>}
+                <span className="text-ink-400">·</span>
+                <span>Hết hạn <b className="text-navy-900">{dinhDangNgay(r.han)}</b></span>
+                <span className="text-ink-400">·</span>
+                <span>{tenSale(r.saleId)}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-none items-center gap-2">
+              <a href={r.khach.sdt ? `tel:${r.khach.sdt}` : undefined}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
+                  r.khach.sdt ? 'bg-teal-50 text-teal-600 hover:bg-teal-100' : 'text-ink-400'
+                }`}>
+                <Phone size={13} /> Gọi
+              </a>
+              <button type="button" onClick={() => onTaiKy(r)}
+                className="inline-flex items-center gap-1 rounded-lg bg-coral-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-coral-600">
+                <RefreshCw size={13} /> Tạo đơn tái ký
+              </button>
+              <button type="button" disabled={dangDong === r.hd.id} onClick={() => onKhongTaiKy(r)}
+                className="rounded-lg px-2.5 py-1.5 text-xs text-ink-400 hover:bg-slate-100 hover:text-rose-500 disabled:opacity-50">
+                Không tái ký
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-xs text-ink-400">
+        Bấm "Tạo đơn tái ký" để lên đơn mới cho hợp đồng này (điền sẵn dịch vụ theo đơn trước) — nhắc sẽ tự biến mất, và hiện lại khi đến kỳ hết hạn kế tiếp.
+        "Không tái ký" = khách dừng dịch vụ, hợp đồng chuyển sang Hết hạn.
+      </p>
     </div>
   )
 }
