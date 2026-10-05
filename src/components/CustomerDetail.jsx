@@ -13,6 +13,8 @@ import OrderForm from './OrderForm'
 import BenBModal from './BenBModal'
 import { useBenB } from '../lib/benB'
 import { nhacChoHopDong, hanDichVu, dinhDangNgay, moTaConLai } from '../lib/taiKy'
+import { baoCaoKeTiep, moTaHanBaoCao } from '../lib/baoCaoAds'
+import BaoCaoAdsModal from './BaoCaoAdsModal'
 import {
   LOAI_TUONG_TAC_OPTIONS, NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, LOAI_KHACH_OPTIONS,
@@ -40,6 +42,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const [xuatHD, setXuatHD] = useState(null)   // { hd, don }
   const [xemHD, setXemHD] = useState(null)
   const [donMoi, setDonMoi] = useState(false)
+  const [baoCaoAds, setBaoCaoAds] = useState([])        // các lần đã báo cáo chỉ số ADS của khách
+  const [ghiBaoCao, setGhiBaoCao] = useState(null)       // { hd, lanThu } — mở cửa sổ ghi nhận đã báo cáo
   const [taiKyPreset, setTaiKyPreset] = useState(null)   // { hd, donGanNhat } — mở form tái ký cho 1 hợp đồng
 
   const cuaMinh = customer.sale_id === currentProfile?.id
@@ -53,7 +57,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   async function load() {
     setLoading(true)
-    const [{ data: it }, { data: lg }, { data: pf }, { data: od }, { data: ct }, { data: pk }] = await Promise.all([
+    const [{ data: it }, { data: lg }, { data: pf }, { data: od }, { data: ct }, { data: pk }, { data: bcAds }] = await Promise.all([
       supabase.from('customer_interactions').select('*').eq('customer_id', customer.id)
         .order('ngay_thuc_hien', { ascending: false }),
       supabase.from('customer_logs').select('*').eq('customer_id', customer.id)
@@ -62,7 +66,9 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
       supabase.from('orders').select('*').eq('customer_id', customer.id).order('ngay_chot', { ascending: false }),
       supabase.from('contracts').select('*').eq('customer_id', customer.id).order('ngay_ky', { ascending: false }),
       supabase.from('service_packages').select('*'),
+      supabase.from('ads_bao_cao').select('*').eq('customer_id', customer.id).order('ngay_bao_cao', { ascending: false }),
     ])
+    setBaoCaoAds(bcAds || [])
     setInteractions(it || []); setLogs(lg || []); setProfiles(pf || [])
     setDonHang(od || []); setHopDong(ct || [])
     setPackages(pk || [])
@@ -118,6 +124,13 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     const { error } = await supabase.from('orders').delete().eq('id', o.id)
     if (error) { setMsg('Không xoá được: ' + error.message); return }
     setMsg(''); load(); onChanged?.()
+  }
+
+  async function xoaBaoCaoAds(b) {
+    if (!window.confirm(`Xoá lần báo cáo ngày ${dinhDangNgay(b.ngay_bao_cao)}? Lịch nhắc báo cáo sẽ tính lại.`)) return
+    const { error } = await supabase.from('ads_bao_cao').delete().eq('id', b.id)
+    if (error) { setMsg('Không xoá được: ' + error.message); return }
+    setMsg(''); load()
   }
 
   async function xoaHopDong(hd) {
@@ -489,6 +502,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                       const donGoc = donHang.find((o) => o.id === hd.order_id)
                       const itemsPhang = Object.values(dvTheoDon).flat()
                       const nhac = nhacChoHopDong(hd, donHang, itemsPhang)
+                      const bc = baoCaoKeTiep(hd, donHang, baoCaoAds, (dvTheoDon[hd.order_id] || []))
+                      const lichSuBc = baoCaoAds.filter((b) => b.contract_id === hd.id)
                       const hanHienTai = hanDichVu(hd, donHang) || hd.ngay_het_han
                       const daTaiKy = !!hd.ngay_het_han && !!hanHienTai && hanHienTai !== String(hd.ngay_het_han).slice(0, 10)
                       return (
@@ -536,6 +551,12 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                                 <Eye size={12} /> Xem
                               </button>
                             )}
+                            {bc && (
+                              <button type="button" onClick={() => setGhiBaoCao({ hd, lanThu: bc.lanThu })}
+                                className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-2 py-1 font-medium text-white hover:bg-violet-700">
+                                Ghi nhận đã báo cáo ADS
+                              </button>
+                            )}
                             {nhac && (
                               <button type="button" onClick={() => setTaiKyPreset({ hd, donGanNhat: nhac.donGanNhat })}
                                 className="inline-flex items-center gap-1 rounded-md bg-coral-500 px-2 py-1 font-medium text-white hover:bg-coral-600">
@@ -549,6 +570,41 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                               </button>
                             )}
                           </div>
+
+                          {(bc || lichSuBc.length > 0) && (
+                            <div className="mt-3 rounded-lg bg-violet-50/60 px-3 py-2 text-xs text-ink-600">
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span className="font-medium text-violet-700">Báo cáo chỉ số ADS (2 tuần/lần)</span>
+                                <span>Đã báo cáo: <b className="text-navy-900">{lichSuBc.length} lần</b></span>
+                                {bc && bc.canBaoCao && (
+                                  <span>
+                                    Lần kế tiếp: <b className="text-navy-900">{dinhDangNgay(bc.ngayDenHan)}</b>{' '}
+                                    <Badge className={bc.conLai < 0 ? 'bg-rose-100 text-rose-600' : bc.conLai <= 2 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}>
+                                      {moTaHanBaoCao(bc.conLai)}
+                                    </Badge>
+                                  </span>
+                                )}
+                                {bc && !bc.canBaoCao && <span className="text-ink-400">Không còn lần báo cáo nào trong thời gian hợp đồng</span>}
+                              </div>
+                              {lichSuBc.length > 0 && (
+                                <ul className="mt-1.5 space-y-1">
+                                  {lichSuBc.slice(0, 4).map((b) => (
+                                    <li key={b.id} className="flex items-start justify-between gap-2">
+                                      <span>
+                                        <b className="text-navy-900">{dinhDangNgay(b.ngay_bao_cao)}</b>
+                                        {b.ghi_chu ? ` — ${b.ghi_chu}` : ''}
+                                      </span>
+                                      <button type="button" onClick={() => xoaBaoCaoAds(b)}
+                                        className="flex-none text-ink-400 hover:text-rose-500" title="Xoá lần báo cáo này">
+                                        <Trash2 size={11} />
+                                      </button>
+                                    </li>
+                                  ))}
+                                  {lichSuBc.length > 4 && <li className="text-ink-400">... và {lichSuBc.length - 4} lần trước đó</li>}
+                                </ul>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
@@ -624,6 +680,17 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
         )}
         </div>
       </div>
+
+      {ghiBaoCao && (
+        <BaoCaoAdsModal
+          hd={ghiBaoCao.hd}
+          khach={customer}
+          lanThu={ghiBaoCao.lanThu}
+          currentProfile={currentProfile}
+          onClose={() => setGhiBaoCao(null)}
+          onSaved={() => { setGhiBaoCao(null); load(); onChanged?.() }}
+        />
+      )}
 
       {(donMoi || taiKyPreset) && (
         <OrderForm

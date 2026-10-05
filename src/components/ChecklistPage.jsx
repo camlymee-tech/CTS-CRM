@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Phone, CalendarCheck, CalendarClock, CircleAlert, CircleCheck, RefreshCw } from 'lucide-react'
+import { Phone, CalendarCheck, CalendarClock, CircleAlert, CircleCheck, RefreshCw, BarChart3 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Select, Badge } from './ui'
 import CustomerDetail from './CustomerDetail'
 import OrderForm from './OrderForm'
+import BaoCaoAdsModal from './BaoCaoAdsModal'
 import ChecklistTasks from './ChecklistTasks'
 import { DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, classOf, labelOf } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
-import { danhSachNhacTaiKy, homNayLocal, dinhDangNgay, moTaConLai, SO_NGAY_NHAC } from '../lib/taiKy'
+import { homNayLocal, dinhDangNgay, moTaConLai, SO_NGAY_NHAC } from '../lib/taiKy'
+import { moTaHanBaoCao, CHU_KY_BAO_CAO } from '../lib/baoCaoAds'
+import { tinhNhacViec } from '../lib/nhacViec'
 
-export default function ChecklistPage({ currentProfile }) {
+export default function ChecklistPage({ currentProfile, onDoiViec }) {
   const { tenTrangThai, classTrangThai, maDaChot } = useTrangThai()
   const [customers, setCustomers] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -19,6 +22,8 @@ export default function ChecklistPage({ currentProfile }) {
   const [hopDong, setHopDong] = useState([])
   const [don, setDon] = useState([])
   const [itemsDon, setItemsDon] = useState([])
+  const [baoCao, setBaoCao] = useState([])
+  const [ghiBaoCao, setGhiBaoCao] = useState(null)   // dòng nhắc báo cáo ADS đang mở cửa sổ ghi nhận
   const [taiKy, setTaiKy] = useState(null)   // { khach, muc } đang mở form tái ký
   const [dangDong, setDangDong] = useState('')
 
@@ -29,16 +34,18 @@ export default function ChecklistPage({ currentProfile }) {
 
   async function load() {
     setLoading(true)
-    const [{ data: c }, { data: p }, { data: hd }, { data: dn }, { data: it }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: hd }, { data: dn }, { data: it }, { data: bc }] = await Promise.all([
       supabase.from('customers').select('*').order('ngay_cham_soc_tiep_theo'),
       supabase.from('profiles').select('id, full_name').order('full_name'),
       supabase.from('contracts').select('*').eq('trang_thai', 'hieu_luc'),
       supabase.from('orders').select('*').neq('trang_thai', 'huy'),
       supabase.from('order_items').select('order_id, ten_dich_vu'),
+      supabase.from('ads_bao_cao').select('*'),   // chưa chạy SQL thì rỗng
     ])
     setCustomers(c || []); setProfiles(p || [])
-    setHopDong(hd || []); setDon(dn || []); setItemsDon(it || [])
+    setHopDong(hd || []); setDon(dn || []); setItemsDon(it || []); setBaoCao(bc || [])
     setLoading(false)
+    onDoiViec?.()   // báo App cập nhật huy hiệu số việc cần nhắc
   }
 
   const tenSale = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
@@ -53,16 +60,12 @@ export default function ChecklistPage({ currentProfile }) {
     return true
   }), [customers, homNay, isAdmin, currentProfile?.id, filterSale, maDaChot])
 
-  // Hợp đồng ADS sắp / đã hết hạn cần nhắc tái ký (sale chỉ thấy của mình, admin thấy cả team)
-  const nhacTaiKy = useMemo(() => {
-    const khachTheoId = new Map(customers.map((c) => [c.id, c]))
-    const saleCua = (r) => r.donGoc?.sale_id || khachTheoId.get(r.hd.customer_id)?.sale_id
-    return danhSachNhacTaiKy({ hopDong, don, items: itemsDon })
-      .map((r) => ({ ...r, khach: khachTheoId.get(r.hd.customer_id), saleId: saleCua(r) }))
-      .filter((r) => r.khach)
-      .filter((r) => isAdmin || r.saleId === currentProfile?.id)
-      .filter((r) => !filterSale || r.saleId === filterSale)
-  }, [hopDong, don, itemsDon, customers, isAdmin, currentProfile?.id, filterSale])
+  // Việc cần nhắc: tái ký hợp đồng ADS + báo cáo chỉ số ADS (sale chỉ thấy của mình, admin thấy cả team)
+  const { nhacTaiKy, nhacBaoCao } = useMemo(() => {
+    const r = tinhNhacViec({ khach: customers, hopDong, don, items: itemsDon, baoCao, isAdmin, userId: currentProfile?.id })
+    const loc = (ds) => ds.filter((x) => !filterSale || x.saleId === filterSale)
+    return { nhacTaiKy: loc(r.taiKy), nhacBaoCao: loc(r.baoCaoAds) }
+  }, [customers, hopDong, don, itemsDon, baoCao, isAdmin, currentProfile?.id, filterSale])
 
   async function khongTaiKy(r) {
     if (!window.confirm(`Đánh dấu hợp đồng ${r.hd.so_hop_dong} của ${r.khach.ten_khach} là HẾT HẠN, khách không tái ký?\nNhắc tái ký sẽ biến mất.`)) return
@@ -119,6 +122,10 @@ export default function ChecklistPage({ currentProfile }) {
               onTaiKy={(r) => setTaiKy(r)} onKhongTaiKy={khongTaiKy} dangDong={dangDong} />
           )}
 
+          {nhacBaoCao.length > 0 && (
+            <NhacBaoCaoAds ds={nhacBaoCao} tenSale={tenSale} onMoKhach={setXemKhach} onGhi={(r) => setGhiBaoCao(r)} />
+          )}
+
           {canLam.length === 0 ? (
             <div className="rounded-2xl bg-white p-10 text-center shadow-sm">
               <CircleCheck size={40} className="mx-auto text-emerald-500" />
@@ -160,6 +167,17 @@ export default function ChecklistPage({ currentProfile }) {
             />
           )}
         </div>
+      )}
+
+      {ghiBaoCao && (
+        <BaoCaoAdsModal
+          hd={ghiBaoCao.hd}
+          khach={ghiBaoCao.khach}
+          lanThu={ghiBaoCao.lanThu}
+          currentProfile={currentProfile}
+          onClose={() => setGhiBaoCao(null)}
+          onSaved={() => { setGhiBaoCao(null); load() }}
+        />
       )}
 
       {taiKy && (
@@ -245,6 +263,66 @@ function NhacTaiKy({ ds, tenSale, onMoKhach, onTaiKy, onKhongTaiKy, dangDong }) 
       <p className="mt-3 text-xs text-ink-400">
         Bấm "Tạo đơn tái ký" để lên đơn mới cho hợp đồng này (điền sẵn dịch vụ theo đơn trước) — nhắc sẽ tự biến mất, và hiện lại khi đến kỳ hết hạn kế tiếp.
         "Không tái ký" = khách dừng dịch vụ, hợp đồng chuyển sang Hết hạn.
+      </p>
+    </div>
+  )
+}
+
+// Nhắc báo cáo chỉ số ADS cho khách (cứ 2 tuần 1 lần sau khi ký hợp đồng)
+function NhacBaoCaoAds({ ds, tenSale, onMoKhach, onGhi }) {
+  const mau = {
+    qua_han: 'bg-rose-100 text-rose-600',
+    hom_nay: 'bg-coral-50 text-coral-600',
+    sap_toi: 'bg-amber-100 text-amber-700',
+  }
+  const soTre = ds.filter((r) => r.muc === 'qua_han').length
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <BarChart3 size={18} className={soTre > 0 ? 'text-rose-500' : 'text-violet-600'} />
+        <h2 className="font-display font-semibold text-navy-900">Nhắc báo cáo chỉ số ADS ({ds.length})</h2>
+        <span className="text-xs text-ink-400">· cứ {CHU_KY_BAO_CAO} ngày (2 tuần) báo cáo chỉ số cho khách 1 lần</span>
+      </div>
+
+      <div className="space-y-2">
+        {ds.map((r) => (
+          <div key={r.hd.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 px-4 py-3">
+            <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onMoKhach(r.khach)}>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium text-navy-900">{r.khach.ten_khach}</p>
+                <span className="text-xs text-ink-400">{r.khach.ma_khach}</span>
+                <Badge className={mau[r.muc]}>{moTaHanBaoCao(r.conLai)}</Badge>
+                <Badge className="bg-violet-100 text-violet-700">Báo cáo lần {r.lanThu}</Badge>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-600">
+                <span>{r.hd.so_hop_dong}</span>
+                {r.hd.ten_goi && <><span className="text-ink-400">·</span><span>{r.hd.ten_goi}</span></>}
+                <span className="text-ink-400">·</span>
+                <span>Hạn báo cáo <b className="text-navy-900">{dinhDangNgay(r.ngayDenHan)}</b></span>
+                <span className="text-ink-400">·</span>
+                <span>{r.lanCuoi ? `Lần gần nhất ${dinhDangNgay(r.lanCuoi)}` : 'Chưa báo cáo lần nào'}</span>
+                <span className="text-ink-400">·</span>
+                <span>{tenSale(r.saleId)}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-none items-center gap-2">
+              <a href={r.khach.sdt ? `tel:${r.khach.sdt}` : undefined}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
+                  r.khach.sdt ? 'bg-teal-50 text-teal-600 hover:bg-teal-100' : 'text-ink-400'
+                }`}>
+                <Phone size={13} /> Gọi
+              </a>
+              <button type="button" onClick={() => onGhi(r)}
+                className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700">
+                <CircleCheck size={13} /> Đã báo cáo
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-xs text-ink-400">
+        Bấm "Đã báo cáo" sau khi gửi chỉ số cho khách — nhắc biến mất và tự hẹn lần kế tiếp sau 2 tuần. Chỉ nhắc trong thời gian hợp đồng còn hiệu lực.
       </p>
     </div>
   )

@@ -10,6 +10,7 @@ import DocumentsPage from './components/DocumentsPage'
 import NotificationsPage from './components/NotificationsPage'
 import BaoCaoPage from './components/BaoCaoPage'
 import ChecklistPage from './components/ChecklistPage'
+import { demNhacViec } from './lib/nhacViec'
 import PricingPage from './components/PricingPage'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
   const [page, setPage] = useState('checklist')
   const [recovering, setRecovering] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [viecCan, setViecCan] = useState({ tong: 0, taiKy: 0, baoCaoAds: 0 })   // việc nhắc: tái ký + báo cáo ADS
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -49,6 +51,16 @@ export default function App() {
   }, [profile?.id])
 
   useEffect(() => { loadUnread() }, [loadUnread, page])
+
+  // Huy hiệu số việc cần nhắc ở mục Checklist (tái ký hợp đồng ADS + báo cáo chỉ số ADS)
+  const loadViecCan = useCallback(async () => {
+    if (!profile?.id) return
+    try {
+      setViecCan(await demNhacViec(supabase, { isAdmin: profile.role === 'admin', userId: profile.id }))
+    } catch { /* bo qua, khong anh huong cac man khac */ }
+  }, [profile?.id, profile?.role])
+
+  useEffect(() => { loadViecCan() }, [loadViecCan, page])
 
   if (session === undefined) {
     return <div className="flex min-h-screen items-center justify-center bg-navy-950 text-white">Đang tải...</div>
@@ -90,9 +102,10 @@ export default function App() {
         onNavigate={setPage}
         profile={profile}
         unreadCount={unread}
+        viecCan={viecCan}
         onChangePassword={() => setRecovering(true)}
       />
-      {page === 'checklist' && <ChecklistPage currentProfile={profile} />}
+      {page === 'checklist' && <ChecklistPage currentProfile={profile} onDoiViec={loadViecCan} />}
       {page === 'customers' && <CustomerList currentProfile={profile} />}
       {page === 'baocao' && <BaoCaoPage currentProfile={profile} />}
       {page === 'team' && <TeamPage currentProfile={profile} />}
