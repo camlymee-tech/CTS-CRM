@@ -17,20 +17,16 @@ export function gioNgay(ts) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-// Trao đổi gần nhất của mỗi khách: lấy lần chăm sóc ghi gần nhất; chưa có thì lấy dòng nhật ký mới nhất
-export function traoDoiGanNhat(interactions = [], logs = []) {
+// Trao đổi gần nhất của mỗi khách = lần CHĂM SÓC được ghi gần nhất (gọi điện, nhắn tin, gặp mặt...).
+// Không lấy nhật ký hệ thống (đổi trạng thái, cập nhật vấn đề/giải pháp...) — khách chưa có lần chăm sóc nào thì để trống.
+export function traoDoiGanNhat(interactions = []) {
   const map = {}
-  const dat = (id, v) => { if (!map[id] || v.thoiGian > map[id].thoiGian) map[id] = v }
-  for (const l of logs) dat(l.customer_id, { loai: 'nhat_ky', nguoi: l.user_id, thoiGian: l.created_at || '', noiDung: l.hanh_dong })
-  // chăm sóc luôn được ưu tiên hơn nhật ký hệ thống nếu cả hai tồn tại
-  const cs = {}
   for (const it of interactions) {
     const tg = it.ngay_thuc_hien || it.created_at || ''
-    if (!cs[it.customer_id] || tg > cs[it.customer_id].thoiGian) {
-      cs[it.customer_id] = { loai: it.loai || 'khac', nguoi: it.sale_id, thoiGian: tg, noiDung: it.noi_dung }
+    if (!map[it.customer_id] || tg > map[it.customer_id].thoiGian) {
+      map[it.customer_id] = { loai: it.loai || 'khac', nguoi: it.sale_id, thoiGian: tg, noiDung: it.noi_dung }
     }
   }
-  for (const [id, v] of Object.entries(cs)) map[id] = v
   return map
 }
 

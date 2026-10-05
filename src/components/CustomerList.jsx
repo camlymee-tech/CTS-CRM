@@ -214,7 +214,7 @@ export default function CustomerList({ currentProfile }) {
 
   const profileName = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
-  const traoDoi = useMemo(() => traoDoiGanNhat(interactions, Object.values(nhatKyGanNhat)), [interactions, nhatKyGanNhat])
+  const traoDoi = useMemo(() => traoDoiGanNhat(interactions), [interactions])
   const luotCS = useMemo(() => demLuotChamSoc(interactions), [interactions])
   const doanhThu = useMemo(() => tongDoanhThu(donHang), [donHang])
 
@@ -499,11 +499,9 @@ export default function CustomerList({ currentProfile }) {
                             <span className="flex-none whitespace-nowrap text-xs text-ink-600">{gioNgay(td.thoiGian)}</span>
                           </div>
                           <p className="mt-0.5 line-clamp-2 whitespace-pre-wrap text-navy-900">
-                            {td.loai !== 'nhat_ky' && (
-                              <span className="mr-1 text-xs font-medium text-teal-600">
-                                [{labelOf(LOAI_TUONG_TAC_OPTIONS, td.loai)}]
-                              </span>
-                            )}
+                            <span className="mr-1 text-xs font-medium text-teal-600">
+                              [{labelOf(LOAI_TUONG_TAC_OPTIONS, td.loai)}]
+                            </span>
                             {td.noiDung}
                           </p>
                         </div>
