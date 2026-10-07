@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Select, Badge, Input } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
+import { NGUON_KHACH_OPTIONS } from '../lib/constants'
 import { khoangNgay } from '../lib/doanhSo'
 
 const NGAY_BO_QUEN = 7
@@ -33,6 +34,7 @@ export default function AnalyticsPage() {
   const [tu, setTu] = useState('')
   const [den, setDen] = useState('')
   const [filterSale, setFilterSale] = useState('')
+  const [filterNguon, setFilterNguon] = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -54,7 +56,7 @@ export default function AnalyticsPage() {
   }
 
   // Áp bộ lọc sale cho toàn bộ báo cáo
-  const khachLoc = useMemo(() => customers.filter((c) => !filterSale || c.sale_id === filterSale), [customers, filterSale])
+  const khachLoc = useMemo(() => customers.filter((c) => (!filterSale || c.sale_id === filterSale) && (!filterNguon || c.nguon_khach === filterNguon)), [customers, filterSale, filterNguon])
 
   // Khách phát sinh trong kỳ
   const khachTrongKy = useMemo(
@@ -120,6 +122,10 @@ export default function AnalyticsPage() {
         <Select label="Sale" value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-52">
           <option value="">Tất cả sale</option>
           {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+        </Select>
+        <Select label="Nguồn khách" value={filterNguon} onChange={(e) => setFilterNguon(e.target.value)} className="w-52">
+          <option value="">Tất cả nguồn</option>
+          {NGUON_KHACH_OPTIONS.map((n) => <option key={n.value} value={n.value}>{n.label}</option>)}
         </Select>
       </div>
 
