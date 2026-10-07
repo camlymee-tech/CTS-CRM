@@ -46,12 +46,15 @@ export const LOAI_TUONG_TAC_OPTIONS = [
   { value: 'khac', label: 'Khác' },
 ]
 
+// Mục đã tắt trong "Danh mục" vẫn cần hiện đúng tên cho dữ liệu cũ
+export const DA_AN = {}
+
 export function labelOf(options, value) {
-  return options.find((o) => o.value === value)?.label ?? value
+  return options.find((o) => o.value === value)?.label ?? DA_AN[value]?.label ?? value
 }
 
 export function classOf(options, value) {
-  return options.find((o) => o.value === value)?.className ?? 'bg-slate-100 text-slate-600'
+  return options.find((o) => o.value === value)?.className ?? DA_AN[value]?.className ?? 'bg-slate-100 text-slate-600'
 }
 
 // Đã từng ký hợp đồng (dùng để loại khỏi danh sách cần chăm sóc)

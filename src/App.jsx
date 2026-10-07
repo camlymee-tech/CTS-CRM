@@ -11,6 +11,7 @@ import NotificationsPage from './components/NotificationsPage'
 import BaoCaoPage from './components/BaoCaoPage'
 import ChecklistPage from './components/ChecklistPage'
 import { demNhacViec } from './lib/nhacViec'
+import { useDanhMuc } from './lib/danhMuc'
 import PricingPage from './components/PricingPage'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [page, setPage] = useState('checklist')
   const [recovering, setRecovering] = useState(false)
+  useDanhMuc(!!session)  // nạp Nguồn / Dịch vụ tuỳ chỉnh
   const [unread, setUnread] = useState(0)
   const [viecCan, setViecCan] = useState({ tong: 0, taiKy: 0, baoCaoAds: 0 })   // việc nhắc: tái ký + báo cáo ADS
 

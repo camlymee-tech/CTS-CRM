@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download } from 'lucide-react'
+import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, ListPlus, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Phantrang } from './ui'
 import CustomerForm from './CustomerForm'
 import CustomerDetail from './CustomerDetail'
 import OrderForm from './OrderForm'
 import StatusesModal from './StatusesModal'
+import DanhMucModal from './DanhMucModal'
 import { useTrangThai } from '../lib/StatusContext'
 import { ngayLocal, gioNgay, traoDoiGanNhat, demLuotChamSoc, tongDoanhThu, sapXepKhach } from '../lib/danhSachKhach'
 import {
@@ -28,6 +29,7 @@ const chiSo = (s) => (s || '').replace(/\D/g, '')
 export default function CustomerList({ currentProfile }) {
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung } = useTrangThai()
   const [quanLyTT, setQuanLyTT] = useState(false)
+  const [quanLyDM, setQuanLyDM] = useState(false)
   const [donMoiKhach, setDonMoiKhach] = useState(null)
 
   // Các cột có thể bật/tắt (Khách hàng và Thao tác luôn hiển thị). sapXep = bấm tiêu đề để sắp xếp.
@@ -290,6 +292,11 @@ export default function CustomerList({ currentProfile }) {
               <Settings2 size={16} /> Trạng thái
             </Button>
           )}
+          {isAdmin && (
+            <Button variant="secondary" onClick={() => setQuanLyDM(true)}>
+              <ListPlus size={16} /> Nguồn & dịch vụ
+            </Button>
+          )}
           <Button onClick={() => { setEditingCustomer(null); setShowForm(true) }}>
             <Plus size={16} /> Thêm khách hàng
           </Button>
@@ -332,12 +339,6 @@ export default function CustomerList({ currentProfile }) {
             <option value="">Tất cả trạng thái</option>
             {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
           </Select>
-          {isAdmin && (
-            <button type="button" onClick={() => setQuanLyTT(true)}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-dashed border-slate-300 px-3 py-2.5 text-sm font-medium text-ink-600 hover:border-coral-500 hover:text-coral-500">
-              <Settings2 size={15} /> Sửa / thêm / xoá trạng thái
-            </button>
-          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Select value={filterDichVu} onChange={(e) => setFilterDichVu(e.target.value)} className="w-48">
@@ -603,6 +604,7 @@ export default function CustomerList({ currentProfile }) {
       <Phantrang trang={trang} setTrang={setTrang} tong={filtered.length} />
 
       {quanLyTT && <StatusesModal onClose={() => setQuanLyTT(false)} />}
+      {quanLyDM && <DanhMucModal onClose={() => setQuanLyDM(false)} />}
 
       {showForm && (
         <CustomerForm
