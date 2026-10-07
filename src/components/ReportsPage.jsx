@@ -4,13 +4,6 @@ import { Select, Input } from './ui'
 import { formatVnd, NGUON_KHACH_OPTIONS, labelOf } from '../lib/constants'
 import { NHOM, khoangNgay, taoDong, gom, cong, gomDichVu } from '../lib/doanhSo'
 
-const BAO_CAO = [
-  { key: 'chung', label: '1. Doanh số chung (mới + tái ký) — từng sale và tổng' },
-  { key: 'tai_ky', label: '2. Doanh số tái ký — từng sale và tổng' },
-  { key: 'moi', label: '3. Doanh số đơn mới — từng sale và tổng' },
-  { key: 'dich_vu', label: '4. Doanh số từng dịch vụ (mới / tái ký)' },
-]
-
 const KY = [
   { key: 'nam_nay', label: 'Năm nay' },
   { key: 'thang_nay', label: 'Tháng này' },
@@ -33,7 +26,7 @@ export default function ReportsPage() {
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const [loai, setLoai] = useState('chung')
+  const loai = 'chung'   // luôn hiển thị tổng, trong đó đã tách Đơn mới / Tái ký
   const [ky, setKy] = useState('thang_nay')
   const [tu, setTu] = useState('')
   const [den, setDen] = useState('')
@@ -82,14 +75,13 @@ export default function ReportsPage() {
   const theoSale = useMemo(() => gom(dongBaoCao, (r) => r.sale).sort((a, b) => b.tong - a.tong), [dongBaoCao])
   const theoThang = useMemo(() => gom(dongBaoCao, (r) => r.thang).sort((a, b) => a.key.localeCompare(b.key)), [dongBaoCao])
   const tong = useMemo(() => cong(theoSale), [theoSale])
-  const theoDichVu = useMemo(() => gomDichVu(dong, chiTietGoi), [dong, chiTietGoi])
+  const theoDichVu = useMemo(() => gomDichVu(dongBaoCao, chiTietGoi), [dongBaoCao, chiTietGoi])
   const tongChung = useMemo(() => cong(gom(dong, () => 'x')), [dong])  // tổng mọi dòng đang lọc (mới + tái ký)
 
   const moTaKy = ky === 'tat_ca' ? 'Tất cả thời gian'
     : `${ngayHienThi(tuNgay) || '...'} → ${ngayHienThi(denNgay) || '...'}`
-  const loaiHienTai = BAO_CAO.find((b) => b.key === loai)
   const macDinh = loai === 'chung' && ky === 'thang_nay' && !filterSale && !filterNhom && !filterNguon
-  const datLai = () => { setLoai('chung'); setKy('thang_nay'); setTu(''); setDen(''); setFilterSale(''); setFilterNhom(''); setFilterNguon('') }
+  const datLai = () => { setKy('thang_nay'); setTu(''); setDen(''); setFilterSale(''); setFilterNhom(''); setFilterNguon('') }
   const thangDangXem = tuNgay ? `${tuNgay.slice(5, 7)}/${tuNgay.slice(0, 4)}` : ''
 
   return (
@@ -99,17 +91,12 @@ export default function ReportsPage() {
           {macDinh ? `Tổng kết doanh số tháng ${thangDangXem}` : 'Báo cáo doanh số'}
         </h1>
         <p className="text-sm text-ink-600">
-          {macDinh ? 'Tất cả sale · ' : ''}Cần xem báo cáo khác thì chọn bộ lọc bên dưới · không tính đơn huỷ · số liệu chưa gồm VAT
+          {macDinh ? 'Tất cả sale · ' : ''}Cần xem kỳ, sale hoặc nguồn khác thì chọn bộ lọc bên dưới · không tính đơn huỷ · số liệu chưa gồm VAT
         </p>
       </header>
 
       {/* Bộ lọc */}
       <div className="mx-8 mt-6 flex flex-wrap items-end gap-3 rounded-2xl bg-white p-4 shadow-sm">
-        <div className="min-w-[280px] flex-1">
-          <Select label="Loại báo cáo" value={loai} onChange={(e) => setLoai(e.target.value)} className="font-medium">
-            {BAO_CAO.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
-          </Select>
-        </div>
         <Select label="Kỳ" value={ky} onChange={(e) => setKy(e.target.value)}>
           {KY.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
         </Select>
@@ -138,14 +125,12 @@ export default function ReportsPage() {
             Về tổng kết tháng này
           </button>
         )}
-        {loai === 'dich_vu' && (
-          <label className="flex items-center gap-2 pb-2.5 text-sm text-ink-600">
-            <input type="checkbox" checked={chiTietGoi} onChange={(e) => setChiTietGoi(e.target.checked)} />
-            Tách theo gói
-          </label>
-        )}
+        <label className="flex items-center gap-2 pb-2.5 text-sm text-ink-600">
+          <input type="checkbox" checked={chiTietGoi} onChange={(e) => setChiTietGoi(e.target.checked)} />
+          Tách dịch vụ theo gói
+        </label>
       </div>
-      <p className="mx-8 mt-2 text-xs text-ink-400">Đang xem: {loaiHienTai?.label.replace(/^\d\.\s*/, '')} · {moTaKy}{filterNguon ? ` · Nguồn: ${labelOf(NGUON_KHACH_OPTIONS, filterNguon)}` : ''}</p>
+      <p className="mx-8 mt-2 text-xs text-ink-400">Doanh số tổng (mới + tái ký) · {moTaKy}{filterNguon ? ` · Nguồn: ${labelOf(NGUON_KHACH_OPTIONS, filterNguon)}` : ''}</p>
 
       {loading ? (
         <p className="py-16 text-center text-ink-400">Đang tải...</p>
@@ -154,7 +139,7 @@ export default function ReportsPage() {
       ) : (
         <div className="space-y-6 px-8 py-6">
           {/* Thẻ tổng quan */}
-          {loai === 'chung' || loai === 'dich_vu' ? (
+          {loai === 'chung' ? (
             <div className="grid grid-cols-3 gap-4">
               <Card label="Tổng doanh số" mau="text-indigo-700" value={formatVnd(tongChung.tong)} sub={`${tongChung.soDon} đơn`} />
               <Card label="Đơn mới" mau="text-coral-500" value={formatVnd(tongChung.moi)}
@@ -172,7 +157,7 @@ export default function ReportsPage() {
           )}
 
           {/* Báo cáo 1-3: theo sale + theo tháng */}
-          {loai !== 'dich_vu' && (
+          {(
             <>
               <Panel title="Theo từng sale">
                 <div className="overflow-x-auto">
@@ -261,19 +246,19 @@ export default function ReportsPage() {
           )}
 
           {/* Báo cáo 4: từng dịch vụ, tách rõ mới / tái ký, gom theo nhóm */}
-          {loai === 'dich_vu' && (
+          {(
             <Panel title="Doanh số từng dịch vụ">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-xs uppercase tracking-wide text-ink-400">
                       <th rowSpan={2} className="pb-2 text-left align-bottom">Dịch vụ</th>
-                      <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-coral-600">Đơn mới</th>
-                      <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-teal-600">Tái ký</th>
-                      <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-navy-900">Tổng</th>
+                      {loai !== 'tai_ky' && <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-coral-600">Đơn mới</th>}
+                      {loai !== 'moi' && <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-teal-600">Tái ký</th>}
+                      {loai === 'chung' && <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-navy-900">Tổng</th>}
                     </tr>
                     <tr className="text-xs uppercase tracking-wide text-ink-400">
-                      {[0, 1, 2].map((i) => (
+                      {(loai === 'chung' ? [0, 1, 2] : [0]).map((i) => (
                         <FragmentTieuDe key={i} />
                       ))}
                     </tr>
@@ -288,12 +273,12 @@ export default function ReportsPage() {
                       return [
                         <tr key={`h-${n}`} className="border-t border-slate-200 bg-slate-50 font-semibold">
                           <td className="py-2 pl-2"><span className={`rounded-full px-2.5 py-1 text-xs ${NHOM_MAU[n]}`}>{NHOM_TEN[n]}</span></td>
-                          <Cells mL={c.mL} mT={c.mT} kL={c.kL} kT={c.kT} tong="nhom" />
+                          <Cells loai={loai} mL={c.mL} mT={c.mT} kL={c.kL} kT={c.kT} tong="nhom" />
                         </tr>,
                         ...dsNhom.map((r) => (
                           <tr key={`${n}-${r.ten}`} className="border-t border-slate-100">
                             <td className="py-2.5 pl-6 text-navy-900">{r.ten}</td>
-                            <Cells mL={r.moi.luot} mT={r.moi.tien} kL={r.tai_ky.luot} kT={r.tai_ky.tien} />
+                            <Cells loai={loai} mL={r.moi.luot} mT={r.moi.tien} kL={r.tai_ky.luot} kT={r.tai_ky.tien} />
                           </tr>
                         )),
                       ]
@@ -301,7 +286,7 @@ export default function ReportsPage() {
                     <tr className="border-t-2 border-slate-200 bg-indigo-50 font-bold text-indigo-700">
                       <td className="py-2.5 pl-2">TỔNG CỘNG</td>
                       <Cells
-                        mL={theoDichVu.reduce((s, r) => s + r.moi.luot, 0)} mT={theoDichVu.reduce((s, r) => s + r.moi.tien, 0)}
+                        loai={loai} mL={theoDichVu.reduce((s, r) => s + r.moi.luot, 0)} mT={theoDichVu.reduce((s, r) => s + r.moi.tien, 0)}
                         kL={theoDichVu.reduce((s, r) => s + r.tai_ky.luot, 0)} kT={theoDichVu.reduce((s, r) => s + r.tai_ky.tien, 0)}
                         tong="cong" />
                     </tr>
@@ -329,7 +314,7 @@ function FragmentTieuDe() {
 
 // 3 cặp ô "lượt | doanh số": Đơn mới, Tái ký, Tổng.
 // tong = 'nhom' (dòng cộng của nhóm) hoặc 'cong' (tổng cộng) -> dùng màu riêng cho số tổng, không dùng màu cam/xanh của dòng thường
-function Cells({ mL, mT, kL, kT, tong }) {
+function Cells({ loai, mL, mT, kL, kT, tong }) {
   const mauTong = tong === 'cong' ? 'text-indigo-700 font-bold' : tong === 'nhom' ? 'text-indigo-600 font-semibold' : null
   const cMoiL = mauTong || 'text-ink-600'
   const cMoiT = mauTong || 'text-coral-600'
@@ -338,12 +323,18 @@ function Cells({ mL, mT, kL, kT, tong }) {
   const cTong = mauTong || 'text-navy-900 font-semibold'
   return (
     <>
-      <td className={`border-l border-slate-100 py-2.5 text-right ${cMoiL}`}>{mL || '—'}</td>
-      <td className={`py-2.5 text-right ${cMoiT}`}>{mT ? formatVnd(mT) : '—'}</td>
-      <td className={`border-l border-slate-100 py-2.5 text-right ${cKyL}`}>{kL || '—'}</td>
-      <td className={`py-2.5 text-right ${cKyT}`}>{kT ? formatVnd(kT) : '—'}</td>
-      <td className={`border-l border-slate-100 py-2.5 text-right ${cTong}`}>{mL + kL}</td>
-      <td className={`py-2.5 pr-2 text-right ${cTong}`}>{formatVnd(mT + kT)}</td>
+      {loai !== 'tai_ky' && <>
+        <td className={`border-l border-slate-100 py-2.5 text-right ${cMoiL}`}>{mL || '—'}</td>
+        <td className={`py-2.5 text-right ${cMoiT}`}>{mT ? formatVnd(mT) : '—'}</td>
+      </>}
+      {loai !== 'moi' && <>
+        <td className={`border-l border-slate-100 py-2.5 text-right ${cKyL}`}>{kL || '—'}</td>
+        <td className={`py-2.5 text-right ${cKyT}`}>{kT ? formatVnd(kT) : '—'}</td>
+      </>}
+      {loai === 'chung' && <>
+        <td className={`border-l border-slate-100 py-2.5 text-right ${cTong}`}>{mL + kL}</td>
+        <td className={`py-2.5 pr-2 text-right ${cTong}`}>{formatVnd(mT + kT)}</td>
+      </>}
     </>
   )
 }
