@@ -332,6 +332,12 @@ export default function CustomerList({ currentProfile }) {
             <option value="">Tất cả trạng thái</option>
             {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
           </Select>
+          {isAdmin && (
+            <button type="button" onClick={() => setQuanLyTT(true)}
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-dashed border-slate-300 px-3 py-2.5 text-sm font-medium text-ink-600 hover:border-coral-500 hover:text-coral-500">
+              <Settings2 size={15} /> Sửa / thêm / xoá trạng thái
+            </button>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Select value={filterDichVu} onChange={(e) => setFilterDichVu(e.target.value)} className="w-48">
