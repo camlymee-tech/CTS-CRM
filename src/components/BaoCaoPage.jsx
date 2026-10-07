@@ -3,6 +3,7 @@ import OrdersPage from './OrdersPage'
 import ReportsPage from './ReportsPage'
 import AnalyticsPage from './AnalyticsPage'
 import ChuyenDoiNguonPage from './ChuyenDoiNguonPage'
+import BaoCaoTongHopPage from './BaoCaoTongHopPage'
 
 // Gộp 3 màn cũ (Đơn dịch vụ / Tổng kết doanh số / Báo cáo) + thêm tab mới
 // Chuyển đổi nguồn khách, chọn bằng tab giống kiểu "Báo cáo khách hàng" tham khảo.
@@ -11,6 +12,7 @@ const TABS = [
   { key: 'doanh_so', label: 'Doanh số dịch vụ' },
   { key: 'hieu_suat', label: 'Hiệu suất Sale' },
   { key: 'chuyen_doi', label: 'Chuyển đổi nguồn khách' },
+  { key: 'tong_hop', label: 'Báo cáo tổng hợp' },
 ]
 
 export default function BaoCaoPage({ currentProfile }) {
@@ -34,6 +36,7 @@ export default function BaoCaoPage({ currentProfile }) {
         {tab === 'doanh_so' && <ReportsPage />}
         {tab === 'hieu_suat' && <AnalyticsPage />}
         {tab === 'chuyen_doi' && <ChuyenDoiNguonPage />}
+        {tab === 'tong_hop' && <BaoCaoTongHopPage />}
       </div>
     </div>
   )
