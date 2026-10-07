@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Select, Input } from './ui'
 import { formatVnd, NGUON_KHACH_OPTIONS, labelOf } from '../lib/constants'
+import { useTrangThai } from '../lib/StatusContext'
 import { NHOM, khoangNgay, taoDong, gom, cong, gomDichVu } from '../lib/doanhSo'
 
 const KY = [
@@ -21,8 +22,9 @@ const ngayHienThi = (s) => (s ? s.split('-').reverse().join('/') : '')
 const thangHienThi = (s) => s.split('-').reverse().join('/')
 
 export default function ReportsPage() {
-  const [orders, setOrders] = useState([])
-  const [ordersHuy, setOrdersHuy] = useState([])
+  const { maHoanHuy } = useTrangThai()
+  const [ttKhach, setTtKhach] = useState({})
+  const [tatCaDon, setTatCaDon] = useState([])
   const [items, setItems] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -45,15 +47,20 @@ export default function ReportsPage() {
       supabase.from('orders').select('*'),
       supabase.from('order_items').select('*'),
       supabase.from('profiles').select('id, full_name'),
-      supabase.from('customers').select('id, nguon_khach'),
+      supabase.from('customers').select('id, nguon_khach, trang_thai_cham_soc'),
     ])
     setNguonKhach(Object.fromEntries((khs || []).map((k) => [k.id, k.nguon_khach])))
-    setOrders((ords || []).filter((o) => o.trang_thai !== 'huy'))
-    setOrdersHuy((ords || []).filter((o) => o.trang_thai === 'huy'))
+    setTtKhach(Object.fromEntries((khs || []).map((k) => [k.id, k.trang_thai_cham_soc])))
+    setTatCaDon(ords || [])
     setItems(its || [])
     setProfiles(profs || [])
     setLoading(false)
   }
+
+  // Đơn hoàn / huỷ = đơn đã huỷ, hoặc đơn của khách đang ở trạng thái "hoàn / huỷ"
+  const laHoanHuy = (o) => o.trang_thai === 'huy' || maHoanHuy.includes(ttKhach[o.customer_id])
+  const orders = useMemo(() => tatCaDon.filter((o) => !laHoanHuy(o)), [tatCaDon, ttKhach, maHoanHuy])
+  const ordersHuy = useMemo(() => tatCaDon.filter(laHoanHuy), [tatCaDon, ttKhach, maHoanHuy])
 
   const [tuNgay, denNgay] = useMemo(() => khoangNgay(ky, tu, den), [ky, tu, den])
   const tenSale = (id) => (id === 'chua_gan' ? 'Chưa gán sale' : profiles.find((p) => p.id === id)?.full_name || 'Không rõ')

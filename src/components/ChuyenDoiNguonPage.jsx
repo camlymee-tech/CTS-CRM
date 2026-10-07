@@ -41,7 +41,7 @@ function rutGon(n) {
 const chuCai = (ten) => (ten || '?').trim().split(/\s+/).slice(-2).map((t) => t[0]).join('').toUpperCase()
 
 export default function ChuyenDoiNguonPage() {
-  const { maDaChot, loaded } = useTrangThai()
+  const { maDaChot, maHoanHuy, loaded } = useTrangThai()
   const [customers, setCustomers] = useState([])
   const [orders, setOrders] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -72,12 +72,13 @@ export default function ChuyenDoiNguonPage() {
 
   const doanhSoKhach = useMemo(() => {
     const m = {}
+    const huyKhach = new Set(customers.filter((c) => maHoanHuy.includes(c.trang_thai_cham_soc)).map((c) => c.id))
     for (const o of orders) {
-      if (o.trang_thai === 'huy' || !o.customer_id) continue
+      if (o.trang_thai === 'huy' || !o.customer_id || huyKhach.has(o.customer_id)) continue
       m[o.customer_id] = (m[o.customer_id] || 0) + giaTruocVat(o.gia_tri)
     }
     return m
-  }, [orders])
+  }, [orders, customers, maHoanHuy])
 
   const customersLoc = useMemo(() => customers.filter((c) => {
     if (filterSale === 'chua_gan' ? c.sale_id : filterSale && c.sale_id !== filterSale) return false

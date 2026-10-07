@@ -38,10 +38,11 @@ export function demLuotChamSoc(interactions = []) {
 }
 
 // Tổng doanh thu mỗi khách: cộng các đơn (trừ đơn huỷ), chưa VAT
-export function tongDoanhThu(orders = []) {
+// boQua = tập id khách có doanh số bị tính là hoàn / huỷ (theo trạng thái khách)
+export function tongDoanhThu(orders = [], boQua) {
   const m = {}
   for (const o of orders) {
-    if (o.trang_thai === 'huy') continue
+    if (o.trang_thai === 'huy' || boQua?.has(o.customer_id)) continue
     m[o.customer_id] = (m[o.customer_id] || 0) + giaTruocVat(o.gia_tri)
   }
   return m

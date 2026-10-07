@@ -27,7 +27,7 @@ const chiSo = (s) => (s || '').replace(/\D/g, '')
 
 
 export default function CustomerList({ currentProfile }) {
-  const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung } = useTrangThai()
+  const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung, maHoanHuy } = useTrangThai()
   const [quanLyTT, setQuanLyTT] = useState(false)
   const [quanLyDM, setQuanLyDM] = useState(false)
   const [donMoiKhach, setDonMoiKhach] = useState(null)
@@ -218,7 +218,10 @@ export default function CustomerList({ currentProfile }) {
 
   const traoDoi = useMemo(() => traoDoiGanNhat(interactions), [interactions])
   const luotCS = useMemo(() => demLuotChamSoc(interactions), [interactions])
-  const doanhThu = useMemo(() => tongDoanhThu(donHang), [donHang])
+  const doanhThu = useMemo(
+    () => tongDoanhThu(donHang, new Set(customers.filter((c) => maHoanHuy.includes(c.trang_thai_cham_soc)).map((c) => c.id))),
+    [donHang, customers, maHoanHuy],
+  )
 
   const daSapXep = useMemo(
     () => sapXepKhach(filtered, sapXep.cot, sapXep.dir, {

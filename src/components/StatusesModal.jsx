@@ -61,6 +61,7 @@ export default function StatusesModal({ onClose }) {
               </div>
               <p className="mt-1 text-xs text-ink-600">
                 {s.la_chot && <span className="mr-2">Tính là đã ký</span>}
+                {s.la_hoan_huy && <span className="mr-2 text-rose-600">Doanh số tính là hoàn / huỷ</span>}
                 {s.tao_don && <span className="mr-2">Mời tạo đơn dịch vụ</span>}
                 {s.chung_sau_ngay === null || s.chung_sau_ngay === undefined
                   ? 'Riêng của sale'
@@ -85,7 +86,7 @@ export default function StatusesModal({ onClose }) {
 
       <div className="flex justify-between border-t border-slate-100 pt-4">
         <Button type="button" variant="secondary"
-          onClick={() => setEditing({ ma: '', ten: '', mau: 'slate', thu_tu: statuses.length + 1, la_chot: false, tao_don: false, chung_sau_ngay: '' })}>
+          onClick={() => setEditing({ ma: '', ten: '', mau: 'slate', thu_tu: statuses.length + 1, la_chot: false, tao_don: false, la_hoan_huy: false, chung_sau_ngay: '' })}>
           <Plus size={15} /> Thêm trạng thái
         </Button>
         <Button type="button" onClick={onClose}>Xong</Button>
@@ -107,6 +108,7 @@ function StatusForm({ tt, onClose, onSaved }) {
     thu_tu: tt.thu_tu ?? 0,
     la_chot: !!tt.la_chot,
     tao_don: !!tt.tao_don,
+    la_hoan_huy: !!tt.la_hoan_huy,
     // '' = riêng của sale, số = số ngày
     chung_sau_ngay: tt.chung_sau_ngay === null || tt.chung_sau_ngay === undefined ? '' : String(tt.chung_sau_ngay),
   })
@@ -124,6 +126,7 @@ function StatusForm({ tt, onClose, onSaved }) {
       thu_tu: Number(form.thu_tu) || 0,
       la_chot: form.la_chot,
       tao_don: form.tao_don,
+      la_hoan_huy: form.la_hoan_huy,
       chung_sau_ngay: form.chung_sau_ngay === '' ? null : Number(form.chung_sau_ngay),
     }
 
@@ -193,6 +196,15 @@ function StatusForm({ tt, onClose, onSaved }) {
           <span>
             <b className="text-navy-900">Mời tạo đơn dịch vụ</b>
             <span className="block text-xs text-ink-600">Chuyển sang trạng thái này thì app tự mở form tạo đơn</span>
+          </span>
+        </label>
+
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" checked={form.la_hoan_huy} className="mt-0.5 h-4 w-4 rounded border-slate-300"
+            onChange={(e) => setForm({ ...form, la_hoan_huy: e.target.checked })} />
+          <span>
+            <b className="text-navy-900">Tính là hoàn / huỷ doanh số</b>
+            <span className="block text-xs text-ink-600">Khách chuyển sang trạng thái này thì doanh số các đơn của khách được chuyển sang "Hoàn / huỷ" trong báo cáo</span>
           </span>
         </label>
 

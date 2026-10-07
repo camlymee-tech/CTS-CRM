@@ -53,6 +53,8 @@ export function StatusProvider({ children }) {
       tenTrangThai: (ma) => tim(ma)?.ten ?? ma,
       classTrangThai: (ma) => MAU_BADGE[tim(ma)?.mau] ?? MAU_BADGE.slate,
       maDaChot: dangDung.filter((s) => s.la_chot).map((s) => s.ma),
+      // Khách ở trạng thái này: toàn bộ doanh số của khách được tính là hoàn / huỷ
+      maHoanHuy: statuses.filter((s) => s.la_hoan_huy).map((s) => s.ma),
       maTaoDon: dangDung.filter((s) => s.tao_don).map((s) => s.ma),
       // Khách thành data chung khi im lặng đủ số ngày quy định
       laKhachChung: (c) => {
