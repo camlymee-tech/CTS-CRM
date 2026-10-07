@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useTrangThai } from '../lib/StatusContext'
-import { NGUON_KHACH_OPTIONS } from '../lib/constants'
+import { NGUON_KHACH_OPTIONS, formatVnd, giaTruocVat } from '../lib/constants'
 import { khoangNgay } from '../lib/doanhSo'
 import { ngayLocal } from '../lib/danhSachKhach'
-import { Select, Input } from './ui'
+import { Select, Input, Badge } from './ui'
 
 const KY = [
   { key: 'thang_nay', label: 'Tháng này' },
@@ -15,12 +15,15 @@ const KY = [
   { key: 'tuy_chon', label: 'Chọn ngày...' },
 ]
 const ngayHienThi = (s) => (s ? s.split('-').reverse().join('/') : '')
+const phanTram = (a, b) => (b > 0 ? Math.round((a / b) * 1000) / 10 : 0)
 
-// Đo tỷ lệ chuyển đổi: trong số khách đến từ mỗi nguồn, bao nhiêu % đã thực sự
-// chốt hợp đồng (tính theo các trạng thái được đánh dấu "la_chot" trong Cấu hình trạng thái).
+// Đo hiệu quả từng nguồn data: bao nhiêu % chốt, mỗi data mang về bao nhiêu tiền,
+// và trong mỗi nguồn thì từng sale chốt tốt đến đâu (để phân bổ data cho đúng người).
+// Doanh số mang về = tổng đơn (chưa VAT, không tính đơn huỷ) của các khách thuộc nhóm đang lọc.
 export default function ChuyenDoiNguonPage() {
   const { maDaChot, loaded } = useTrangThai()
   const [customers, setCustomers] = useState([])
+  const [orders, setOrders] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [ky, setKy] = useState('thang_nay')
@@ -32,53 +35,69 @@ export default function ChuyenDoiNguonPage() {
 
   async function load() {
     setLoading(true)
-    const [{ data }, { data: profs }] = await Promise.all([
+    const [{ data }, { data: ords }, { data: profs }] = await Promise.all([
       supabase.from('customers').select('id, nguon_khach, trang_thai_cham_soc, sale_id, created_at'),
+      supabase.from('orders').select('customer_id, gia_tri, trang_thai'),
       supabase.from('profiles').select('id, full_name'),
     ])
     setCustomers(data || [])
+    setOrders(ords || [])
     setProfiles(profs || [])
     setLoading(false)
   }
 
-  // Lọc theo ngày tạo khách + sale
   const [tuNgay, denNgay] = useMemo(() => khoangNgay(ky, tu, den), [ky, tu, den])
-  const tatCa = customers
-  const customersLoc = useMemo(() => tatCa.filter((c) => {
+  const tenSale = (id) => (id === 'chua_gan' ? 'Chưa gán sale' : profiles.find((p) => p.id === id)?.full_name || 'Không rõ')
+
+  // Doanh số theo từng khách (chưa VAT, trừ đơn huỷ)
+  const doanhSoKhach = useMemo(() => {
+    const m = {}
+    for (const o of orders) {
+      if (o.trang_thai === 'huy' || !o.customer_id) continue
+      m[o.customer_id] = (m[o.customer_id] || 0) + giaTruocVat(o.gia_tri)
+    }
+    return m
+  }, [orders])
+
+  const customersLoc = useMemo(() => customers.filter((c) => {
     if (filterSale === 'chua_gan' ? c.sale_id : filterSale && c.sale_id !== filterSale) return false
     const ng = ngayLocal(c.created_at)
     if (tuNgay && ng < tuNgay) return false
     if (denNgay && ng > denNgay) return false
     return true
-  }), [tatCa, filterSale, tuNgay, denNgay])
-  const moTaKy = ky === 'tat_ca' ? 'Tất cả thời gian' : `${ngayHienThi(tuNgay) || '...'} → ${ngayHienThi(denNgay) || '...'}`
+  }), [customers, filterSale, tuNgay, denNgay])
 
-  const theoNguon = useMemo(() => {
-    const m = {}
-    for (const o of NGUON_KHACH_OPTIONS) m[o.value] = { nguon: o.value, ten: o.label, tong: 0, daChot: 0 }
-    m['_khac'] = { nguon: '_khac', ten: 'Chưa xác định', tong: 0, daChot: 0 }
+  const moiDong = () => ({ data: 0, chot: 0, tien: 0 })
+
+  const { theoNguon, tong } = useMemo(() => {
+    const nguon = {}
+    const t = moiDong()
+    const nhan = (v) => NGUON_KHACH_OPTIONS.find((o) => o.value === v)?.label
     for (const c of customersLoc) {
-      const key = m[c.nguon_khach] ? c.nguon_khach : '_khac'
-      m[key].tong += 1
-      if (maDaChot.includes(c.trang_thai_cham_soc)) m[key].daChot += 1
+      const key = nhan(c.nguon_khach) ? c.nguon_khach : '_khac'
+      if (!nguon[key]) nguon[key] = { key, ten: nhan(key) || 'Chưa xác định', ...moiDong(), sale: {} }
+      const sid = c.sale_id || 'chua_gan'
+      if (!nguon[key].sale[sid]) nguon[key].sale[sid] = moiDong()
+      const chot = maDaChot.includes(c.trang_thai_cham_soc) ? 1 : 0
+      const tien = doanhSoKhach[c.id] || 0
+      for (const x of [nguon[key], nguon[key].sale[sid], t]) { x.data += 1; x.chot += chot; x.tien += tien }
     }
-    return Object.values(m)
-      .filter((r) => r.tong > 0)
-      .map((r) => ({ ...r, tyLe: r.tong ? Math.round((r.daChot / r.tong) * 1000) / 10 : 0 }))
-      .sort((a, b) => b.tong - a.tong)
-  }, [customersLoc, maDaChot])
+    const ds = Object.values(nguon).map((n) => ({
+      ...n,
+      sales: Object.entries(n.sale).map(([id, v]) => ({ id, ...v }))
+        .sort((a, b) => phanTram(b.chot, b.data) - phanTram(a.chot, a.data) || b.data - a.data),
+    })).sort((a, b) => b.data - a.data)
+    return { theoNguon: ds, tong: t }
+  }, [customersLoc, maDaChot, doanhSoKhach])
 
-  const tongKhach = customersLoc.length
-  const tongDaChot = customersLoc.filter((c) => maDaChot.includes(c.trang_thai_cham_soc)).length
-  const tyLeChung = tongKhach ? Math.round((tongDaChot / tongKhach) * 1000) / 10 : 0
-  const maxTong = Math.max(...theoNguon.map((r) => r.tong), 1)
+  const moTaKy = ky === 'tat_ca' ? 'Tất cả thời gian' : `${ngayHienThi(tuNgay) || '...'} → ${ngayHienThi(denNgay) || '...'}`
 
   return (
     <div className="flex-1 overflow-y-auto">
       <header className="border-b border-slate-200 bg-white px-8 py-5">
         <h1 className="font-display text-xl font-bold text-navy-900">Chuyển đổi nguồn khách</h1>
         <p className="text-sm text-ink-600">
-          So sánh tỷ lệ chốt hợp đồng giữa các nguồn khách (data Marketing gửi, tự tìm kiếm, giới thiệu...)
+          Mỗi nguồn data chốt được bao nhiêu %, mỗi data mang về bao nhiêu tiền, và từng sale chốt tốt đến đâu để chia data
         </p>
       </header>
 
@@ -104,51 +123,116 @@ export default function ChuyenDoiNguonPage() {
           </button>
         )}
       </div>
-      <p className="mx-8 mt-2 text-xs text-ink-400">Đang xem: {moTaKy} · {filterSale ? (filterSale === 'chua_gan' ? 'Chưa gán sale' : profiles.find((p) => p.id === filterSale)?.full_name) : 'Tất cả sale'} · tính theo ngày tạo khách</p>
+      <p className="mx-8 mt-2 text-xs text-ink-400">
+        Đang xem: {moTaKy} · {filterSale ? tenSale(filterSale) : 'Tất cả sale'} · tính theo ngày tạo khách · doanh số chưa VAT, trừ đơn huỷ
+      </p>
 
       {(loading || !loaded) ? (
         <p className="py-16 text-center text-ink-400">Đang tải...</p>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-4 px-8 pt-6">
-            <StatCard label="Tổng khách hàng" value={tongKhach} />
-            <StatCard label="Đã chốt hợp đồng" value={tongDaChot} accent="teal" />
-            <StatCard label="Tỷ lệ chuyển đổi chung" value={`${tyLeChung}%`} accent="coral" />
+          <div className="grid grid-cols-5 gap-4 px-8 pt-6">
+            <StatCard label="Tổng data" value={tong.data} />
+            <StatCard label="Đã chốt" value={tong.chot} accent="teal" />
+            <StatCard label="Tỷ lệ chốt" value={`${phanTram(tong.chot, tong.data)}%`} accent="coral" />
+            <StatCard label="Doanh số mang về" value={formatVnd(tong.tien)} accent="indigo" />
+            <StatCard label="Giá trị / 1 data" value={formatVnd(tong.data ? tong.tien / tong.data : 0)} accent="indigo" />
           </div>
 
-          <div className="mx-8 my-6 rounded-2xl bg-white p-5 shadow-sm">
-            <h2 className="mb-4 font-display font-semibold text-navy-900">Theo nguồn khách</h2>
+          {/* Bảng so sánh các nguồn */}
+          <div className="mx-8 mt-6 rounded-2xl bg-white p-5 shadow-sm">
+            <h2 className="mb-3 font-display font-semibold text-navy-900">So sánh các nguồn</h2>
             {theoNguon.length === 0 ? (
-              <p className="py-6 text-center text-sm text-ink-400">Chưa có dữ liệu.</p>
+              <p className="py-6 text-center text-sm text-ink-400">Chưa có dữ liệu trong bộ lọc này.</p>
             ) : (
-              <div className="space-y-4">
-                {theoNguon.map((r) => (
-                  <div key={r.nguon}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="font-medium text-navy-900">{r.ten}</span>
-                      <span className="text-ink-600">
-                        {r.daChot}/{r.tong} khách · <b className="text-navy-900">{r.tyLe}%</b> chuyển đổi
-                      </span>
-                    </div>
-                    <div className="h-6 overflow-hidden rounded-lg bg-slate-100">
-                      <div className="flex h-full items-center rounded-lg bg-coral-500 pl-2 text-[11px] font-medium text-white transition-all"
-                        style={{ width: `${Math.max((r.tong / maxTong) * 100, 6)}%` }}>
-                        {r.tong}
-                      </div>
-                    </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
+                      <th className="pb-2">Nguồn</th>
+                      <th className="pb-2 text-right">Số data</th>
+                      <th className="pb-2 text-right">Đã chốt</th>
+                      <th className="pb-2 text-right">Tỷ lệ chốt</th>
+                      <th className="pb-2 text-right">Doanh số mang về</th>
+                      <th className="pb-2 text-right">Giá trị / 1 data</th>
+                      <th className="pb-2 text-right">Giá trị / đơn chốt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {theoNguon.map((n) => (
+                      <tr key={n.key} className="border-t border-slate-100">
+                        <td className="py-2.5 font-medium text-navy-900">{n.ten}</td>
+                        <td className="py-2.5 text-right text-ink-600">{n.data}</td>
+                        <td className="py-2.5 text-right text-teal-600">{n.chot}</td>
+                        <td className="py-2.5 text-right font-semibold text-coral-600">{phanTram(n.chot, n.data)}%</td>
+                        <td className="py-2.5 text-right font-semibold text-navy-900">{formatVnd(n.tien)}</td>
+                        <td className="py-2.5 text-right text-indigo-700">{formatVnd(n.data ? n.tien / n.data : 0)}</td>
+                        <td className="py-2.5 text-right text-ink-600">{n.chot ? formatVnd(n.tien / n.chot) : '—'}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-slate-200 bg-indigo-50 font-bold text-indigo-700">
+                      <td className="py-2.5 pl-2">TỔNG</td>
+                      <td className="py-2.5 text-right">{tong.data}</td>
+                      <td className="py-2.5 text-right">{tong.chot}</td>
+                      <td className="py-2.5 text-right">{phanTram(tong.chot, tong.data)}%</td>
+                      <td className="py-2.5 text-right">{formatVnd(tong.tien)}</td>
+                      <td className="py-2.5 text-right">{formatVnd(tong.data ? tong.tien / tong.data : 0)}</td>
+                      <td className="py-2.5 pr-2 text-right">{tong.chot ? formatVnd(tong.tien / tong.chot) : '—'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Mỗi nguồn: từng sale xử lý data nguồn đó thế nào */}
+          <div className="mx-8 my-6 space-y-6">
+            {theoNguon.map((n) => {
+              const cao = n.sales.length > 1 ? n.sales.find((s) => s.data >= 3 && s.chot > 0) : null
+              return (
+                <div key={n.key} className="rounded-2xl bg-white p-5 shadow-sm">
+                  <h2 className="mb-3 font-display font-semibold text-navy-900">
+                    Nguồn {n.ten} — từng sale
+                    <span className="ml-2 text-sm font-normal text-ink-400">{n.data} data · {phanTram(n.chot, n.data)}% chốt</span>
+                  </h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
+                          <th className="pb-2">Sale</th>
+                          <th className="pb-2 text-right">Data nhận</th>
+                          <th className="pb-2 text-right">Đã chốt</th>
+                          <th className="pb-2 text-right">Tỷ lệ chốt</th>
+                          <th className="pb-2 text-right">Doanh số</th>
+                          <th className="pb-2 text-right">Giá trị / 1 data</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {n.sales.map((s) => (
+                          <tr key={s.id} className="border-t border-slate-100">
+                            <td className="py-2.5 font-medium text-navy-900">
+                              {tenSale(s.id)}
+                              {cao && cao.id === s.id && <Badge className="ml-2 bg-emerald-100 text-emerald-700">Chốt tốt nhất</Badge>}
+                            </td>
+                            <td className="py-2.5 text-right text-ink-600">{s.data}</td>
+                            <td className="py-2.5 text-right text-teal-600">{s.chot}</td>
+                            <td className="py-2.5 text-right font-semibold text-coral-600">{phanTram(s.chot, s.data)}%</td>
+                            <td className="py-2.5 text-right text-navy-900">{formatVnd(s.tien)}</td>
+                            <td className="py-2.5 text-right text-indigo-700">{formatVnd(s.data ? s.tien / s.data : 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              )
+            })}
             {theoNguon.length > 0 && (
-              <div className="mt-5 flex items-center justify-between rounded-lg bg-indigo-50 px-3 py-2.5 text-sm font-bold text-indigo-700">
-                <span>TỔNG</span>
-                <span>{tongDaChot}/{tongKhach} khách · {tyLeChung}% chuyển đổi</span>
-              </div>
+              <p className="text-xs text-ink-400">
+                "Đã chốt" tính theo các trạng thái chăm sóc được đánh dấu là chốt. Doanh số mang về là tổng đơn (mới + tái ký) của các khách thuộc bộ lọc.
+                Sale có ít hơn 3 data thì chưa đủ để xếp "Chốt tốt nhất". Sale xếp theo tỷ lệ chốt từ cao xuống thấp.
+              </p>
             )}
-            <p className="mt-4 text-xs text-ink-400">
-              "Đã chốt hợp đồng" tính theo các trạng thái chăm sóc được đánh dấu là chốt trong phần Cấu hình trạng thái.
-            </p>
           </div>
         </>
       )}
@@ -157,11 +241,11 @@ export default function ChuyenDoiNguonPage() {
 }
 
 function StatCard({ label, value, accent = 'navy' }) {
-  const accents = { navy: 'text-navy-900', coral: 'text-coral-500', teal: 'text-teal-500' }
+  const accents = { navy: 'text-navy-900', coral: 'text-coral-500', teal: 'text-teal-500', indigo: 'text-indigo-700' }
   return (
     <div className="rounded-2xl bg-white p-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-ink-400">{label}</p>
-      <p className={`mt-1 font-display text-2xl font-bold ${accents[accent]}`}>{value}</p>
+      <p className={`mt-1 font-display text-xl font-bold ${accents[accent]}`}>{value}</p>
     </div>
   )
 }
