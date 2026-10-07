@@ -34,7 +34,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true)
 
   const [loai, setLoai] = useState('chung')
-  const [ky, setKy] = useState('nam_nay')
+  const [ky, setKy] = useState('thang_nay')
   const [tu, setTu] = useState('')
   const [den, setDen] = useState('')
   const [filterSale, setFilterSale] = useState('')
@@ -80,13 +80,18 @@ export default function ReportsPage() {
   const moTaKy = ky === 'tat_ca' ? 'Tất cả thời gian'
     : `${ngayHienThi(tuNgay) || '...'} → ${ngayHienThi(denNgay) || '...'}`
   const loaiHienTai = BAO_CAO.find((b) => b.key === loai)
+  const macDinh = loai === 'chung' && ky === 'thang_nay' && !filterSale && !filterNhom
+  const datLai = () => { setLoai('chung'); setKy('thang_nay'); setTu(''); setDen(''); setFilterSale(''); setFilterNhom('') }
+  const thangDangXem = tuNgay ? `${tuNgay.slice(5, 7)}/${tuNgay.slice(0, 4)}` : ''
 
   return (
     <div className="flex-1 overflow-y-auto">
       <header className="border-b border-slate-200 bg-white px-8 py-5">
-        <h1 className="font-display text-xl font-bold text-navy-900">Báo cáo doanh số</h1>
+        <h1 className="font-display text-xl font-bold text-navy-900">
+          {macDinh ? `Tổng kết doanh số tháng ${thangDangXem}` : 'Báo cáo doanh số'}
+        </h1>
         <p className="text-sm text-ink-600">
-          Chọn loại báo cáo và bộ lọc bên dưới · không tính đơn huỷ · số liệu chưa gồm VAT
+          {macDinh ? 'Tất cả sale · ' : ''}Cần xem báo cáo khác thì chọn bộ lọc bên dưới · không tính đơn huỷ · số liệu chưa gồm VAT
         </p>
       </header>
 
@@ -115,6 +120,12 @@ export default function ReportsPage() {
           <option value="">Tất cả dịch vụ</option>
           {NHOM.map((n) => <option key={n} value={n}>{NHOM_TEN[n]}</option>)}
         </Select>
+        {!macDinh && (
+          <button type="button" onClick={datLai}
+            className="mb-0.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-ink-600 hover:bg-slate-50">
+            Về tổng kết tháng này
+          </button>
+        )}
         {loai === 'dich_vu' && (
           <label className="flex items-center gap-2 pb-2.5 text-sm text-ink-600">
             <input type="checkbox" checked={chiTietGoi} onChange={(e) => setChiTietGoi(e.target.checked)} />
@@ -200,7 +211,7 @@ export default function ReportsPage() {
                 </div>
               </Panel>
 
-              <Panel title="Theo tháng">
+              {theoThang.length > 1 && <Panel title="Theo tháng">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -233,7 +244,7 @@ export default function ReportsPage() {
                     </tbody>
                   </table>
                 </div>
-              </Panel>
+              </Panel>}
             </>
           )}
 
