@@ -29,13 +29,9 @@ const ngayHienThi = (s) => (s ? s.split('-').reverse().join('/') : '')
 const phanTram = (a, b) => (b > 0 ? Math.round((a / b) * 1000) / 10 : 0)
 const so1 = (n) => String(Math.round(n * 10) / 10).replace('.', ',')
 
-// 11.741.000 -> "11,7 triệu"; số đầy đủ nằm trong tooltip
+// 11.741.000 -> "11.741.000đ"; số lẻ được làm tròn đến hàng nghìn
 function rutGon(n) {
-  const x = Math.round(n || 0)
-  if (x >= 1e9) return `${so1(x / 1e9)} tỷ`
-  if (x >= 1e6) return `${so1(x / 1e6)} triệu`
-  if (x >= 1e3) return `${Math.round(x / 1e3)} nghìn`
-  return `${x}đ`
+  return `${(Math.round((n || 0) / 1000) * 1000).toLocaleString('vi-VN')}đ`
 }
 
 const chuCai = (ten) => (ten || '?').trim().split(/\s+/).slice(-2).map((t) => t[0]).join('').toUpperCase()
