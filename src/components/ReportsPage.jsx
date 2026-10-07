@@ -1,15 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Select, Input } from './ui'
-import { formatVnd } from '../lib/constants'
+import { formatVnd, NGUON_KHACH_OPTIONS, labelOf } from '../lib/constants'
 import { NHOM, khoangNgay, taoDong, gom, cong, gomDichVu } from '../lib/doanhSo'
-
-const BAO_CAO = [
-  { key: 'chung', label: '1. Doanh số chung (mới + tái ký) — từng sale và tổng' },
-  { key: 'tai_ky', label: '2. Doanh số tái ký — từng sale và tổng' },
-  { key: 'moi', label: '3. Doanh số đơn mới — từng sale và tổng' },
-  { key: 'dich_vu', label: '4. Doanh số từng dịch vụ (mới / tái ký)' },
-]
 
 const KY = [
   { key: 'nam_nay', label: 'Năm nay' },
@@ -33,7 +26,9 @@ export default function ReportsPage() {
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const [loai, setLoai] = useState('chung')
+  const loai = 'chung'
+  const [filterNguon, setFilterNguon] = useState('')
+  const [nguonKhach, setNguonKhach] = useState({})
   const [ky, setKy] = useState('thang_nay')
   const [tu, setTu] = useState('')
   const [den, setDen] = useState('')
@@ -45,11 +40,13 @@ export default function ReportsPage() {
 
   async function load() {
     setLoading(true)
-    const [{ data: ords }, { data: its }, { data: profs }] = await Promise.all([
+    const [{ data: ords }, { data: its }, { data: profs }, { data: khs }] = await Promise.all([
       supabase.from('orders').select('*').neq('trang_thai', 'huy'),
       supabase.from('order_items').select('*'),
       supabase.from('profiles').select('id, full_name'),
+      supabase.from('customers').select('id, nguon_khach'),
     ])
+    setNguonKhach(Object.fromEntries((khs || []).map((k) => [k.id, k.nguon_khach])))
     setOrders(ords || [])
     setItems(its || [])
     setProfiles(profs || [])
@@ -61,9 +58,13 @@ export default function ReportsPage() {
   const coDonChuaGan = useMemo(() => orders.some((o) => !o.sale_id), [orders])
 
   // Mọi dòng doanh số (chưa VAT) sau khi lọc kỳ / sale / nhóm dịch vụ
+  const ordersLoc = useMemo(
+    () => (filterNguon ? orders.filter((o) => nguonKhach[o.customer_id] === filterNguon) : orders),
+    [orders, filterNguon, nguonKhach],
+  )
   const dong = useMemo(
-    () => taoDong({ orders, items, tuNgay, denNgay, sale: filterSale, nhom: filterNhom }),
-    [orders, items, tuNgay, denNgay, filterSale, filterNhom],
+    () => taoDong({ orders: ordersLoc, items, tuNgay, denNgay, sale: filterSale, nhom: filterNhom }),
+    [ordersLoc, items, tuNgay, denNgay, filterSale, filterNhom],
   )
   // Báo cáo 2, 3 chỉ lấy đơn tái ký / đơn mới
   const dongBaoCao = useMemo(
@@ -79,9 +80,8 @@ export default function ReportsPage() {
 
   const moTaKy = ky === 'tat_ca' ? 'Tất cả thời gian'
     : `${ngayHienThi(tuNgay) || '...'} → ${ngayHienThi(denNgay) || '...'}`
-  const loaiHienTai = BAO_CAO.find((b) => b.key === loai)
-  const macDinh = loai === 'chung' && ky === 'thang_nay' && !filterSale && !filterNhom
-  const datLai = () => { setLoai('chung'); setKy('thang_nay'); setTu(''); setDen(''); setFilterSale(''); setFilterNhom('') }
+  const macDinh = ky === 'thang_nay' && !filterSale && !filterNhom && !filterNguon
+  const datLai = () => { setKy('thang_nay'); setTu(''); setDen(''); setFilterSale(''); setFilterNhom(''); setFilterNguon('') }
   const thangDangXem = tuNgay ? `${tuNgay.slice(5, 7)}/${tuNgay.slice(0, 4)}` : ''
 
   return (
@@ -91,17 +91,12 @@ export default function ReportsPage() {
           {macDinh ? `Tổng kết doanh số tháng ${thangDangXem}` : 'Báo cáo doanh số'}
         </h1>
         <p className="text-sm text-ink-600">
-          {macDinh ? 'Tất cả sale · ' : ''}Cần xem báo cáo khác thì chọn bộ lọc bên dưới · không tính đơn huỷ · số liệu chưa gồm VAT
+          {macDinh ? 'Tất cả sale, tất cả nguồn · ' : ''}Cần xem kỳ khác, sale khác hoặc nguồn khác thì chọn bộ lọc bên dưới · không tính đơn huỷ · số liệu chưa gồm VAT
         </p>
       </header>
 
       {/* Bộ lọc */}
       <div className="mx-8 mt-6 flex flex-wrap items-end gap-3 rounded-2xl bg-white p-4 shadow-sm">
-        <div className="min-w-[280px] flex-1">
-          <Select label="Loại báo cáo" value={loai} onChange={(e) => setLoai(e.target.value)} className="font-medium">
-            {BAO_CAO.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
-          </Select>
-        </div>
         <Select label="Kỳ" value={ky} onChange={(e) => setKy(e.target.value)}>
           {KY.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
         </Select>
@@ -120,20 +115,22 @@ export default function ReportsPage() {
           <option value="">Tất cả dịch vụ</option>
           {NHOM.map((n) => <option key={n} value={n}>{NHOM_TEN[n]}</option>)}
         </Select>
+        <Select label="Nguồn khách" value={filterNguon} onChange={(e) => setFilterNguon(e.target.value)}>
+          <option value="">Tất cả nguồn</option>
+          {NGUON_KHACH_OPTIONS.map((n) => <option key={n.value} value={n.value}>{n.label}</option>)}
+        </Select>
         {!macDinh && (
           <button type="button" onClick={datLai}
             className="mb-0.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-ink-600 hover:bg-slate-50">
             Về tổng kết tháng này
           </button>
         )}
-        {loai === 'dich_vu' && (
-          <label className="flex items-center gap-2 pb-2.5 text-sm text-ink-600">
-            <input type="checkbox" checked={chiTietGoi} onChange={(e) => setChiTietGoi(e.target.checked)} />
-            Tách theo gói
-          </label>
-        )}
+        <label className="flex items-center gap-2 pb-2.5 text-sm text-ink-600">
+          <input type="checkbox" checked={chiTietGoi} onChange={(e) => setChiTietGoi(e.target.checked)} />
+          Tách dịch vụ theo gói
+        </label>
       </div>
-      <p className="mx-8 mt-2 text-xs text-ink-400">Đang xem: {loaiHienTai?.label.replace(/^\d\.\s*/, '')} · {moTaKy}</p>
+      <p className="mx-8 mt-2 text-xs text-ink-400">Đang xem: {moTaKy}{filterNguon ? ` · Nguồn: ${labelOf(NGUON_KHACH_OPTIONS, filterNguon)}` : ''}</p>
 
       {loading ? (
         <p className="py-16 text-center text-ink-400">Đang tải...</p>
@@ -142,25 +139,16 @@ export default function ReportsPage() {
       ) : (
         <div className="space-y-6 px-8 py-6">
           {/* Thẻ tổng quan */}
-          {loai === 'chung' || loai === 'dich_vu' ? (
-            <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-4">
               <Card label="Tổng doanh số" mau="text-indigo-700" value={formatVnd(tongChung.tong)} sub={`${tongChung.soDon} đơn`} />
               <Card label="Đơn mới" mau="text-coral-500" value={formatVnd(tongChung.moi)}
                 sub={`${tongChung.soDonMoi} đơn · ${phanTram(tongChung.moi, tongChung.tong)}`} />
               <Card label="Tái ký" mau="text-teal-500" value={formatVnd(tongChung.tai_ky)}
                 sub={`${tongChung.soDonTaiKy} đơn · ${phanTram(tongChung.tai_ky, tongChung.tong)}`} />
             </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-4">
-              <Card label={loai === 'moi' ? 'Tổng doanh số đơn mới' : 'Tổng doanh số tái ký'}
-                mau="text-indigo-700" value={formatVnd(tong.tong)} />
-              <Card label="Số đơn" value={tong.soDon} />
-              <Card label="Giá trị trung bình / đơn" value={formatVnd(tong.soDon ? tong.tong / tong.soDon : 0)} />
-            </div>
-          )}
 
           {/* Báo cáo 1-3: theo sale + theo tháng */}
-          {loai !== 'dich_vu' && (
+          {(
             <>
               <Panel title="Theo từng sale">
                 <div className="overflow-x-auto">
@@ -249,7 +237,7 @@ export default function ReportsPage() {
           )}
 
           {/* Báo cáo 4: từng dịch vụ, tách rõ mới / tái ký, gom theo nhóm */}
-          {loai === 'dich_vu' && (
+          {(
             <Panel title="Doanh số từng dịch vụ">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
