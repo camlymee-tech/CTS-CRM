@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Select, Badge, Input } from './ui'
-import { NGUON_KHACH_OPTIONS, laDataDuocChia, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
 import { khoangNgay } from '../lib/doanhSo'
 
@@ -26,10 +25,8 @@ function khoangKy(ky, tu, den) {
 }
 
 export default function AnalyticsPage() {
-  const { options: TRANG_THAI, tenTrangThai, classTrangThai, maDaChot } = useTrangThai()
+  const { options: TRANG_THAI, tenTrangThai, classTrangThai } = useTrangThai()
   const [customers, setCustomers] = useState([])
-  const [orders, setOrders] = useState([])
-  const [interactions, setInteractions] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [ky, setKy] = useState('thang_nay')
@@ -41,13 +38,11 @@ export default function AnalyticsPage() {
 
   async function load() {
     setLoading(true)
-    const [{ data: c }, { data: o }, { data: i }, { data: p }] = await Promise.all([
+    const [{ data: c }, { data: p }] = await Promise.all([
       supabase.from('customers').select('*'),
-      supabase.from('orders').select('*').neq('trang_thai', 'huy'),
-      supabase.from('customer_interactions').select('*'),
       supabase.from('profiles').select('id, full_name'),
     ])
-    setCustomers(c || []); setOrders(o || []); setInteractions(i || []); setProfiles(p || [])
+    setCustomers(c || []); setProfiles(p || [])
     setLoading(false)
   }
 
@@ -60,7 +55,6 @@ export default function AnalyticsPage() {
 
   // Áp bộ lọc sale cho toàn bộ báo cáo
   const khachLoc = useMemo(() => customers.filter((c) => !filterSale || c.sale_id === filterSale), [customers, filterSale])
-  const donLoc = useMemo(() => orders.filter((o) => !filterSale || o.sale_id === filterSale), [orders, filterSale])
 
   // Khách phát sinh trong kỳ
   const khachTrongKy = useMemo(
@@ -70,112 +64,15 @@ export default function AnalyticsPage() {
 
   // ===== Phễu: mỗi khách chỉ nằm ở ĐÚNG MỘT bước theo trạng thái hiện tại =====
   const pheu = useMemo(() => {
-    const buoc = TRANG_THAI.map((b) => ({
-      value: b.ma, label: b.ten, mau: b.mau,
-      so: khachTrongKy.filter((c) => c.trang_thai_cham_soc === b.ma).length,
-    }))
-    return { buoc, tong: khachTrongKy.length }
+    const tong = khachTrongKy.length
+    const buoc = TRANG_THAI.map((b) => {
+      const so = khachTrongKy.filter((c) => c.trang_thai_cham_soc === b.ma).length
+      return { ma: b.ma, ten: b.ten, mau: b.mau, chot: !!b.la_chot, so, pt: tong ? (so / tong) * 100 : 0 }
+    })
+    const co = buoc.filter((b) => b.so > 0)
+    const chot = buoc.filter((b) => b.chot).reduce((a, b) => a + b.so, 0)
+    return { tong, buoc, co, trong: buoc.filter((b) => b.so === 0), chot, tyLeChot: tong ? (chot / tong) * 100 : 0 }
   }, [khachTrongKy, TRANG_THAI])
-
-  // ===== Chỉ số theo sale trong kỳ =====
-  const theoSale = useMemo(() => {
-    const m = {}
-    const co = (id) => { if (!m[id]) m[id] = { dataChia: 0, dataTuNhap: 0, tuVan: 0, chot: 0, luotCS: 0, doanhSo: 0, dangGiu: 0 } }
-
-    for (const c of customers) {
-      if (!c.sale_id) continue
-      co(c.sale_id)
-      m[c.sale_id].dangGiu += 1
-      if (trongKy(c.created_at)) {
-        if (laDataDuocChia(c)) {
-          m[c.sale_id].dataChia += 1
-          // Chỉ số chuyển đổi chỉ tính trên data được chia, cho khách quan
-          if (c.trang_thai_cham_soc === 'dang_tu_van' || maDaChot.includes(c.trang_thai_cham_soc)) {
-            m[c.sale_id].tuVan += 1
-          }
-        } else {
-          m[c.sale_id].dataTuNhap += 1
-        }
-      }
-    }
-    for (const it of interactions) {
-      if (!it.sale_id || !trongKy(it.ngay_thuc_hien)) continue
-      co(it.sale_id); m[it.sale_id].luotCS += 1
-    }
-    for (const o of orders) {
-      if (!o.sale_id || !trongKy(o.ngay_chot)) continue
-      co(o.sale_id); m[o.sale_id].chot += 1; m[o.sale_id].doanhSo += giaTruocVat(o.gia_tri)
-    }
-
-    return Object.entries(m)
-      .map(([id, v]) => ({
-        id, ten: tenSale(id), ...v,
-        tiLe: v.dataChia ? Math.round((v.tuVan / v.dataChia) * 100) : null,
-      }))
-      .filter((r) => !filterSale || r.id === filterSale)
-      .sort((a, b) => b.doanhSo - a.doanhSo || b.chot - a.chot)
-  }, [customers, interactions, orders, profiles, tuNgay, denNgay, filterSale, maDaChot])
-
-  // Dòng TỔNG của bảng chỉ số từng sale
-  const tongSale = useMemo(() => {
-    const t = theoSale.reduce((s, r) => ({
-      dataChia: s.dataChia + r.dataChia, dataTuNhap: s.dataTuNhap + r.dataTuNhap, tuVan: s.tuVan + r.tuVan,
-      luotCS: s.luotCS + r.luotCS, chot: s.chot + r.chot, doanhSo: s.doanhSo + r.doanhSo,
-    }), { dataChia: 0, dataTuNhap: 0, tuVan: 0, luotCS: 0, chot: 0, doanhSo: 0 })
-    return { ...t, tiLe: t.dataChia ? Math.round((t.tuVan / t.dataChia) * 100) : null }
-  }, [theoSale])
-
-  // ===== Chỉ số theo từng NGUỒN data (Giới thiệu / Tự tìm kiếm / Marketing / Khác) =====
-  const theoNguon = useMemo(() => {
-    const nguonCua = (c) => (NGUON_KHACH_OPTIONS.some((n) => n.value === c?.nguon_khach) ? c.nguon_khach : 'khac')
-    const m = {}
-    for (const n of NGUON_KHACH_OPTIONS) m[n.value] = { nguon: n.value, dataVao: 0, tuVan: 0, daChot: 0, donChot: 0, doanhSo: 0 }
-    for (const c of khachTrongKy) {
-      const r = m[nguonCua(c)]
-      r.dataVao += 1
-      if (c.trang_thai_cham_soc === 'dang_tu_van' || maDaChot.includes(c.trang_thai_cham_soc)) r.tuVan += 1
-      if (maDaChot.includes(c.trang_thai_cham_soc)) r.daChot += 1
-    }
-    // Đơn chốt / doanh số trong kỳ tính theo nguồn của khách đã mua
-    const khachTheoId = new Map(customers.map((c) => [c.id, c]))
-    for (const o of donLoc) {
-      if (!trongKy(o.ngay_chot)) continue
-      const r = m[nguonCua(khachTheoId.get(o.customer_id))]
-      r.donChot += 1
-      r.doanhSo += giaTruocVat(o.gia_tri)
-    }
-    const ds = Object.values(m).map((r) => ({
-      ...r,
-      tiLeTuVan: r.dataVao ? Math.round((r.tuVan / r.dataVao) * 100) : null,
-      tiLeChot: r.dataVao ? Math.round((r.daChot / r.dataVao) * 100) : null,
-    }))
-    const tong = ds.reduce((s, r) => ({
-      dataVao: s.dataVao + r.dataVao, tuVan: s.tuVan + r.tuVan, daChot: s.daChot + r.daChot,
-      donChot: s.donChot + r.donChot, doanhSo: s.doanhSo + r.doanhSo,
-    }), { dataVao: 0, tuVan: 0, daChot: 0, donChot: 0, doanhSo: 0 })
-    tong.tiLeTuVan = tong.dataVao ? Math.round((tong.tuVan / tong.dataVao) * 100) : null
-    tong.tiLeChot = tong.dataVao ? Math.round((tong.daChot / tong.dataVao) * 100) : null
-    return { ds, tong }
-  }, [khachTrongKy, customers, donLoc, tuNgay, denNgay, maDaChot])
-
-  // ===== Ma trận nguồn × sale =====
-  const maTran = useMemo(() => {
-    const khachChia = khachTrongKy.filter(laDataDuocChia)
-    const saleIds = [...new Set(khachChia.map((c) => c.sale_id).filter(Boolean))]
-    const nguons = NGUON_KHACH_OPTIONS.map((n) => n.value)
-    const bang = saleIds.map((sid) => {
-      const o = { id: sid, ten: tenSale(sid), cot: {}, tong: 0, tongChot: 0 }
-      for (const n of nguons) {
-        const ds = khachChia.filter((c) => c.sale_id === sid && (c.nguon_khach || 'khac') === n)
-        const chot = ds.filter((c) => maDaChot.includes(c.trang_thai_cham_soc)).length
-        o.cot[n] = { tong: ds.length, chot }
-        o.tong += ds.length
-        o.tongChot += chot
-      }
-      return o
-    }).filter((r) => r.tong > 0).sort((a, b) => b.tong - a.tong)
-    return { nguons, bang }
-  }, [khachTrongKy, profiles, maDaChot])
 
   // ===== Khách bị bỏ quên =====
   const boQuen = useMemo(() => {
@@ -192,25 +89,13 @@ export default function AnalyticsPage() {
       .slice(0, 12)
   }, [khachLoc])
 
-  // ===== Tốc độ chốt =====
-  const tocDoChot = useMemo(() => {
-    const ds = []
-    for (const o of donLoc) {
-      const c = customers.find((x) => x.id === o.customer_id)
-      if (!c?.created_at || !o.ngay_chot) continue
-      const d = Math.floor((new Date(o.ngay_chot) - new Date(c.created_at)) / 86400000)
-      if (d >= 0) ds.push(d)
-    }
-    return ds.length ? Math.round(ds.reduce((a, b) => a + b, 0) / ds.length) : null
-  }, [donLoc, customers])
-
-  const maxPheu = Math.max(...pheu.buoc.map((b) => b.so), 1)
+  const so1 = (n) => String(Math.round(n * 10) / 10).replace('.', ',')
 
   return (
     <div className="flex-1 overflow-y-auto">
       <header className="border-b border-slate-200 bg-white px-8 py-5">
         <h1 className="font-display text-xl font-bold text-navy-900">Hiệu suất Sale</h1>
-        <p className="text-sm text-ink-600">Phễu chuyển đổi, chỉ số từng sale và chất lượng từng nguồn data</p>
+        <p className="text-sm text-ink-600">Khách đang nằm ở bước nào trong quy trình chăm sóc, và khách nào đang bị bỏ quên</p>
       </header>
 
       <div className="mx-8 mt-6 flex flex-wrap items-end gap-3 rounded-2xl bg-white p-4 shadow-sm">
@@ -241,189 +126,73 @@ export default function AnalyticsPage() {
       {loading ? (
         <p className="py-16 text-center text-ink-400">Đang tải...</p>
       ) : (
-        <div className="space-y-4 p-8">
-          <Panel title="Phễu chuyển đổi">
-            <div className="mb-3 flex items-baseline gap-2">
-              <span className="font-display text-2xl font-bold text-navy-900">{pheu.tong}</span>
-              <span className="text-sm text-ink-600">khách vào data trong kỳ</span>
+        <div className="space-y-5 p-8">
+          {/* Chỉ số nhanh */}
+          <div className="grid grid-cols-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
+            <div className="px-5 py-4">
+              <p className="text-sm text-ink-600">Khách vào data</p>
+              <p className="mt-1 font-display text-2xl font-bold text-navy-900">{pheu.tong}</p>
             </div>
-            <div className="space-y-3">
-              {pheu.buoc.map((b) => {
-                const pct = pheu.tong ? Math.round((b.so / pheu.tong) * 100) : 0
-                return (
-                  <div key={b.value}>
-                    <div className="mb-1 flex items-baseline justify-between text-sm">
-                      <span className="font-medium text-navy-900">{b.label}</span>
-                      <span className="text-ink-600">
-                        <b className="text-navy-900">{b.so}</b>
-                        <span className="ml-2 text-ink-400">({pct}%)</span>
-                      </span>
-                    </div>
-                    <div className="h-7 overflow-hidden rounded-lg bg-slate-100">
-                      <div className="h-full rounded-lg bg-coral-500 transition-all"
-                        style={{ width: `${b.so ? Math.max((b.so / maxPheu) * 100, 4) : 0}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-
+            <div className="px-5 py-4">
+              <p className="text-sm text-ink-600">Đã chốt</p>
+              <p className="mt-1 font-display text-2xl font-bold text-teal-500">{pheu.chot}</p>
             </div>
-            <p className="mt-3 text-xs text-ink-400">
-              Mỗi khách chỉ nằm ở đúng một bước theo trạng thái hiện tại, không cộng dồn — tổng các bước bằng số data vào.
-              Khách ùn ở bước nào thì đó là chỗ team đang tắc.
-            </p>
-          </Panel>
+            <div className="px-5 py-4">
+              <p className="text-sm text-ink-600">Tỷ lệ chốt</p>
+              <p className="mt-1 font-display text-2xl font-bold text-coral-500">{so1(pheu.tyLeChot)}%</p>
+            </div>
+          </div>
 
-          <Panel title="Chỉ số từng sale trong kỳ">
-            {theoSale.length === 0 ? <Empty /> : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[820px] text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
-                      <th className="pb-2">Sale</th>
-                      <th className="pb-2 text-right">Data được chia</th>
-                      <th className="pb-2 text-right font-normal normal-case text-ink-400">Tự nhập</th>
-                      <th className="pb-2 text-right">Vào tư vấn</th>
-                      <th className="pb-2 text-right">Lượt CS</th>
-                      <th className="pb-2 text-right">Đơn chốt</th>
-                      <th className="pb-2 text-right">Tỉ lệ tư vấn</th>
-                      <th className="pb-2 text-right">Doanh số (chưa VAT)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {theoSale.map((s) => (
-                      <tr key={s.id} className="border-t border-slate-50">
-                        <td className="py-2.5 font-medium text-navy-900">{s.ten}</td>
-                        <td className="py-2.5 text-right font-medium text-navy-900">{s.dataChia}</td>
-                        <td className="py-2.5 text-right text-ink-400">{s.dataTuNhap || '—'}</td>
-                        <td className="py-2.5 text-right text-ink-600">{s.tuVan}</td>
-                        <td className="py-2.5 text-right text-ink-600">{s.luotCS}</td>
-                        <td className="py-2.5 text-right font-medium text-navy-900">{s.chot}</td>
-                        <td className="py-2.5 text-right">
-                          {s.tiLe === null
-                            ? <span className="text-ink-400">—</span>
-                            : <span className={s.tiLe >= 30 ? 'text-emerald-600' : 'text-ink-600'}>{s.tiLe}%</span>}
-                        </td>
-                        <td className="py-2.5 text-right font-medium text-navy-900">{formatVnd(s.doanhSo)}</td>
-                      </tr>
-                    ))}
-                    <tr className="border-t-2 border-slate-200 bg-indigo-50 font-bold text-indigo-700">
-                      <td className="py-2.5 pl-2">TỔNG</td>
-                      <td className="py-2.5 text-right">{tongSale.dataChia}</td>
-                      <td className="py-2.5 text-right">{tongSale.dataTuNhap || '—'}</td>
-                      <td className="py-2.5 text-right">{tongSale.tuVan}</td>
-                      <td className="py-2.5 text-right">{tongSale.luotCS}</td>
-                      <td className="py-2.5 text-right">{tongSale.chot}</td>
-                      <td className="py-2.5 text-right">{tongSale.tiLe === null ? '—' : `${tongSale.tiLe}%`}</td>
-                      <td className="py-2.5 pr-2 text-right">{formatVnd(tongSale.doanhSo)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+          {/* Phễu */}
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <h2 className="font-display text-base font-semibold text-navy-900">Khách đang ở bước nào</h2>
+            <p className="mt-0.5 text-xs text-ink-400">Mỗi khách chỉ nằm ở một bước theo trạng thái hiện tại. Bước nào dày nhất là chỗ team đang ùn.</p>
+
+            {pheu.tong === 0 ? (
+              <p className="py-10 text-center text-sm text-ink-400">Chưa có khách nào vào data trong kỳ này.</p>
+            ) : (
+              <>
+                {/* Thanh tổng: nhìn một lần thấy cơ cấu */}
+                <div className="mt-4 flex h-3.5 overflow-hidden rounded-full bg-slate-100">
+                  {pheu.co.map((b) => (
+                    <div key={b.ma} style={{ width: `${b.pt}%`, backgroundColor: MAU_HEX[b.mau] || MAU_HEX.slate }}
+                      title={`${b.ten}: ${b.so} khách`} />
+                  ))}
+                </div>
+
+                <ul className="mt-5 divide-y divide-slate-100">
+                  {pheu.co.map((b) => {
+                    const mau = MAU_HEX[b.mau] || MAU_HEX.slate
+                    return (
+                      <li key={b.ma} className="grid grid-cols-[minmax(150px,220px)_1fr_auto] items-center gap-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ backgroundColor: mau }} />
+                          <span className="font-medium text-navy-900">{b.ten}</span>
+                          {b.chot && <CheckCircle2 size={14} className="flex-none text-emerald-500" aria-label="Đã chốt" />}
+                        </div>
+                        <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(b.pt, 2)}%`, backgroundColor: mau }} />
+                        </div>
+                        <div className="w-28 text-right">
+                          <span className="font-display text-lg font-bold text-navy-900">{b.so}</span>
+                          <span className="ml-2 text-sm text-ink-400">{so1(b.pt)}%</span>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+
+                {pheu.trong.length > 0 && (
+                  <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-ink-400">
+                    Chưa có khách ở: {pheu.trong.map((b) => b.ten).join(' · ')}
+                  </p>
+                )}
+              </>
             )}
-            <p className="mt-3 text-xs text-ink-400">
-              <b>Data được chia</b> chỉ tính khách do người khác giao cho sale — khách sale tự nhập hoặc tự nhận từ data chung
-              không được tính, để so sánh giữa các sale cho công bằng. Tỉ lệ tư vấn cũng tính trên riêng phần data được chia.
-              Lượt CS = số lần ghi lịch sử chăm sóc. Đơn chốt và doanh số lấy theo ngày chốt đơn.
-            </p>
-          </Panel>
+          </section>
 
-          <Panel title="Chỉ số theo từng nguồn data">
-            {theoNguon.tong.dataVao === 0 && theoNguon.tong.donChot === 0 ? <Empty /> : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[820px] text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
-                      <th className="pb-2">Nguồn data</th>
-                      <th className="pb-2 text-right">Data vào</th>
-                      <th className="pb-2 text-right">Vào tư vấn</th>
-                      <th className="pb-2 text-right">Đã chốt HĐ</th>
-                      <th className="pb-2 text-right">Tỉ lệ tư vấn</th>
-                      <th className="pb-2 text-right">Tỉ lệ chốt</th>
-                      <th className="pb-2 text-right">Đơn chốt</th>
-                      <th className="pb-2 text-right">Doanh số (chưa VAT)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {theoNguon.ds.map((r) => (
-                      <tr key={r.nguon} className="border-t border-slate-50">
-                        <td className="py-2.5 font-medium text-navy-900">{labelOf(NGUON_KHACH_OPTIONS, r.nguon)}</td>
-                        <td className="py-2.5 text-right text-ink-600">{r.dataVao}</td>
-                        <td className="py-2.5 text-right text-ink-600">{r.tuVan}</td>
-                        <td className="py-2.5 text-right text-ink-600">{r.daChot}</td>
-                        <td className="py-2.5 text-right text-ink-600">{r.tiLeTuVan === null ? '—' : `${r.tiLeTuVan}%`}</td>
-                        <td className="py-2.5 text-right">
-                          {r.tiLeChot === null ? <span className="text-ink-400">—</span>
-                            : <span className={r.tiLeChot >= 20 ? 'text-emerald-600' : 'text-ink-600'}>{r.tiLeChot}%</span>}
-                        </td>
-                        <td className="py-2.5 text-right text-ink-600">{r.donChot}</td>
-                        <td className="py-2.5 text-right font-medium text-navy-900">{formatVnd(r.doanhSo)}</td>
-                      </tr>
-                    ))}
-                    <tr className="border-t-2 border-slate-200 bg-indigo-50 font-bold text-indigo-700">
-                      <td className="py-2.5 pl-2">TỔNG</td>
-                      <td className="py-2.5 text-right">{theoNguon.tong.dataVao}</td>
-                      <td className="py-2.5 text-right">{theoNguon.tong.tuVan}</td>
-                      <td className="py-2.5 text-right">{theoNguon.tong.daChot}</td>
-                      <td className="py-2.5 text-right">{theoNguon.tong.tiLeTuVan === null ? '—' : `${theoNguon.tong.tiLeTuVan}%`}</td>
-                      <td className="py-2.5 text-right">{theoNguon.tong.tiLeChot === null ? '—' : `${theoNguon.tong.tiLeChot}%`}</td>
-                      <td className="py-2.5 text-right">{theoNguon.tong.donChot}</td>
-                      <td className="py-2.5 pr-2 text-right">{formatVnd(theoNguon.tong.doanhSo)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <p className="mt-3 text-xs text-ink-400">
-              <b>Data vào</b> = khách được tạo trong kỳ, tính cả data được chia và data sale tự nhập. <b>Vào tư vấn</b> = đang tư vấn hoặc đã chốt.
-              <b> Tỉ lệ tư vấn / chốt</b> tính trên data vào. <b>Đơn chốt và doanh số</b> lấy theo ngày chốt đơn, tính theo nguồn của khách đã mua.
-            </p>
-          </Panel>
-
-          <Panel title="Nguồn khách theo từng sale">
-            {maTran.bang.length === 0 ? <Empty /> : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[700px] text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
-                      <th className="pb-2">Sale</th>
-                      {maTran.nguons.map((n) => (
-                        <th key={n} className="pb-2 text-right">{labelOf(NGUON_KHACH_OPTIONS, n)}</th>
-                      ))}
-                      <th className="pb-2 text-right">Tổng</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {maTran.bang.map((r) => (
-                      <tr key={r.id} className="border-t border-slate-50">
-                        <td className="py-2.5 font-medium text-navy-900">{r.ten}</td>
-                        {maTran.nguons.map((n) => (
-                          <td key={n} className="py-2.5 text-right">
-                            {r.cot[n].tong === 0 ? <span className="text-ink-400">—</span> : (
-                              <span className="text-ink-600">
-                                {r.cot[n].tong}
-                                {r.cot[n].chot > 0 && <b className="ml-1 text-emerald-600">({r.cot[n].chot} chốt)</b>}
-                              </span>
-                            )}
-                          </td>
-                        ))}
-                        <td className="py-2.5 text-right font-medium text-navy-900">
-                          {r.tong}
-                          {r.tongChot > 0 && <b className="ml-1 text-emerald-600">({r.tongChot})</b>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <p className="mt-3 text-xs text-ink-400">
-              Chỉ tính data được chia. Số đầu là lượng khách nhận từ nguồn đó, số trong ngoặc màu xanh là số đã ký hợp đồng.
-              Giúp biết mỗi sale mạnh ở nguồn nào để chia data cho đúng người.
-            </p>
-          </Panel>
-
-          <Panel title={`Khách bị bỏ quên (quá ${NGAY_BO_QUEN} ngày chưa liên hệ lại)`}>
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <h2 className="mb-3 font-display text-base font-semibold text-navy-900">Khách bị bỏ quên <span className="text-sm font-normal text-ink-400">(quá {NGAY_BO_QUEN} ngày chưa liên hệ lại)</span></h2>
             {boQuen.length === 0 ? (
               <p className="py-6 text-center text-sm text-emerald-600">Không có khách nào bị bỏ quên. Team đang bám sát tốt.</p>
             ) : (
@@ -461,31 +230,15 @@ export default function AnalyticsPage() {
                 </table>
               </>
             )}
-          </Panel>
-
-          <Panel title="Tốc độ chốt trung bình">
-            {tocDoChot === null ? <Empty /> : (
-              <div className="flex items-baseline gap-3">
-                <span className="font-display text-4xl font-bold text-coral-500">{tocDoChot}</span>
-                <span className="text-ink-600">ngày từ lúc khách vào data đến khi chốt đơn</span>
-              </div>
-            )}
-          </Panel>
+          </section>
         </div>
       )}
     </div>
   )
 }
 
-function Panel({ title, children }) {
-  return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm">
-      <h2 className="mb-3 font-display font-semibold text-navy-900">{title}</h2>
-      {children}
-    </div>
-  )
-}
-
-function Empty() {
-  return <p className="py-6 text-center text-sm text-ink-400">Chưa có dữ liệu trong kỳ này.</p>
+// Màu hiển thị cho từng trạng thái (khớp với màu chọn trong phần Trạng thái)
+const MAU_HEX = {
+  slate: '#94a3b8', orange: '#fb923c', amber: '#f59e0b', emerald: '#10b981', teal: '#14b8a6',
+  violet: '#8b5cf6', rose: '#f43f5e', coral: '#ff6b45', sky: '#0ea5e9', navy: '#0f2438',
 }
