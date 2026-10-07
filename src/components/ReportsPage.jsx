@@ -141,22 +141,22 @@ export default function ReportsPage() {
       ) : (
         <div className="space-y-6 px-8 py-6">
           {/* Thẻ tổng quan */}
-          {loai === 'chung' || loai === 'dich_vu' ? (
-            <div className="grid grid-cols-3 gap-4">
-              <Card label="Tổng doanh số" mau="text-indigo-700" value={formatVnd(tongChung.tong)} sub={`${tongChung.soDon} đơn`} />
-              <Card label="Đơn mới" mau="text-coral-500" value={formatVnd(tongChung.moi)}
-                sub={`${tongChung.soDonMoi} đơn · ${phanTram(tongChung.moi, tongChung.tong)}`} />
-              <Card label="Tái ký" mau="text-teal-500" value={formatVnd(tongChung.tai_ky)}
-                sub={`${tongChung.soDonTaiKy} đơn · ${phanTram(tongChung.tai_ky, tongChung.tong)}`} />
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-4">
-              <Card label={loai === 'moi' ? 'Tổng doanh số đơn mới' : 'Tổng doanh số tái ký'}
-                mau="text-indigo-700" value={formatVnd(tong.tong)} />
-              <Card label="Số đơn" value={tong.soDon} />
-              <Card label="Giá trị trung bình / đơn" value={formatVnd(tong.soDon ? tong.tong / tong.soDon : 0)} />
-            </div>
-          )}
+          <div className="grid grid-cols-3 gap-4">
+            <Card label="Tổng doanh số" mau="text-indigo-700" value={formatVnd(tongChung.tong)} sub={`${tongChung.soDon} đơn`} />
+            <Card label="Đơn mới" mau="text-coral-500" value={formatVnd(tongChung.moi)}
+              sub={`${tongChung.soDonMoi} đơn · ${phanTram(tongChung.moi, tongChung.tong)}`} />
+            <Card label="Tái ký" mau="text-teal-500" value={formatVnd(tongChung.tai_ky)}
+              sub={`${tongChung.soDonTaiKy} đơn · ${phanTram(tongChung.tai_ky, tongChung.tong)}`} />
+          </div>
+          {/* Doanh số theo nhóm dịch vụ */}
+          <div className="grid grid-cols-3 gap-4">
+            <Card label="Xây shop + Tối ưu sản phẩm" mau="text-amber-700" value={formatVnd(tongChung.Seller)}
+              sub={phanTram(tongChung.Seller, tongChung.tong)} />
+            <Card label="Chạy quảng cáo (ADS)" mau="text-violet-700" value={formatVnd(tongChung.ADS)}
+              sub={phanTram(tongChung.ADS, tongChung.tong)} />
+            <Card label="Dịch vụ bổ sung" mau="text-slate-600" value={formatVnd(tongChung['Bổ sung'])}
+              sub={phanTram(tongChung['Bổ sung'], tongChung.tong)} />
+          </div>
 
           {/* Báo cáo 1-3: theo sale + theo tháng */}
           {loai !== 'dich_vu' && (
