@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye, Printer, Download, Trash2 } from 'lucide-react'
+import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye, Printer, Download, Trash2, Save } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Modal, Textarea } from './ui'
 import { TRANG_THAI_HD_OPTIONS, classOf, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
@@ -349,10 +349,12 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
     so_san_pham: contract.so_san_pham || goiKhop0?.so_san_pham || '',
     ten_goi: contract.ten_goi || (dichVu || []).map((d) => d.ten_goi).filter(Boolean).join(', '),
     ngay_bat_dau: contract.ngay_bat_dau || '',
-    noi_dung: goiKhop0?.noi_dung_hd || '',  // mỗi dòng: "Nội dung | Chi tiết" — tự điền theo gói, sửa được
+    noi_dung: contract.noi_dung_hd || goiKhop0?.noi_dung_hd || '',  // mỗi dòng: "Nội dung | Chi tiết" — tự điền theo gói, sửa được
   })
   const [dangXuat, setDangXuat] = useState(false)
   const [msg, setMsg] = useState('')
+  const [dangLuu, setDangLuu] = useState(false)
+  const [daLuu, setDaLuu] = useState('')
   const [xemTruoc, setXemTruoc] = useState(false)
 
   // Đổi loại hợp đồng (ads/xay_shop) thì dò lại gói khớp để điền lại số SP/nội dung
@@ -396,15 +398,17 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
     }
   }
 
-  async function xuat() {
-    setDangXuat(true); setMsg('')
-    // Lưu lại thông tin bên A vào khách + thông tin hợp đồng để lần sau khỏi nhập lại
-    await supabase.from('customers').update({
+  // Lưu thông tin Bên A vào hồ sơ khách + thông tin hợp đồng để lần sau khỏi nhập lại.
+  // Trả về chuỗi lỗi (rỗng nếu lưu được).
+  async function luuThongTin() {
+    const { error: e1 } = await supabase.from('customers').update({
       dia_chi: form.dia_chi || null, mst: form.mst || null,
       nguoi_dai_dien: form.nguoi_dai_dien || null, chuc_vu: form.chuc_vu || null,
       email: form.email || null, ten_viet_tat: vtat || null,
+      link_shop: form.link_shop || null,
     }).eq('id', khach.id)
-    await supabase.from('contracts').update({
+    if (e1) return e1.message
+    const { error: e2 } = await supabase.from('contracts').update({
       so_hop_dong: soHD, loai_dich_vu: loaiDV,
       so_luong_gian_hang: Number(form.so_luong_gian_hang) || 1,
       so_san_pham: form.so_san_pham ? Number(form.so_san_pham) : null,
@@ -412,6 +416,21 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
       ngay_bat_dau: form.ngay_bat_dau || null,
       noi_dung_hd: form.noi_dung || null,
     }).eq('id', contract.id)
+    return e2 ? e2.message : ''
+  }
+
+  async function luu() {
+    setDangLuu(true); setMsg(''); setDaLuu('')
+    const loi = await luuThongTin()
+    setDangLuu(false)
+    if (loi) setMsg('Không lưu được: ' + loi)
+    else setDaLuu('Đã lưu thông tin')
+  }
+
+  async function xuat() {
+    setDangXuat(true); setMsg(''); setDaLuu('')
+    const loi = await luuThongTin()
+    if (loi) { setDangXuat(false); setMsg('Không lưu được: ' + loi); return }
 
     try {
       const { taoFileHopDong } = await import('../lib/hopDong')
@@ -507,11 +526,15 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
         </div>
 
         {msg && <p className="text-sm text-rose-600">{msg}</p>}
+        {daLuu && <p className="text-sm font-medium text-emerald-600">✓ {daLuu}</p>}
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>Hủy</Button>
           <Button type="button" variant="secondary" onClick={() => setXemTruoc(true)}>
             <Eye size={15} /> Xem trước
+          </Button>
+          <Button type="button" variant="secondary" onClick={luu} disabled={dangLuu || dangXuat}>
+            <Save size={15} /> {dangLuu ? 'Đang lưu...' : 'Lưu'}
           </Button>
           <Button type="button" onClick={xuat} disabled={dangXuat}>
             <FileDown size={15} /> {dangXuat ? 'Đang tạo file...' : 'Tải hợp đồng Word'}
