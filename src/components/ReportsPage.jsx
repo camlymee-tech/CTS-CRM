@@ -22,6 +22,7 @@ const thangHienThi = (s) => s.split('-').reverse().join('/')
 
 export default function ReportsPage() {
   const [orders, setOrders] = useState([])
+  const [ordersHuy, setOrdersHuy] = useState([])
   const [items, setItems] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -41,13 +42,14 @@ export default function ReportsPage() {
   async function load() {
     setLoading(true)
     const [{ data: ords }, { data: its }, { data: profs }, { data: khs }] = await Promise.all([
-      supabase.from('orders').select('*').neq('trang_thai', 'huy'),
+      supabase.from('orders').select('*'),
       supabase.from('order_items').select('*'),
       supabase.from('profiles').select('id, full_name'),
       supabase.from('customers').select('id, nguon_khach'),
     ])
     setNguonKhach(Object.fromEntries((khs || []).map((k) => [k.id, k.nguon_khach])))
-    setOrders(ords || [])
+    setOrders((ords || []).filter((o) => o.trang_thai !== 'huy'))
+    setOrdersHuy((ords || []).filter((o) => o.trang_thai === 'huy'))
     setItems(its || [])
     setProfiles(profs || [])
     setLoading(false)
@@ -61,6 +63,15 @@ export default function ReportsPage() {
   const ordersLoc = useMemo(
     () => (filterNguon ? orders.filter((o) => nguonKhach[o.customer_id] === filterNguon) : orders),
     [orders, filterNguon, nguonKhach],
+  )
+  const ordersHuyLoc = useMemo(
+    () => (filterNguon ? ordersHuy.filter((o) => nguonKhach[o.customer_id] === filterNguon) : ordersHuy),
+    [ordersHuy, filterNguon, nguonKhach],
+  )
+  // Đơn hoàn / huỷ trong cùng bộ lọc (tính theo ngày chốt của đơn)
+  const dongHuy = useMemo(
+    () => taoDong({ orders: ordersHuyLoc, items, tuNgay, denNgay, sale: filterSale, nhom: filterNhom }),
+    [ordersHuyLoc, items, tuNgay, denNgay, filterSale, filterNhom],
   )
   const dong = useMemo(
     () => taoDong({ orders: ordersLoc, items, tuNgay, denNgay, sale: filterSale, nhom: filterNhom }),
@@ -76,6 +87,7 @@ export default function ReportsPage() {
   const theoThang = useMemo(() => gom(dongBaoCao, (r) => r.thang).sort((a, b) => a.key.localeCompare(b.key)), [dongBaoCao])
   const tong = useMemo(() => cong(theoSale), [theoSale])
   const theoDichVu = useMemo(() => gomDichVu(dong, chiTietGoi), [dong, chiTietGoi])
+  const tongHuy = useMemo(() => cong(gom(dongHuy, () => 'x')), [dongHuy])
   const tongChung = useMemo(() => cong(gom(dong, () => 'x')), [dong])  // tổng mọi dòng đang lọc (mới + tái ký)
 
   const moTaKy = ky === 'tat_ca' ? 'Tất cả thời gian'
@@ -91,7 +103,7 @@ export default function ReportsPage() {
           {macDinh ? `Tổng kết doanh số tháng ${thangDangXem}` : 'Báo cáo doanh số'}
         </h1>
         <p className="text-sm text-ink-600">
-          {macDinh ? 'Tất cả sale · ' : ''}Cần xem kỳ, sale, dịch vụ hoặc nguồn khác thì chọn bộ lọc bên dưới · không tính đơn huỷ · số liệu chưa gồm VAT
+          {macDinh ? 'Tất cả sale · ' : ''}Cần xem kỳ, sale, dịch vụ hoặc nguồn khác thì chọn bộ lọc bên dưới · doanh số thực đã trừ hoàn / huỷ · số liệu chưa gồm VAT
         </p>
       </header>
 
@@ -140,22 +152,40 @@ export default function ReportsPage() {
         <p className="py-16 text-center text-ink-400">Không có đơn nào trong bộ lọc này.</p>
       ) : (
         <div className="space-y-6 px-8 py-6">
-          {/* Thẻ tổng quan */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card label="Tổng doanh số" mau="text-indigo-700" value={formatVnd(tongChung.tong)} sub={`${tongChung.soDon} đơn`} />
-            <Card label="Đơn mới" mau="text-coral-500" value={formatVnd(tongChung.moi)}
-              sub={`${tongChung.soDonMoi} đơn · ${phanTram(tongChung.moi, tongChung.tong)}`} />
-            <Card label="Tái ký" mau="text-teal-500" value={formatVnd(tongChung.tai_ky)}
-              sub={`${tongChung.soDonTaiKy} đơn · ${phanTram(tongChung.tai_ky, tongChung.tong)}`} />
+          {/* Doanh số thực = doanh số gộp − hoàn / huỷ */}
+          <div className="grid grid-cols-1 overflow-hidden rounded-2xl bg-white shadow-sm md:grid-cols-3 md:divide-x md:divide-slate-100">
+            <div className="px-6 py-5">
+              <p className="text-sm text-ink-600">Doanh số gộp</p>
+              <p className="mt-1 font-display text-2xl font-bold text-navy-900">{formatVnd(tongChung.tong + tongHuy.tong)}</p>
+              <p className="mt-1 text-sm text-ink-400">{tongChung.soDon + tongHuy.soDon} đơn, trước khi trừ hoàn / huỷ</p>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-ink-600">Hoàn / huỷ</p>
+              <p className="mt-1 font-display text-2xl font-bold text-rose-500">
+                {tongHuy.tong > 0 ? '− ' : ''}{formatVnd(tongHuy.tong)}
+              </p>
+              <p className="mt-1 text-sm text-ink-400">
+                {tongHuy.soDon} đơn · {phanTram(tongHuy.tong, tongChung.tong + tongHuy.tong)} doanh số gộp
+              </p>
+            </div>
+            <div className="bg-indigo-50/70 px-6 py-5">
+              <p className="text-sm font-medium text-indigo-700">Doanh số thực</p>
+              <p className="mt-1 font-display text-3xl font-bold text-indigo-700">{formatVnd(tongChung.tong)}</p>
+              <p className="mt-1 text-sm text-indigo-700/70">{tongChung.soDon} đơn · gộp − hoàn / huỷ</p>
+            </div>
           </div>
-          {/* Doanh số theo nhóm dịch vụ */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card label="Xây shop + Tối ưu sản phẩm" mau="text-amber-700" value={formatVnd(tongChung.Seller)}
-              sub={phanTram(tongChung.Seller, tongChung.tong)} />
-            <Card label="Chạy quảng cáo (ADS)" mau="text-violet-700" value={formatVnd(tongChung.ADS)}
-              sub={phanTram(tongChung.ADS, tongChung.tong)} />
-            <Card label="Dịch vụ bổ sung" mau="text-slate-600" value={formatVnd(tongChung['Bổ sung'])}
-              sub={phanTram(tongChung['Bổ sung'], tongChung.tong)} />
+
+          {/* Cơ cấu doanh số thực: mới / tái ký và theo nhóm dịch vụ */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <CoCau tieuDe="Đơn mới và tái ký" tong={tongChung.tong} muc={[
+              { ten: 'Đơn mới', tien: tongChung.moi, don: tongChung.soDonMoi, hex: '#ff6b45' },
+              { ten: 'Tái ký', tien: tongChung.tai_ky, don: tongChung.soDonTaiKy, hex: '#14b8a6' },
+            ]} />
+            <CoCau tieuDe="Theo nhóm dịch vụ" tong={tongChung.tong} muc={[
+              { ten: 'Xây shop + Tối ưu SP', tien: tongChung.Seller, hex: '#f59e0b' },
+              { ten: 'Chạy quảng cáo (ADS)', tien: tongChung.ADS, hex: '#8b5cf6' },
+              { ten: 'Dịch vụ bổ sung', tien: tongChung['Bổ sung'], hex: '#94a3b8' },
+            ]} />
           </div>
 
           {/* Báo cáo 1-3: theo sale + theo tháng */}
@@ -350,6 +380,31 @@ function Panel({ title, children }) {
     <div className="rounded-2xl bg-white p-5 shadow-sm">
       <h2 className="mb-3 font-display font-semibold text-navy-900">{title}</h2>
       {children}
+    </div>
+  )
+}
+
+// Thanh 100% + chú thích có số tiền cho từng phần
+function CoCau({ tieuDe, tong, muc }) {
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-navy-900">{tieuDe}</h3>
+      <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-slate-100">
+        {muc.map((m) => m.tien > 0 && tong > 0 && (
+          <div key={m.ten} style={{ width: `${(m.tien / tong) * 100}%`, backgroundColor: m.hex }} title={`${m.ten}: ${formatVnd(m.tien)}`} />
+        ))}
+      </div>
+      <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${muc.length}, minmax(0, 1fr))` }}>
+        {muc.map((m) => (
+          <div key={m.ten}>
+            <p className="flex items-center gap-1.5 text-sm text-ink-600">
+              <span className="h-2 w-2 flex-none rounded-full" style={{ backgroundColor: m.hex }} />{m.ten}
+            </p>
+            <p className="mt-0.5 font-display text-lg font-bold text-navy-900">{formatVnd(m.tien)}</p>
+            <p className="text-xs text-ink-400">{phanTram(m.tien, tong)}{m.don !== undefined ? ` · ${m.don} đơn` : ''}</p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
