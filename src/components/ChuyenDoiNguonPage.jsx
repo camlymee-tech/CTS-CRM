@@ -248,15 +248,15 @@ export default function ChuyenDoiNguonPage() {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-sm">
+                  <table className="border-collapse w-full min-w-[640px] text-sm">
                     <thead>
-                      <tr className="text-left text-xs text-ink-400">
-                        <th className="px-5 py-2.5 font-medium">Sale</th>
-                        <th className="px-3 py-2.5 text-right font-medium">Data nhận</th>
-                        <th className="px-3 py-2.5 text-right font-medium">Đã chốt</th>
-                        <th className="w-56 px-3 py-2.5 font-medium">Tỷ lệ chốt</th>
-                        <th className="px-3 py-2.5 text-right font-medium">Doanh số</th>
-                        <th className="px-5 py-2.5 text-right font-medium">Giá trị mỗi data</th>
+                      <tr className="bg-slate-50 text-left text-xs text-ink-600">
+                        <th className="border border-slate-200 px-5 py-2.5 font-medium">Sale</th>
+                        <th className="border border-slate-200 px-3 py-2.5 text-right font-medium">Data nhận</th>
+                        <th className="border border-slate-200 px-3 py-2.5 text-right font-medium">Đã chốt</th>
+                        <th className="border border-slate-200 w-56 px-3 py-2.5 font-medium">Tỷ lệ chốt</th>
+                        <th className="border border-slate-200 px-3 py-2.5 text-right font-medium">Doanh số</th>
+                        <th className="border border-slate-200 px-5 py-2.5 text-right font-medium">Giá trị mỗi data</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -265,7 +265,7 @@ export default function ChuyenDoiNguonPage() {
                         const tot = nguonDangXem.sales.length > 1 && i === 0 && s.data >= 3 && s.chot > 0
                         return (
                           <tr key={s.id} className="border-t border-slate-100">
-                            <td className="px-5 py-3">
+                            <td className="border border-slate-200 px-5 py-3">
                               <div className="flex items-center gap-3">
                                 <span className={`flex h-8 w-8 flex-none items-center justify-center rounded-full text-xs font-semibold text-navy-900 ${nguonDangXem.mau.nhat}`}>
                                   {chuCai(tenSale(s.id))}
@@ -276,9 +276,9 @@ export default function ChuyenDoiNguonPage() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-3 py-3 text-right text-ink-600">{s.data}</td>
-                            <td className="px-3 py-3 text-right text-ink-600">{s.chot}</td>
-                            <td className="px-3 py-3">
+                            <td className="border border-slate-200 px-3 py-3 text-right text-ink-600">{s.data}</td>
+                            <td className="border border-slate-200 px-3 py-3 text-right text-ink-600">{s.chot}</td>
+                            <td className="border border-slate-200 px-3 py-3">
                               <div className="flex items-center gap-2">
                                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                                   <div className={`h-full rounded-full ${nguonDangXem.mau.thanh}`} style={{ width: `${Math.max(tyLe, tyLe > 0 ? 3 : 0)}%` }} />
@@ -286,8 +286,8 @@ export default function ChuyenDoiNguonPage() {
                                 <span className="w-12 text-right font-semibold text-navy-900">{so1(tyLe)}%</span>
                               </div>
                             </td>
-                            <td className="px-3 py-3 text-right font-medium text-navy-900" title={formatVnd(s.tien)}>{rutGon(s.tien)}</td>
-                            <td className="px-5 py-3 text-right text-indigo-700" title={formatVnd(Math.round(s.data ? s.tien / s.data : 0))}>
+                            <td className="border border-slate-200 px-3 py-3 text-right font-medium text-navy-900" title={formatVnd(s.tien)}>{rutGon(s.tien)}</td>
+                            <td className="border border-slate-200 px-5 py-3 text-right text-indigo-700" title={formatVnd(Math.round(s.data ? s.tien / s.data : 0))}>
                               {rutGon(s.data ? s.tien / s.data : 0)}
                             </td>
                           </tr>

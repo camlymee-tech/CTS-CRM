@@ -199,22 +199,22 @@ export default function FeesImportModal({ onXong }) {
           )}
 
           <div className="max-h-52 overflow-y-auto rounded-lg border border-slate-200">
-            <table className="w-full text-xs">
+            <table className="border-collapse w-full text-xs">
               <thead className="sticky top-0 bg-slate-50">
-                <tr className="text-left text-ink-400">
-                  <th className="px-3 py-2">Ngành cấp 1</th>
-                  <th className="px-3 py-2">Ngành hàng</th>
-                  <th className="px-3 py-2 text-right">Tiêu chuẩn</th>
-                  <th className="px-3 py-2 text-right">Người bán mới</th>
+                <tr className="bg-slate-50 text-left text-ink-600">
+                  <th className="border border-slate-200 px-3 py-2">Ngành cấp 1</th>
+                  <th className="border border-slate-200 px-3 py-2">Ngành hàng</th>
+                  <th className="border border-slate-200 px-3 py-2 text-right">Tiêu chuẩn</th>
+                  <th className="border border-slate-200 px-3 py-2 text-right">Người bán mới</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.slice(0, 60).map((r, i) => (
                   <tr key={i} className="border-t border-slate-50">
-                    <td className="px-3 py-1.5 text-ink-600">{r.nganh_1}</td>
-                    <td className="px-3 py-1.5 text-navy-900">{r.nganh_2}</td>
-                    <td className="px-3 py-1.5 text-right font-medium text-coral-500">{r.phi_phan_tram}%</td>
-                    <td className="px-3 py-1.5 text-right text-emerald-600">
+                    <td className="border border-slate-200 px-3 py-1.5 text-ink-600">{r.nganh_1}</td>
+                    <td className="border border-slate-200 px-3 py-1.5 text-navy-900">{r.nganh_2}</td>
+                    <td className="border border-slate-200 px-3 py-1.5 text-right font-medium text-coral-500">{r.phi_phan_tram}%</td>
+                    <td className="border border-slate-200 px-3 py-1.5 text-right text-emerald-600">
                       {r.phi_nguoi_ban_moi != null ? r.phi_nguoi_ban_moi + '%' : '—'}
                     </td>
                   </tr>

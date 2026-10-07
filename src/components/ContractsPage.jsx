@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye, Printer, Download, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { Button, Input, Select, Badge, Modal, Textarea, Phantrang } from './ui'
+import { Button, Input, Select, Badge, Modal, Textarea } from './ui'
 import { TRANG_THAI_HD_OPTIONS, classOf, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
-import { taoSoHopDong, laSoChuan, vietTat } from '../lib/docSo'
+import { taoSoHopDong, vietTat } from '../lib/docSo'
 import ContractPreview from './ContractPreview'
-import { useBenB } from '../lib/benB'
 
 // Chuỗi "Tên | Chi tiết" mỗi dòng -> mảng [ [tên, chi tiết], ... ] cho bảng nội dung hợp đồng
 function parseNoiDung(text) {
@@ -28,23 +27,15 @@ function timGoiKhop(loaiDV, dichVu, packages) {
 
 // Dựng lại dữ liệu hợp đồng (đúng cấu trúc taoFileHopDong cần) từ 1 hợp đồng đã lưu,
 // dùng để xem trước ngay từ danh sách mà không cần mở lại form xuất file
-export function hdTuHopDongDaLuu(c, khach, benB) {
-  // Xem/In cũng phải theo đúng quy tắc số hợp đồng (DDMMYY/HĐDV/...) như lúc Xuất —
-  // nếu số đang lưu vẫn là số tạm (HD-YYYYMM-NNN) thì tính lại cho khớp, không hiện số cũ
-  const soHD = laSoChuan(c.so_hop_dong) ? c.so_hop_dong : taoSoHopDong({
-    loaiDichVu: c.loai_dich_vu || 'ads', ngay: c.ngay_ky, maKhach: khach?.ma_khach,
-  })
+export function hdTuHopDongDaLuu(c, khach) {
   return {
     loai_dich_vu: c.loai_dich_vu || 'ads',
-    so_hop_dong: soHD,
+    so_hop_dong: c.so_hop_dong,
     ngay_ky: c.ngay_ky,
     ten_khach: khach?.ten_khach,
     sdt: khach?.sdt,
     dia_chi: khach?.dia_chi, mst: khach?.mst,
-    ten_tieu_de_bena: khach?.ten_tieu_de_bena,
-    nguoi_dai_dien: khach?.nguoi_dai_dien, chuc_vu: khach?.chuc_vu,
-    so_tai_khoan: khach?.so_tai_khoan,
-    ben_b: benB?.[c.loai_dich_vu || 'ads'],
+    nguoi_dai_dien: khach?.nguoi_dai_dien, chuc_vu: khach?.chuc_vu, email: khach?.email,
     link_shop: khach?.link_shop,
     so_luong_gian_hang: c.so_luong_gian_hang || 1,
     so_san_pham: c.so_san_pham,
@@ -78,7 +69,7 @@ export default function ContractsPage({ currentProfile }) {
     setLoading(true)
     const [{ data: ct }, { data: cu }, { data: od }, { data: it }, { data: pf }, { data: pk }] = await Promise.all([
       supabase.from('contracts').select('*').order('ngay_ky', { ascending: false }),
-      supabase.from('customers').select('*'),
+      supabase.from('customers').select('id, ten_khach, ma_khach, sdt, dia_chi, mst, nguoi_dai_dien, chuc_vu, email, ten_viet_tat, link_shop'),
       supabase.from('orders').select('id, ma_don, sale_id'),
       supabase.from('order_items').select('*'),
       supabase.from('profiles').select('id, full_name'),
@@ -112,10 +103,6 @@ export default function ContractsPage({ currentProfile }) {
     }
     return true
   }), [contracts, customers, orders, items, search, filterTT, filterSale, tuNgay, denNgay])
-
-  const [trang, setTrang] = useState(1)
-  useEffect(() => { setTrang(1) }, [search, filterTT, filterSale, tuNgay, denNgay])
-  const phanTrang = useMemo(() => filtered.slice((trang - 1) * 20, trang * 20), [filtered, trang])
 
   const tongGiaTri = filtered.filter((c) => c.trang_thai !== 'da_huy')
     .reduce((s, c) => s + (Number(c.gia_tri) || 0), 0)
@@ -220,36 +207,36 @@ export default function ContractsPage({ currentProfile }) {
       </div>
 
       <div className="mx-8 my-6 overflow-x-auto rounded-2xl bg-white shadow-sm print:mx-0 print:shadow-none">
-        <table className="w-full min-w-[1000px] text-sm">
+        <table className="border-collapse w-full min-w-[1000px] text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
-              <th className="px-5 py-3">Số hợp đồng</th>
-              <th className="px-5 py-3">Khách hàng</th>
-              <th className="px-5 py-3">Dịch vụ</th>
-              <th className="px-5 py-3 text-right">Giá trị</th>
-              <th className="px-5 py-3">Ngày ký</th>
-              <th className="px-5 py-3">Hết hạn</th>
-              <th className="px-5 py-3">Sale</th>
-              <th className="px-5 py-3">Trạng thái</th>
-              <th className="px-5 py-3 print:hidden"></th>
+            <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-600">
+              <th className="border border-slate-200 px-5 py-3">Số hợp đồng</th>
+              <th className="border border-slate-200 px-5 py-3">Khách hàng</th>
+              <th className="border border-slate-200 px-5 py-3">Dịch vụ</th>
+              <th className="border border-slate-200 px-5 py-3 text-right">Giá trị</th>
+              <th className="border border-slate-200 px-5 py-3">Ngày ký</th>
+              <th className="border border-slate-200 px-5 py-3">Hết hạn</th>
+              <th className="border border-slate-200 px-5 py-3">Sale</th>
+              <th className="border border-slate-200 px-5 py-3">Trạng thái</th>
+              <th className="border border-slate-200 px-5 py-3 print:hidden"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
+              <tr><td colSpan={9} className="border border-slate-200 px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={9} className="px-5 py-8 text-center text-ink-400">
+              <tr><td colSpan={9} className="border border-slate-200 px-5 py-8 text-center text-ink-400">
                 {contracts.length === 0
                   ? 'Chưa có hợp đồng nào. Hợp đồng sẽ tự tạo khi bạn tạo đơn dịch vụ.'
                   : 'Không tìm thấy hợp đồng phù hợp.'}
               </td></tr>
-            ) : phanTrang.map((c) => {
+            ) : filtered.map((c) => {
               const k = khach(c.customer_id)
               const d = don(c.order_id)
               const hetHanSom = c.trang_thai === 'hieu_luc' && c.ngay_het_han && c.ngay_het_han < homNay
               return (
                 <tr key={c.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-5 py-3">
                     <button
                       onClick={() => (c.loai_dich_vu ? setXemHD(c) : setXuatHD(c))}
                       className="text-left font-medium text-navy-900 hover:text-coral-500 hover:underline print:no-underline print:text-navy-900"
@@ -258,11 +245,11 @@ export default function ContractsPage({ currentProfile }) {
                     </button>
                     {d && <p className="text-xs text-ink-400">Đơn {d.ma_don}</p>}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-5 py-3">
                     <p className="text-navy-900">{k?.ten_khach || '—'}</p>
                     <p className="text-xs text-ink-400">{k?.ma_khach}{k?.ma_khach && k?.sdt ? ' · ' : ''}{k?.sdt}</p>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-5 py-3">
                     <div className="flex flex-wrap gap-1">
                       {(items[c.order_id] || []).map((i) => (
                         <Badge key={i.id} className="bg-slate-100 text-slate-600">
@@ -271,21 +258,21 @@ export default function ContractsPage({ currentProfile }) {
                       ))}
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-right font-medium text-navy-900">{formatVnd(c.gia_tri)}</td>
-                  <td className="px-5 py-3 text-ink-600">{c.ngay_ky || '—'}</td>
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-5 py-3 text-right font-medium text-navy-900">{formatVnd(c.gia_tri)}</td>
+                  <td className="border border-slate-200 px-5 py-3 text-ink-600">{c.ngay_ky || '—'}</td>
+                  <td className="border border-slate-200 px-5 py-3">
                     <span className={hetHanSom ? 'text-rose-500' : 'text-ink-600'}>
                       {c.ngay_het_han || '—'}
                     </span>
                     {c.thoi_han_thang && <p className="text-xs text-ink-400">{c.thoi_han_thang} tháng</p>}
                   </td>
-                  <td className="px-5 py-3 text-ink-600">{tenSale(d?.sale_id)}</td>
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-5 py-3 text-ink-600">{tenSale(d?.sale_id)}</td>
+                  <td className="border border-slate-200 px-5 py-3">
                     <Badge className={classOf(TRANG_THAI_HD_OPTIONS, c.trang_thai)}>
                       {labelOf(TRANG_THAI_HD_OPTIONS, c.trang_thai)}
                     </Badge>
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-right print:hidden">
+                  <td className="border border-slate-200 whitespace-nowrap px-5 py-3 text-right print:hidden">
                     {c.file_url && (
                       <a href={c.file_url} target="_blank" rel="noreferrer"
                         className="mr-3 inline-flex text-teal-500 hover:text-teal-600" title="Mở file hợp đồng">
@@ -317,7 +304,6 @@ export default function ContractsPage({ currentProfile }) {
           </tbody>
         </table>
       </div>
-      <Phantrang trang={trang} setTrang={setTrang} tong={filtered.length} />
 
       {xuatHD && (
         <XuatHopDongForm
@@ -349,18 +335,15 @@ export default function ContractsPage({ currentProfile }) {
 export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClose, onSaved }) {
   const laXayShop = (dichVu || []).some((d) => /xây shop|tối ưu/i.test(d.ten_dich_vu))
   const [loaiDV, setLoaiDV] = useState(contract.loai_dich_vu || (laXayShop ? 'xay_shop' : 'ads'))
-  const { benB } = useBenB()
   const [vtat, setVtat] = useState(khach?.ten_viet_tat || vietTat(khach?.ten_khach))
   const goiKhop0 = timGoiKhop(loaiDV, dichVu, packages)
   const [form, setForm] = useState({
     ngay_ky: contract.ngay_ky || new Date().toISOString().slice(0, 10),
     dia_chi: khach?.dia_chi || '',
     mst: khach?.mst || '',
-    ten_tieu_de_bena: khach?.ten_tieu_de_bena || '',
     nguoi_dai_dien: khach?.nguoi_dai_dien || '',
     chuc_vu: khach?.chuc_vu || '',
-    sdt: khach?.sdt || '',
-    so_tai_khoan: khach?.so_tai_khoan || '',
+    email: khach?.email || '',
     link_shop: khach?.link_shop || '',
     so_luong_gian_hang: contract.so_luong_gian_hang || 1,
     so_san_pham: contract.so_san_pham || goiKhop0?.so_san_pham || '',
@@ -386,12 +369,11 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
     }
   }
 
-  // Số tạm (HD-YYYYMM-NNN) tự sinh lúc tạo đơn sẽ được thay bằng số chuẩn
-  // DDMMYY/HĐDV/TUKIADS|TUKISELLER-Mã KH ngay lần xuất đầu tiên; từ đó giữ nguyên,
-  // không đổi số mỗi lần xuất lại nữa
-  const soHD = laSoChuan(contract.so_hop_dong) ? contract.so_hop_dong : taoSoHopDong({
+  // Giữ nguyên số hợp đồng đã có (tự sinh lúc tạo đơn) — chỉ sinh số mới theo mẫu
+  // TUKISELLER/TUKIADS cho hợp đồng CHƯA từng có số, để không đổi số mỗi lần xuất lại
+  const soHD = contract.so_hop_dong || taoSoHopDong({
     loaiDichVu: loaiDV, ngay: form.ngay_ky,
-    maKhach: khach?.ma_khach,
+    maKhach: khach?.ma_khach, tenVietTat: vtat,
   })
 
   // Dữ liệu hợp đồng dựng từ form hiện tại — dùng chung cho cả Xem trước và Xuất file Word
@@ -401,12 +383,9 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
       so_hop_dong: soHD,
       ngay_ky: form.ngay_ky,
       ten_khach: khach?.ten_khach,
-      sdt: form.sdt,
+      sdt: khach?.sdt,
       dia_chi: form.dia_chi, mst: form.mst,
-      ten_tieu_de_bena: form.ten_tieu_de_bena,
-      nguoi_dai_dien: form.nguoi_dai_dien, chuc_vu: form.chuc_vu,
-      so_tai_khoan: form.so_tai_khoan,
-      ben_b: benB?.[loaiDV],
+      nguoi_dai_dien: form.nguoi_dai_dien, chuc_vu: form.chuc_vu, email: form.email,
       link_shop: form.link_shop,
       so_luong_gian_hang: Number(form.so_luong_gian_hang) || 1,
       so_san_pham: form.so_san_pham ? Number(form.so_san_pham) : null,
@@ -422,13 +401,9 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
     // Lưu lại thông tin bên A vào khách + thông tin hợp đồng để lần sau khỏi nhập lại
     await supabase.from('customers').update({
       dia_chi: form.dia_chi || null, mst: form.mst || null,
-      ten_tieu_de_bena: form.ten_tieu_de_bena || null,
       nguoi_dai_dien: form.nguoi_dai_dien || null, chuc_vu: form.chuc_vu || null,
-      so_tai_khoan: form.so_tai_khoan || null, ten_viet_tat: vtat || null,
+      email: form.email || null, ten_viet_tat: vtat || null,
     }).eq('id', khach.id)
-    if ((form.sdt || '') !== (khach.sdt || '')) {
-      await supabase.from('customers').update({ sdt: form.sdt || null }).eq('id', khach.id)
-    }
     await supabase.from('contracts').update({
       so_hop_dong: soHD, loai_dich_vu: loaiDV,
       so_luong_gian_hang: Number(form.so_luong_gian_hang) || 1,
@@ -451,9 +426,7 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
       onSaved()
     } catch (e) {
       setDangXuat(false)
-      setMsg(/Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(e.message)
-        ? 'Trang đang mở là bản cũ (do vừa có cập nhật mới) — tải lại trang (F5) rồi xuất lại nhé.'
-        : 'Lỗi tạo file: ' + e.message)
+      setMsg('Lỗi tạo file: ' + e.message)
     }
   }
 
@@ -465,7 +438,8 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
           <p className="font-display font-semibold text-navy-900">{khach?.ten_khach || '—'}</p>
           <p className="text-sm text-ink-600">Giá trị {formatVnd(contract.gia_tri)} (đã gồm VAT)</p>
           <p className="mt-1 text-xs text-ink-400">
-            Thông tin Bên A lấy từ hồ sơ khách hàng — sửa ở đây sẽ tự cập nhật lại luôn hồ sơ khách để dùng cho các hợp đồng sau. Thông tin Bên B (bên mình) sửa ở tab Hợp đồng của khách (dành cho quản trị).
+            Thông tin Bên A (địa chỉ, MST, người đại diện, link shop...) lấy từ hồ sơ khách hàng —
+            sửa ở đây sẽ tự cập nhật lại luôn hồ sơ khách để dùng chung cho các hợp đồng sau.
           </p>
         </div>
 
@@ -481,33 +455,30 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
         <div className="rounded-lg bg-teal-50 px-3 py-2 text-sm">
           <span className="text-ink-600">Số hợp đồng: </span>
           <span className="font-medium text-navy-900">{soHD}</span>
-          {laSoChuan(contract.so_hop_dong) && (
-            <span className="ml-1 text-xs text-ink-400">(giữ nguyên, không đổi khi xuất lại)</span>
+          {contract.so_hop_dong && (
+            <span className="ml-1 text-xs text-ink-400">(giữ nguyên số đã có, không đổi khi xuất lại)</span>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <Input label="Bên sử dụng dịch vụ (tên công ty / hộ kinh doanh)" value={form.ten_tieu_de_bena}
-              onChange={(e) => setForm({ ...form, ten_tieu_de_bena: e.target.value })} />
-          </div>
-          <Input label="Đại diện" value={form.nguoi_dai_dien}
+          {!contract.so_hop_dong && (
+            <Input label="Tên viết tắt (trong số HĐ)" value={vtat}
+              onChange={(e) => setVtat(e.target.value.toUpperCase())} />
+          )}
+          <Input label="Người đại diện (Bên A)" value={form.nguoi_dai_dien}
             onChange={(e) => setForm({ ...form, nguoi_dai_dien: e.target.value })} />
           <Input label="Chức vụ" value={form.chuc_vu}
             onChange={(e) => setForm({ ...form, chuc_vu: e.target.value })} />
+          <Input label="Mã số thuế" value={form.mst}
+            onChange={(e) => setForm({ ...form, mst: e.target.value })} />
           <div className="col-span-2">
             <Input label="Địa chỉ" value={form.dia_chi}
               onChange={(e) => setForm({ ...form, dia_chi: e.target.value })} />
           </div>
-          <Input label="MST" value={form.mst}
-            onChange={(e) => setForm({ ...form, mst: e.target.value })} />
-          <Input label="SĐT" value={form.sdt}
-            onChange={(e) => setForm({ ...form, sdt: e.target.value })} />
-          <div className="col-span-2">
-            <Input label="Số tài khoản" value={form.so_tai_khoan}
-              onChange={(e) => setForm({ ...form, so_tai_khoan: e.target.value })} />
-          </div>
-          <p className="col-span-2 -mt-2 text-xs text-ink-400">Ô nào để trống thì hợp đồng sẽ không hiện dòng đó.</p>
+          {loaiDV === 'xay_shop' && (
+            <Input label="Email" value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          )}
           <Input label="Link shop" value={form.link_shop}
             onChange={(e) => setForm({ ...form, link_shop: e.target.value })} />
           <Input label="Số lượng gian hàng" type="number" min="1" value={form.so_luong_gian_hang}

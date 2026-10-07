@@ -7,7 +7,7 @@ import CustomerDetail from './CustomerDetail'
 import PackagesModal from './PackagesModal'
 import { DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, classOf, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
-import { khoangNgay, nhomDichVu, NHOM } from '../lib/doanhSo'
+import { khoangNgay } from '../lib/doanhSo'
 
 // Trang báo cáo đơn dịch vụ — tạo đơn mới làm trong panel Khách hàng,
 // trang này chỉ để xem, lọc, sửa số liệu và xoá khi cần.
@@ -25,6 +25,13 @@ export default function OrdersPage({ currentProfile }) {
   const [den, setDen] = useState('')
   const [filterSale, setFilterSale] = useState('')
   const [filterTrangThai, setFilterTrangThai] = useState('')
+  // Chỉ lấy các trạng thái từ "Chốt hợp đồng" trở đi (khách đã có đơn)
+  const trangThaiTuChot = useMemo(() => {
+    const moc = TRANG_THAI.filter((o) => o.la_chot).map((o) => o.thu_tu)
+    if (moc.length === 0) return TRANG_THAI
+    const tu = Math.min(...moc)
+    return TRANG_THAI.filter((o) => o.thu_tu >= tu)
+  }, [TRANG_THAI])
   const [filterNguon, setFilterNguon] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -127,14 +134,11 @@ export default function OrdersPage({ currentProfile }) {
     return ds && ds.length ? ds.reduce((a, i) => a + giaTruocVat(i.gia), 0) : giaTruocVat(o.gia_tri)
   }
   const tong = useMemo(() => {
-    const t = { soDon: filtered.length, moi: 0, soMoi: 0, taiKy: 0, soTaiKy: 0, huy: 0, soHuy: 0, nhom: { Seller: 0, ADS: 0, 'Bổ sung': 0 }, nguon: {} }
+    const t = { soDon: filtered.length, moi: 0, soMoi: 0, taiKy: 0, soTaiKy: 0, huy: 0, soHuy: 0 }
     for (const o of filtered) {
       const tien = tienChuaVat(o)
       if (laHoanHuy(o)) { t.huy += tien; t.soHuy += 1; continue }
       if (o.loai_don === 'tai_ky') { t.taiKy += tien; t.soTaiKy += 1 } else { t.moi += tien; t.soMoi += 1 }
-      for (const i of items[o.id] || []) t.nhom[nhomDichVu(i.ten_dich_vu)] += giaTruocVat(i.gia)
-      const ng = khachCua(o.customer_id)?.nguon_khach || 'khac'
-      t.nguon[ng] = (t.nguon[ng] || 0) + tien
     }
     t.thuc = t.moi + t.taiKy
     return t
@@ -159,8 +163,7 @@ export default function OrdersPage({ currentProfile }) {
         'Khách hàng': k?.ten_khach || '',
         'Số điện thoại': k?.sdt || '',
         'Dịch vụ': (items[o.id] || []).map((x) => `${x.ten_dich_vu}${x.ten_goi ? ' · ' + x.ten_goi : ''}`).join('; '),
-        'Giá trị (sau VAT)': Number(o.gia_tri) || 0,
-        'Doanh số (chưa VAT)': tienChuaVat(o),
+        'Giá trị (chưa VAT)': tienChuaVat(o),
         'Ngày chốt': o.ngay_chot || '',
         'Sale': nameOf(o.sale_id, profiles, 'full_name'),
         'Trạng thái KH': k?.trang_thai_cham_soc ? tenTrangThai(k.trang_thai_cham_soc) : '',
@@ -217,15 +220,6 @@ export default function OrdersPage({ currentProfile }) {
         <Kpi nhan="Hoàn / huỷ" giaTri={formatVnd(tong.huy)} chu="text-rose-500" phu={`${tong.soHuy} đơn`} />
       </div>
 
-      {tong.thuc > 0 && (
-        <div className="mx-8 mt-4 grid gap-4 lg:grid-cols-2">
-          <TyTrong tieuDe="Doanh số theo nhóm dịch vụ"
-            ds={NHOM.map((n, i) => ({ key: n, ten: n === 'Seller' ? 'Xây shop + Tối ưu' : n === 'ADS' ? 'Chạy quảng cáo' : 'Dịch vụ bổ sung', tien: tong.nhom[n], mau: MAU[i] }))} />
-          <TyTrong tieuDe="Doanh số theo nguồn khách"
-            ds={Object.entries(tong.nguon).sort((a, b) => b[1] - a[1]).map(([k, v], i) => ({ key: k, ten: labelOf(NGUON_KHACH_OPTIONS, k) || 'Khác', tien: v, mau: MAU[i % MAU.length] }))} />
-        </div>
-      )}
-
       <div className="mx-8 mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
         <div className="relative min-w-[200px] flex-1">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
@@ -258,7 +252,7 @@ export default function OrdersPage({ currentProfile }) {
         </Select>
         <Select value={filterTrangThai} onChange={(e) => setFilterTrangThai(e.target.value)} className="w-44">
           <option value="">Tất cả trạng thái</option>
-          {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
+          {trangThaiTuChot.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
         </Select>
         <Select value={filterNguon} onChange={(e) => setFilterNguon(e.target.value)} className="w-40">
           <option value="">Tất cả nguồn</option>
@@ -296,21 +290,21 @@ export default function OrdersPage({ currentProfile }) {
         </div>
       </div>
 
-      <div className="mx-8 mb-6 mt-2 overflow-x-auto rounded-2xl bg-white shadow-sm">
-        <table className="w-full text-sm">
+      <div className="mx-8 mb-6 mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
-              {hien('ma') && <th className="px-5 py-3">Mã đơn</th>}
-              {hien('loai') && <th className="px-5 py-3">Loại</th>}
-              {hien('khach') && <th className="px-5 py-3">Khách hàng</th>}
-              {hien('sdt') && <th className="px-5 py-3">SĐT</th>}
-              {hien('dich_vu') && <th className="px-5 py-3">Dịch vụ</th>}
-              {hien('gia_tri') && <th className="px-5 py-3 text-right">Giá trị</th>}
-              {hien('ngay_chot') && <th className="px-5 py-3">Ngày chốt</th>}
-              {hien('sale') && <th className="px-5 py-3">Sale</th>}
-              {hien('trang_thai') && <th className="px-5 py-3">Trạng thái</th>}
-              {hien('nguon') && <th className="px-5 py-3">Nguồn khách</th>}
-              <th className="px-5 py-3"></th>
+            <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-600">
+              {hien('ma') && <th className="border border-slate-200 px-4 py-3">Mã đơn</th>}
+              {hien('loai') && <th className="border border-slate-200 px-4 py-3">Loại</th>}
+              {hien('khach') && <th className="border border-slate-200 px-4 py-3">Khách hàng</th>}
+              {hien('sdt') && <th className="border border-slate-200 px-4 py-3">SĐT</th>}
+              {hien('dich_vu') && <th className="border border-slate-200 px-4 py-3">Dịch vụ</th>}
+              {hien('gia_tri') && <th className="border border-slate-200 px-4 py-3 text-right">Giá trị (chưa VAT)</th>}
+              {hien('ngay_chot') && <th className="border border-slate-200 px-4 py-3">Ngày chốt</th>}
+              {hien('sale') && <th className="border border-slate-200 px-4 py-3">Sale</th>}
+              {hien('trang_thai') && <th className="border border-slate-200 px-4 py-3">Trạng thái</th>}
+              {hien('nguon') && <th className="border border-slate-200 px-4 py-3">Nguồn khách</th>}
+              <th className="border border-slate-200 px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -319,17 +313,17 @@ export default function OrdersPage({ currentProfile }) {
               <tr key={`cho-${c.id}`}
                 onClick={() => setXemKhach(c)}
                 className="cursor-pointer border-b border-slate-50 bg-amber-50/60 last:border-0 hover:bg-amber-100/60">
-                {hien('ma') && <td className="px-5 py-3"><span className="text-ink-400">—</span></td>}
-                {hien('loai') && <td className="px-5 py-3"><span className="text-ink-400">—</span></td>}
+                {hien('ma') && <td className="border border-slate-200 px-4 py-3"><span className="text-ink-400">—</span></td>}
+                {hien('loai') && <td className="border border-slate-200 px-4 py-3"><span className="text-ink-400">—</span></td>}
                 {hien('khach') && (
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-4 py-3">
                     <p className="font-medium text-navy-900">{c.ten_khach}</p>
                     <p className="text-xs text-ink-400">{c.ma_khach}</p>
                   </td>
                 )}
-                {hien('sdt') && <td className="whitespace-nowrap px-5 py-3 text-ink-600">{c.sdt || '—'}</td>}
+                {hien('sdt') && <td className="whitespace-nowrap border border-slate-200 px-4 py-3 text-ink-600">{c.sdt || '—'}</td>}
                 {hien('dich_vu') && (
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {(c.dich_vu || []).map((dv) => (
                         <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
@@ -337,46 +331,46 @@ export default function OrdersPage({ currentProfile }) {
                     </div>
                   </td>
                 )}
-                {hien('gia_tri') && <td className="px-5 py-3 text-right text-ink-400">—</td>}
-                {hien('ngay_chot') && <td className="px-5 py-3 text-ink-400">—</td>}
-                {hien('sale') && <td className="px-5 py-3 text-ink-600">{nameOf(c.sale_id, profiles, 'full_name')}</td>}
+                {hien('gia_tri') && <td className="border border-slate-200 px-4 py-3 text-right text-ink-400">—</td>}
+                {hien('ngay_chot') && <td className="border border-slate-200 px-4 py-3 text-ink-400">—</td>}
+                {hien('sale') && <td className="border border-slate-200 px-4 py-3 text-ink-600">{nameOf(c.sale_id, profiles, 'full_name')}</td>}
                 {hien('trang_thai') && (
-                  <td className="px-5 py-3"><Badge className="bg-amber-100 text-amber-800">Chưa lên đơn</Badge></td>
+                  <td className="border border-slate-200 px-4 py-3"><Badge className="bg-amber-100 text-amber-800">Chưa lên đơn</Badge></td>
                 )}
-                {hien('nguon') && <td className="px-5 py-3 text-ink-600">{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '—'}</td>}
-                <td className="whitespace-nowrap px-5 py-3 text-right text-xs text-ink-400">
+                {hien('nguon') && <td className="border border-slate-200 px-4 py-3 text-ink-600">{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '—'}</td>}
+                <td className="whitespace-nowrap border border-slate-200 px-4 py-3 text-right text-xs text-ink-400">
                   Bấm vào dòng để tạo đơn
                 </td>
               </tr>
             ))}
 
             {loading ? (
-              <tr><td colSpan={soCot} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
+              <tr><td colSpan={soCot} className="border border-slate-200 px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : filtered.length === 0 && chuaCoDon.length === 0 ? (
-              <tr><td colSpan={soCot} className="px-5 py-8 text-center text-ink-400">
+              <tr><td colSpan={soCot} className="border border-slate-200 px-5 py-8 text-center text-ink-400">
                 {orders.length === 0 ? 'Chưa có đơn dịch vụ nào.' : 'Không tìm thấy đơn phù hợp.'}
               </td></tr>
             ) : phanTrang.map((o) => (
               <tr key={o.id}
                 onClick={() => { const k = khachCua(o.customer_id); if (k) setXemKhach(k) }}
                 className={`cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 ${laHoanHuy(o) ? 'opacity-60' : ''}`}>
-                {hien('ma') && <td className="whitespace-nowrap px-5 py-3 font-medium text-navy-900">{o.ma_don}</td>}
+                {hien('ma') && <td className="whitespace-nowrap border border-slate-200 px-4 py-3 font-medium text-navy-900">{o.ma_don}</td>}
                 {hien('loai') && (
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-4 py-3">
                     {o.loai_don === 'tai_ky'
                       ? <Badge className="whitespace-nowrap bg-teal-50 text-teal-600">Tái ký</Badge>
                       : <Badge className="whitespace-nowrap bg-coral-50 text-coral-600">Mới</Badge>}
                   </td>
                 )}
                 {hien('khach') && (
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-4 py-3">
                     <p className="text-navy-900">{nameOf(o.customer_id, customers, 'ten_khach')}</p>
                     <p className="text-xs text-ink-400">{nameOf(o.customer_id, customers, 'ma_khach')}</p>
                   </td>
                 )}
-                {hien('sdt') && <td className="whitespace-nowrap px-5 py-3 text-ink-600">{khachCua(o.customer_id)?.sdt || '—'}</td>}
+                {hien('sdt') && <td className="whitespace-nowrap border border-slate-200 px-4 py-3 text-ink-600">{khachCua(o.customer_id)?.sdt || '—'}</td>}
                 {hien('dich_vu') && (
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {(items[o.id] || []).map((i) => (
                         <Badge key={i.id} className="bg-slate-100 text-slate-600">
@@ -386,11 +380,11 @@ export default function OrdersPage({ currentProfile }) {
                     </div>
                   </td>
                 )}
-                {hien('gia_tri') && <td className="whitespace-nowrap px-5 py-3 text-right font-medium text-navy-900">{formatVnd(o.gia_tri)}</td>}
-                {hien('ngay_chot') && <td className="whitespace-nowrap px-5 py-3 text-ink-600">{o.ngay_chot ? o.ngay_chot.split('-').reverse().join('/') : '—'}</td>}
-                {hien('sale') && <td className="px-5 py-3 text-ink-600">{nameOf(o.sale_id, profiles, 'full_name')}</td>}
+                {hien('gia_tri') && <td className="whitespace-nowrap border border-slate-200 px-4 py-3 text-right font-medium text-navy-900">{formatVnd(tienChuaVat(o))}</td>}
+                {hien('ngay_chot') && <td className="whitespace-nowrap border border-slate-200 px-4 py-3 text-ink-600">{o.ngay_chot ? o.ngay_chot.split('-').reverse().join('/') : '—'}</td>}
+                {hien('sale') && <td className="border border-slate-200 px-4 py-3 text-ink-600">{nameOf(o.sale_id, profiles, 'full_name')}</td>}
                 {hien('trang_thai') && (
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-4 py-3">
                     {(() => {
                       const tt = khachCua(o.customer_id)?.trang_thai_cham_soc
                       return tt ? (
@@ -400,9 +394,9 @@ export default function OrdersPage({ currentProfile }) {
                   </td>
                 )}
                 {hien('nguon') && (
-                  <td className="px-5 py-3 text-ink-600">{labelOf(NGUON_KHACH_OPTIONS, khachCua(o.customer_id)?.nguon_khach) || '—'}</td>
+                  <td className="border border-slate-200 px-4 py-3 text-ink-600">{labelOf(NGUON_KHACH_OPTIONS, khachCua(o.customer_id)?.nguon_khach) || '—'}</td>
                 )}
-                <td className="whitespace-nowrap px-5 py-3 text-right">
+                <td className="whitespace-nowrap border border-slate-200 px-4 py-3 text-right">
                   <button onClick={(e) => { e.stopPropagation(); setEditing(o); setShowForm(true) }}
                     className="mr-3 text-ink-400 hover:text-coral-500" title="Sửa đơn"><Pencil size={14} /></button>
                   <button onClick={(e) => { e.stopPropagation(); remove(o) }}
@@ -441,49 +435,12 @@ export default function OrdersPage({ currentProfile }) {
   )
 }
 
-const MAU = [
-  { thanh: 'bg-coral-500', cham: 'bg-coral-500' },
-  { thanh: 'bg-indigo-500', cham: 'bg-indigo-500' },
-  { thanh: 'bg-teal-500', cham: 'bg-teal-500' },
-  { thanh: 'bg-amber-400', cham: 'bg-amber-400' },
-  { thanh: 'bg-slate-400', cham: 'bg-slate-400' },
-]
-
 function Kpi({ nhan, giaTri, phu, chu = 'text-navy-900' }) {
   return (
     <div className="px-5 py-4">
       <p className="text-sm text-ink-600">{nhan}</p>
       <p className={`mt-1 font-display text-2xl font-bold ${chu}`}>{giaTri}</p>
       {phu && <p className="mt-0.5 text-xs text-ink-400">{phu}</p>}
-    </div>
-  )
-}
-
-// Thanh tỷ trọng: tiền đến từ đâu
-function TyTrong({ tieuDe, ds }) {
-  const tong = ds.reduce((a, n) => a + n.tien, 0)
-  return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm">
-      <h3 className="text-sm font-semibold text-navy-900">{tieuDe}</h3>
-      {tong > 0 ? (
-        <>
-          <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-slate-100">
-            {ds.map((n) => n.tien > 0 && (
-              <div key={n.key} className={n.mau.thanh} style={{ width: `${(n.tien / tong) * 100}%` }}
-                title={`${n.ten}: ${formatVnd(n.tien)}`} />
-            ))}
-          </div>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
-            {ds.filter((n) => n.tien > 0).map((n) => (
-              <span key={n.key} className="inline-flex items-center gap-1.5 text-ink-600">
-                <span className={`h-2 w-2 rounded-full ${n.mau.cham}`} />
-                {n.ten} <b className="text-navy-900">{formatVnd(n.tien)}</b>
-                <span className="text-xs text-ink-400">({Math.round((n.tien / tong) * 100)}%)</span>
-              </span>
-            ))}
-          </div>
-        </>
-      ) : <p className="mt-3 text-sm text-ink-400">Chưa có số liệu.</p>}
     </div>
   )
 }

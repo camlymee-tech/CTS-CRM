@@ -207,29 +207,29 @@ export default function AnalyticsPage() {
                   <AlertTriangle size={16} />
                   {boQuen.length} khách sắp hoặc đã rơi vào nhóm data chung, sale khác có thể nhận mất.
                 </div>
-                <table className="w-full text-sm">
+                <table className="border-collapse w-full text-sm">
                   <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
-                      <th className="pb-2">Khách hàng</th>
-                      <th className="pb-2">Trạng thái</th>
-                      <th className="pb-2">Sale</th>
-                      <th className="pb-2 text-right">Số ngày im lặng</th>
+                    <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-600">
+                      <th className="border border-slate-200 px-3 py-2">Khách hàng</th>
+                      <th className="border border-slate-200 px-3 py-2">Trạng thái</th>
+                      <th className="border border-slate-200 px-3 py-2">Sale</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right">Số ngày im lặng</th>
                     </tr>
                   </thead>
                   <tbody>
                     {boQuen.map((c) => (
                       <tr key={c.id} className="border-t border-slate-50">
-                        <td className="py-2.5">
+                        <td className="border border-slate-200 px-3 py-2.5">
                           <p className="font-medium text-navy-900">{c.ten_khach}</p>
                           <p className="text-xs text-ink-400">{c.ma_khach}</p>
                         </td>
-                        <td className="py-2.5">
+                        <td className="border border-slate-200 px-3 py-2.5">
                           <Badge className={classTrangThai(c.trang_thai_cham_soc)}>
                             {tenTrangThai(c.trang_thai_cham_soc)}
                           </Badge>
                         </td>
-                        <td className="py-2.5 text-ink-600">{tenSale(c.sale_id)}</td>
-                        <td className="py-2.5 text-right font-medium text-rose-500">{c.soNgay} ngày</td>
+                        <td className="border border-slate-200 px-3 py-2.5 text-ink-600">{tenSale(c.sale_id)}</td>
+                        <td className="border border-slate-200 px-3 py-2.5 text-right font-medium text-rose-500">{c.soNgay} ngày</td>
                       </tr>
                     ))}
                   </tbody>

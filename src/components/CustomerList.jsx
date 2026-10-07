@@ -413,10 +413,10 @@ export default function CustomerList({ currentProfile }) {
       </div>
 
       <div className="mx-8 mb-6 mt-2 overflow-x-auto rounded-2xl bg-white shadow-sm">
-        <table className="w-full text-sm" style={{ tableLayout: 'auto' }}>
+        <table className="border-collapse w-full text-sm" style={{ tableLayout: 'auto' }}>
           <thead>
             <tr className="border-b border-slate-200 bg-slate-100 text-left text-sm font-semibold text-navy-900">
-              <th className="w-10 px-4 py-3">
+              <th className="border border-slate-200 w-10 px-4 py-3">
                 <input type="checkbox" checked={chonTatCaTrang} onChange={toggleChonTrang}
                   className="h-4 w-4 rounded border-slate-300" title="Chọn / bỏ chọn các khách trên trang này" />
               </th>
@@ -430,14 +430,14 @@ export default function CustomerList({ currentProfile }) {
                   {c.label}
                 </ThResize>
               ))}
-              <th className="px-4 py-3"></th>
+              <th className="border border-slate-200 px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={soCot} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
+              <tr><td colSpan={soCot} className="border border-slate-200 px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={soCot} className="px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
+              <tr><td colSpan={soCot} className="border border-slate-200 px-5 py-8 text-center text-ink-400">Chưa có khách hàng nào phù hợp.</td></tr>
             ) : phanTrang.map((c, idxTrang) => {
               const idx = (trang - 1) * 20 + idxTrang
               const chung = laKhachChung(c)
@@ -455,12 +455,13 @@ export default function CustomerList({ currentProfile }) {
                   }`}
                   onClick={() => setViewingCustomer(c)}>
                   <td className={`relative w-10 border-l-4 px-4 py-3 ${VIEN_TRANG_THAI[mauTT] || 'border-slate-300'}`}
+                    style={{ borderTop: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}
                     onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={dongChon} onChange={() => toggleChon(c.id)}
                       className="h-4 w-4 rounded border-slate-300" />
                   </td>
-                  {hien('stt') && <td className="px-4 py-3 text-ink-600">{idx + 1}</td>}
-                  <td className="px-4 py-3" style={doRong.ten ? { maxWidth: doRong.ten } : undefined}>
+                  {hien('stt') && <td className="border border-slate-200 px-4 py-3 text-ink-600">{idx + 1}</td>}
+                  <td className="border border-slate-200 px-4 py-3" style={doRong.ten ? { maxWidth: doRong.ten } : undefined}>
                     <div className="flex items-center gap-3">
                       <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-300">
                         <User size={24} fill="currentColor" />
@@ -498,10 +499,10 @@ export default function CustomerList({ currentProfile }) {
                       </div>
                     </div>
                   </td>
-                  {hien('sdt') && <td className="px-4 py-3 font-medium text-indigo-800">{c.sdt || <span className="text-ink-400">—</span>}</td>}
-                  {hien('sale') && <td className="px-4 py-3 text-navy-900">{profileName(c.sale_id)}</td>}
+                  {hien('sdt') && <td className="border border-slate-200 px-4 py-3 font-medium text-indigo-800">{c.sdt || <span className="text-ink-400">—</span>}</td>}
+                  {hien('sale') && <td className="border border-slate-200 px-4 py-3 text-navy-900">{profileName(c.sale_id)}</td>}
                   {hien('trao_doi') && (
-                    <td className="px-4 py-3" style={{ minWidth: 300, maxWidth: doRong.trao_doi || 360 }}>
+                    <td className="border border-slate-200 px-4 py-3" style={{ minWidth: 300, maxWidth: doRong.trao_doi || 360 }}>
                       {!td ? <span className="text-ink-400">—</span> : (
                         <div>
                           <div className="flex items-baseline justify-between gap-3">
@@ -519,7 +520,7 @@ export default function CustomerList({ currentProfile }) {
                     </td>
                   )}
                   {hien('cham_soc') && (
-                    <td className="px-4 py-3" style={{ minWidth: 150 }}>
+                    <td className="border border-slate-200 px-4 py-3" style={{ minWidth: 150 }}>
                       <Badge className={`whitespace-nowrap ${classTrangThai(c.trang_thai_cham_soc)}`}>{tenTrangThai(c.trang_thai_cham_soc)}</Badge>
                       <p className="mt-1 whitespace-nowrap text-xs text-ink-600">
                         {hen
@@ -531,16 +532,16 @@ export default function CustomerList({ currentProfile }) {
                     </td>
                   )}
                   {hien('van_de') && (
-                    <td className="px-4 py-3 text-navy-900" style={{ minWidth: 200, maxWidth: doRong.van_de || 280 }}>
+                    <td className="border border-slate-200 px-4 py-3 text-navy-900" style={{ minWidth: 200, maxWidth: doRong.van_de || 280 }}>
                       <p className="line-clamp-3 whitespace-pre-wrap">{c.van_de || <span className="text-ink-400">—</span>}</p>
                     </td>
                   )}
-                  {hien('nguon') && <td className="px-4 py-3 text-navy-900">{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '—'}</td>}
+                  {hien('nguon') && <td className="border border-slate-200 px-4 py-3 text-navy-900">{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '—'}</td>}
                   {hien('doanh_thu') && (
-                    <td className="px-4 py-3 font-bold text-orange-500">{formatVnd(doanhThu[c.id] || 0)}</td>
+                    <td className="border border-slate-200 px-4 py-3 font-bold text-orange-500">{formatVnd(doanhThu[c.id] || 0)}</td>
                   )}
                   {hien('nen_tang') && (
-                  <td className="px-4 py-3">
+                  <td className="border border-slate-200 px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {(c.nen_tang || []).map((nt) => (
                         <Badge key={nt} className={classOf(NEN_TANG_OPTIONS, nt)}>{labelOf(NEN_TANG_OPTIONS, nt)}</Badge>
@@ -548,7 +549,7 @@ export default function CustomerList({ currentProfile }) {
                     </div>
                   </td>)}
                   {hien('dich_vu') && (
-                  <td className="px-4 py-3">
+                  <td className="border border-slate-200 px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {(c.dich_vu || []).map((dv) => (
                         <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
@@ -556,26 +557,26 @@ export default function CustomerList({ currentProfile }) {
                     </div>
                   </td>)}
                   {hien('loai') && (
-                  <td className="px-4 py-3">
+                  <td className="border border-slate-200 px-4 py-3">
                     <Badge className={c.loai_khach === 'moi' ? 'bg-coral-50 text-coral-600' : 'bg-slate-100 text-slate-600'}>
                       {labelOf(LOAI_KHACH_OPTIONS, c.loai_khach)}
                     </Badge>
                   </td>)}
                   {hien('trang_thai') && (
-                  <td className="px-4 py-3">
+                  <td className="border border-slate-200 px-4 py-3">
                     <Badge className={classTrangThai(c.trang_thai_cham_soc)}>
                       {tenTrangThai(c.trang_thai_cham_soc)}
                     </Badge>
                   </td>)}
-                  {hien('ngay_tao') && <td className="px-4 py-3 text-ink-600">{ngayLocal(c.created_at) || '—'}</td>}
-                  {hien('lien_he') && <td className="px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>}
+                  {hien('ngay_tao') && <td className="border border-slate-200 px-4 py-3 text-ink-600">{ngayLocal(c.created_at) || '—'}</td>}
+                  {hien('lien_he') && <td className="border border-slate-200 px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>}
                   {hien('giai_phap') && (
-                    <td className="px-4 py-3 text-ink-600" style={{ maxWidth: doRong.giai_phap || 220 }}>
+                    <td className="border border-slate-200 px-4 py-3 text-ink-600" style={{ maxWidth: doRong.giai_phap || 220 }}>
                       <p className="line-clamp-2 whitespace-pre-wrap">{c.giai_phap || '—'}</p>
                     </td>
                   )}
                   {hien('nhat_ky') && (
-                    <td className="px-4 py-3 text-ink-600">
+                    <td className="border border-slate-200 px-4 py-3 text-ink-600">
                       {(() => {
                         const l = nhatKyGanNhat[c.id]
                         if (!l) return <span className="text-ink-400">—</span>
@@ -590,7 +591,7 @@ export default function CustomerList({ currentProfile }) {
                       })()}
                     </td>
                   )}
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                  <td className="border border-slate-200 whitespace-nowrap px-4 py-3 text-right">
                     {(isAdmin || cuaMinh) && (
                       <button onClick={(e) => { e.stopPropagation(); xoaKhach(c) }}
                         className="text-ink-400 hover:text-rose-500" title="Xoá khách hàng">
@@ -675,7 +676,7 @@ function ThResize({ colKey, doRong, onResize, children, sapXep, dangSapXep, onSa
   }
   const Mui = dangSapXep === 'asc' ? ArrowUp : dangSapXep === 'desc' ? ArrowDown : ArrowUpDown
   return (
-    <th className="relative select-none px-4 py-3"
+    <th className="border border-slate-200 relative select-none px-4 py-3"
       style={rong ? { width: rong, maxWidth: rong } : undefined}
       title={tieuDeNho}>
       {sapXep ? (

@@ -71,34 +71,34 @@ export default function TeamPage({ currentProfile }) {
       {message && <p className="mx-8 mt-4 rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-600">{message}</p>}
 
       <div className="mx-8 my-6 overflow-x-auto rounded-2xl bg-white shadow-sm">
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="border-collapse w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-ink-400">
-              <th className="px-5 py-3">Nhân sự</th>
-              <th className="px-5 py-3">Mã sale</th>
-              <th className="px-5 py-3">Liên hệ</th>
-              <th className="px-5 py-3">Ngày vào công ty</th>
-              <th className="px-5 py-3">Vai trò</th>
-              <th className="px-5 py-3">Trạng thái</th>
-              <th className="px-5 py-3 text-right">Thao tác</th>
+            <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-600">
+              <th className="border border-slate-200 px-5 py-3">Nhân sự</th>
+              <th className="border border-slate-200 px-5 py-3">Mã sale</th>
+              <th className="border border-slate-200 px-5 py-3">Liên hệ</th>
+              <th className="border border-slate-200 px-5 py-3">Ngày vào công ty</th>
+              <th className="border border-slate-200 px-5 py-3">Vai trò</th>
+              <th className="border border-slate-200 px-5 py-3">Trạng thái</th>
+              <th className="border border-slate-200 px-5 py-3 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
+              <tr><td colSpan={7} className="border border-slate-200 px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : profiles.map((p) => {
               const isMe = p.id === currentProfile.id
               return (
                 <tr key={p.id} className="border-b border-slate-50 last:border-0">
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-5 py-3">
                     <p className="font-medium text-navy-900">
                       {p.full_name || '—'}
                       {isMe && <span className="ml-2 text-xs text-ink-400">(bạn)</span>}
                     </p>
                     <p className="text-xs text-ink-400">{p.email || '—'}</p>
                   </td>
-                  <td className="px-5 py-3 text-ink-600">{p.ma_sale || '—'}</td>
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-5 py-3 text-ink-600">{p.ma_sale || '—'}</td>
+                  <td className="border border-slate-200 px-5 py-3">
                     <p className="text-ink-600">{p.sdt_lam_viec || p.sdt || '—'}</p>
                     {p.link_fb && (
                       <a href={p.link_fb} target="_blank" rel="noreferrer"
@@ -107,19 +107,19 @@ export default function TeamPage({ currentProfile }) {
                       </a>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-ink-600">{p.ngay_vao_cty || '—'}</td>
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-5 py-3 text-ink-600">{p.ngay_vao_cty || '—'}</td>
+                  <td className="border border-slate-200 px-5 py-3">
                     <Select value={p.role} onChange={(e) => changeRole(p, e.target.value)} className="w-32">
                       <option value="sale">Sale</option>
                       <option value="admin">Quản trị</option>
                     </Select>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="border border-slate-200 px-5 py-3">
                     <Badge className={p.active === false ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700'}>
                       {p.active === false ? 'Đã khoá' : 'Đang hoạt động'}
                     </Badge>
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-right">
+                  <td className="border border-slate-200 whitespace-nowrap px-5 py-3 text-right">
                     <button onClick={() => setEditing(p)}
                       className="mr-3 inline-flex items-center gap-1 text-xs text-ink-600 hover:text-coral-500">
                       <Pencil size={13} /> Sửa

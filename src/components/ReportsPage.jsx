@@ -198,49 +198,56 @@ export default function ReportsPage() {
           {/* Báo cáo 1-3: theo sale + theo tháng */}
           {loai !== 'dich_vu' && (
             <>
-              <Panel title="Theo từng sale">
+              <Panel title="Xếp hạng sale — doanh số cao đến thấp">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="border-collapse w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
-                        <th className="pb-2">Sale</th>
-                        <th className="pb-2 text-right">Số đơn</th>
+                      <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-600">
+                        <th className="w-16 border border-slate-200 px-3 py-2 text-center">Hạng</th>
+                        <th className="border border-slate-200 px-3 py-2">Sale</th>
+                        <th className="border border-slate-200 px-3 py-2 text-right">Số đơn</th>
                         {loai === 'chung' ? (
                           <>
-                            <th className="pb-2 text-right">Đơn mới</th>
-                            <th className="pb-2 text-right">Tái ký</th>
+                            <th className="border border-slate-200 px-3 py-2 text-right">Đơn mới</th>
+                            <th className="border border-slate-200 px-3 py-2 text-right">Tái ký</th>
                           </>
-                        ) : NHOM.map((n) => <th key={n} className="pb-2 text-right">{n}</th>)}
-                        <th className="pb-2 text-right">Tổng</th>
-                        <th className="pb-2 text-right">Tỷ trọng</th>
+                        ) : NHOM.map((n) => <th key={n} className="border border-slate-200 px-3 py-2 text-right">{n}</th>)}
+                        <th className="border border-slate-200 px-3 py-2 text-right">Tổng</th>
+                        <th className="border border-slate-200 px-3 py-2 text-right">Tỷ trọng</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {theoSale.map((s) => (
+                      {theoSale.map((s, i) => (
                         <tr key={s.key} className="border-t border-slate-100">
-                          <td className="py-2.5 font-medium text-navy-900">{tenSale(s.key)}</td>
-                          <td className="py-2.5 text-right text-ink-600">{s.soDon}</td>
+                          <td className="border border-slate-200 px-3 py-2.5 text-center">
+                            <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                              i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-400 text-white' : i === 2 ? 'bg-orange-400 text-white' : 'text-ink-600'
+                            }`}>{i + 1}</span>
+                          </td>
+                          <td className="border border-slate-200 px-3 py-2.5 font-medium text-navy-900">{tenSale(s.key)}</td>
+                          <td className="border border-slate-200 px-3 py-2.5 text-right text-ink-600">{s.soDon}</td>
                           {loai === 'chung' ? (
                             <>
-                              <td className="py-2.5 text-right text-coral-600">{formatVnd(s.moi)}</td>
-                              <td className="py-2.5 text-right text-teal-600">{formatVnd(s.tai_ky)}</td>
+                              <td className="border border-slate-200 px-3 py-2.5 text-right text-coral-600">{formatVnd(s.moi)}</td>
+                              <td className="border border-slate-200 px-3 py-2.5 text-right text-teal-600">{formatVnd(s.tai_ky)}</td>
                             </>
-                          ) : NHOM.map((n) => <td key={n} className="py-2.5 text-right text-ink-600">{formatVnd(s[n])}</td>)}
-                          <td className="py-2.5 text-right font-semibold text-navy-900">{formatVnd(s.tong)}</td>
-                          <td className="py-2.5 text-right text-ink-400">{phanTram(s.tong, tong.tong)}</td>
+                          ) : NHOM.map((n) => <td key={n} className="border border-slate-200 px-3 py-2.5 text-right text-ink-600">{formatVnd(s[n])}</td>)}
+                          <td className="border border-slate-200 px-3 py-2.5 text-right font-semibold text-navy-900">{formatVnd(s.tong)}</td>
+                          <td className="border border-slate-200 px-3 py-2.5 text-right text-ink-400">{phanTram(s.tong, tong.tong)}</td>
                         </tr>
                       ))}
                       <tr className="border-t-2 border-slate-200 bg-indigo-50 font-bold text-indigo-700">
-                        <td className="py-2.5 pl-2">TỔNG</td>
-                        <td className="py-2.5 text-right">{tong.soDon}</td>
+                        <td className="border border-slate-200 px-3 py-2.5"></td>
+                        <td className="border border-slate-200 px-3 py-2.5">TỔNG</td>
+                        <td className="border border-slate-200 px-3 py-2.5 text-right">{tong.soDon}</td>
                         {loai === 'chung' ? (
                           <>
-                            <td className="py-2.5 text-right">{formatVnd(tong.moi)}</td>
-                            <td className="py-2.5 text-right">{formatVnd(tong.tai_ky)}</td>
+                            <td className="border border-slate-200 px-3 py-2.5 text-right">{formatVnd(tong.moi)}</td>
+                            <td className="border border-slate-200 px-3 py-2.5 text-right">{formatVnd(tong.tai_ky)}</td>
                           </>
-                        ) : NHOM.map((n) => <td key={n} className="py-2.5 text-right">{formatVnd(tong[n])}</td>)}
-                        <td className="py-2.5 text-right">{formatVnd(tong.tong)}</td>
-                        <td className="py-2.5 pr-2 text-right">100%</td>
+                        ) : NHOM.map((n) => <td key={n} className="border border-slate-200 px-3 py-2.5 text-right">{formatVnd(tong[n])}</td>)}
+                        <td className="border border-slate-200 px-3 py-2.5 text-right">{formatVnd(tong.tong)}</td>
+                        <td className="border border-slate-200 px-3 py-2.5  text-right">100%</td>
                       </tr>
                     </tbody>
                   </table>
@@ -249,32 +256,32 @@ export default function ReportsPage() {
 
               {theoThang.length > 1 && <Panel title="Theo tháng">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="border-collapse w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
-                        <th className="pb-2">Tháng</th>
-                        <th className="pb-2 text-right">Số đơn</th>
+                      <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-600">
+                        <th className="border border-slate-200 px-3 py-2">Tháng</th>
+                        <th className="border border-slate-200 px-3 py-2 text-right">Số đơn</th>
                         {loai === 'chung' && (
                           <>
-                            <th className="pb-2 text-right">Đơn mới</th>
-                            <th className="pb-2 text-right">Tái ký</th>
+                            <th className="border border-slate-200 px-3 py-2 text-right">Đơn mới</th>
+                            <th className="border border-slate-200 px-3 py-2 text-right">Tái ký</th>
                           </>
                         )}
-                        <th className="pb-2 text-right">Tổng</th>
+                        <th className="border border-slate-200 px-3 py-2 text-right">Tổng</th>
                       </tr>
                     </thead>
                     <tbody>
                       {theoThang.map((t) => (
                         <tr key={t.key} className="border-t border-slate-100">
-                          <td className="py-2.5 font-medium text-navy-900">{thangHienThi(t.key)}</td>
-                          <td className="py-2.5 text-right text-ink-600">{t.soDon}</td>
+                          <td className="border border-slate-200 px-3 py-2.5 font-medium text-navy-900">{thangHienThi(t.key)}</td>
+                          <td className="border border-slate-200 px-3 py-2.5 text-right text-ink-600">{t.soDon}</td>
                           {loai === 'chung' && (
                             <>
-                              <td className="py-2.5 text-right text-coral-600">{formatVnd(t.moi)}</td>
-                              <td className="py-2.5 text-right text-teal-600">{formatVnd(t.tai_ky)}</td>
+                              <td className="border border-slate-200 px-3 py-2.5 text-right text-coral-600">{formatVnd(t.moi)}</td>
+                              <td className="border border-slate-200 px-3 py-2.5 text-right text-teal-600">{formatVnd(t.tai_ky)}</td>
                             </>
                           )}
-                          <td className="py-2.5 text-right font-semibold text-navy-900">{formatVnd(t.tong)}</td>
+                          <td className="border border-slate-200 px-3 py-2.5 text-right font-semibold text-navy-900">{formatVnd(t.tong)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -288,13 +295,13 @@ export default function ReportsPage() {
           {loai === 'dich_vu' && (
             <Panel title="Doanh số từng dịch vụ">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="border-collapse w-full text-sm">
                   <thead>
                     <tr className="text-xs uppercase tracking-wide text-ink-400">
-                      <th rowSpan={2} className="pb-2 text-left align-bottom">Dịch vụ</th>
-                      <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-coral-600">Đơn mới</th>
-                      <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-teal-600">Tái ký</th>
-                      <th colSpan={2} className="border-l border-slate-100 pb-1 text-center text-navy-900">Tổng</th>
+                      <th rowSpan={2} className="border border-slate-200 px-3 py-2 text-left align-bottom">Dịch vụ</th>
+                      <th colSpan={2} className="border border-slate-200 px-3 border-l border-slate-100 pb-1 text-center text-coral-600">Đơn mới</th>
+                      <th colSpan={2} className="border border-slate-200 px-3 border-l border-slate-100 pb-1 text-center text-teal-600">Tái ký</th>
+                      <th colSpan={2} className="border border-slate-200 px-3 border-l border-slate-100 pb-1 text-center text-navy-900">Tổng</th>
                     </tr>
                     <tr className="text-xs uppercase tracking-wide text-ink-400">
                       {[0, 1, 2].map((i) => (
@@ -311,19 +318,19 @@ export default function ReportsPage() {
                       }), { mL: 0, mT: 0, kL: 0, kT: 0 })
                       return [
                         <tr key={`h-${n}`} className="border-t border-slate-200 bg-slate-50 font-semibold">
-                          <td className="py-2 pl-2"><span className={`rounded-full px-2.5 py-1 text-xs ${NHOM_MAU[n]}`}>{NHOM_TEN[n]}</span></td>
+                          <td className="border border-slate-200 px-3 py-2"><span className={`rounded-full px-2.5 py-1 text-xs ${NHOM_MAU[n]}`}>{NHOM_TEN[n]}</span></td>
                           <Cells mL={c.mL} mT={c.mT} kL={c.kL} kT={c.kT} tong="nhom" />
                         </tr>,
                         ...dsNhom.map((r) => (
                           <tr key={`${n}-${r.ten}`} className="border-t border-slate-100">
-                            <td className="py-2.5 pl-6 text-navy-900">{r.ten}</td>
+                            <td className="border border-slate-200 px-3 py-2.5 pl-6 text-navy-900">{r.ten}</td>
                             <Cells mL={r.moi.luot} mT={r.moi.tien} kL={r.tai_ky.luot} kT={r.tai_ky.tien} />
                           </tr>
                         )),
                       ]
                     })}
                     <tr className="border-t-2 border-slate-200 bg-indigo-50 font-bold text-indigo-700">
-                      <td className="py-2.5 pl-2">TỔNG CỘNG</td>
+                      <td className="border border-slate-200 px-3 py-2.5">TỔNG CỘNG</td>
                       <Cells
                         mL={theoDichVu.reduce((s, r) => s + r.moi.luot, 0)} mT={theoDichVu.reduce((s, r) => s + r.moi.tien, 0)}
                         kL={theoDichVu.reduce((s, r) => s + r.tai_ky.luot, 0)} kT={theoDichVu.reduce((s, r) => s + r.tai_ky.tien, 0)}
@@ -345,8 +352,8 @@ export default function ReportsPage() {
 function FragmentTieuDe() {
   return (
     <>
-      <th className="border-l border-slate-100 pb-2 text-right font-medium">Lượt</th>
-      <th className="pb-2 text-right font-medium">Doanh số</th>
+      <th className="border border-slate-200 px-3 border-l border-slate-100 py-2 text-right font-medium">Lượt</th>
+      <th className="border border-slate-200 px-3 py-2 text-right font-medium">Doanh số</th>
     </>
   )
 }
@@ -362,12 +369,12 @@ function Cells({ mL, mT, kL, kT, tong }) {
   const cTong = mauTong || 'text-navy-900 font-semibold'
   return (
     <>
-      <td className={`border-l border-slate-100 py-2.5 text-right ${cMoiL}`}>{mL || '—'}</td>
-      <td className={`py-2.5 text-right ${cMoiT}`}>{mT ? formatVnd(mT) : '—'}</td>
-      <td className={`border-l border-slate-100 py-2.5 text-right ${cKyL}`}>{kL || '—'}</td>
-      <td className={`py-2.5 text-right ${cKyT}`}>{kT ? formatVnd(kT) : '—'}</td>
-      <td className={`border-l border-slate-100 py-2.5 text-right ${cTong}`}>{mL + kL}</td>
-      <td className={`py-2.5 pr-2 text-right ${cTong}`}>{formatVnd(mT + kT)}</td>
+      <td className={`border border-slate-200 border-l border-slate-100 py-2.5 text-right ${cMoiL}`}>{mL || '—'}</td>
+      <td className={`border border-slate-200 py-2.5 text-right ${cMoiT}`}>{mT ? formatVnd(mT) : '—'}</td>
+      <td className={`border border-slate-200 border-l border-slate-100 py-2.5 text-right ${cKyL}`}>{kL || '—'}</td>
+      <td className={`border border-slate-200 py-2.5 text-right ${cKyT}`}>{kT ? formatVnd(kT) : '—'}</td>
+      <td className={`border border-slate-200 border-l border-slate-100 py-2.5 text-right ${cTong}`}>{mL + kL}</td>
+      <td className={`border border-slate-200 py-2.5 pr-2 text-right ${cTong}`}>{formatVnd(mT + kT)}</td>
     </>
   )
 }
