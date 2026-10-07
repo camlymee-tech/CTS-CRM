@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Pencil, Trash2, Tags, Columns3 } from 'lucide-react'
+import { Search, Pencil, Trash2, Tags, Columns3, Download, X } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Phantrang } from './ui'
 import OrderForm from './OrderForm'
 import CustomerDetail from './CustomerDetail'
 import PackagesModal from './PackagesModal'
-import { DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, classOf, labelOf, formatVnd } from '../lib/constants'
+import { DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, classOf, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
-import { khoangNgay } from '../lib/doanhSo'
+import { khoangNgay, nhomDichVu, NHOM } from '../lib/doanhSo'
 
 // Trang báo cáo đơn dịch vụ — tạo đơn mới làm trong panel Khách hàng,
 // trang này chỉ để xem, lọc, sửa số liệu và xoá khi cần.
 export default function OrdersPage({ currentProfile }) {
-  const { tenTrangThai, classTrangThai, maTaoDon } = useTrangThai()
+  const { options: TRANG_THAI, tenTrangThai, classTrangThai, maTaoDon, maHoanHuy } = useTrangThai()
   const [orders, setOrders] = useState([])
   const [items, setItems] = useState({})
   const [customers, setCustomers] = useState([])
@@ -24,6 +24,8 @@ export default function OrdersPage({ currentProfile }) {
   const [tu, setTu] = useState('')
   const [den, setDen] = useState('')
   const [filterSale, setFilterSale] = useState('')
+  const [filterTrangThai, setFilterTrangThai] = useState('')
+  const [filterNguon, setFilterNguon] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [xemKhach, setXemKhach] = useState(null)
@@ -34,6 +36,7 @@ export default function OrdersPage({ currentProfile }) {
     { key: 'ma', label: 'Mã đơn' },
     { key: 'loai', label: 'Loại (Mới / Tái ký)' },
     { key: 'khach', label: 'Khách hàng' },
+    { key: 'sdt', label: 'Số điện thoại' },
     { key: 'dich_vu', label: 'Dịch vụ' },
     { key: 'gia_tri', label: 'Giá trị' },
     { key: 'ngay_chot', label: 'Ngày chốt' },
@@ -97,16 +100,18 @@ export default function OrdersPage({ currentProfile }) {
     if (tuNgay && (!o.ngay_chot || o.ngay_chot < tuNgay)) return false
     if (denNgay && (!o.ngay_chot || o.ngay_chot > denNgay)) return false
     if (filterSale && o.sale_id !== filterSale) return false
+    const kh = customers.find((c) => c.id === o.customer_id)
+    if (filterTrangThai && kh?.trang_thai_cham_soc !== filterTrangThai) return false
+    if (filterNguon && kh?.nguon_khach !== filterNguon) return false
     if (search) {
-      const tenKhach = nameOf(o.customer_id, customers, 'ten_khach')
       const dv = (items[o.id] || []).map((i) => i.ten_dich_vu).join(' ')
-      if (!`${o.ma_don} ${tenKhach} ${dv}`.toLowerCase().includes(search.toLowerCase())) return false
+      if (!`${o.ma_don} ${kh?.ten_khach || ''} ${kh?.sdt || ''} ${dv}`.toLowerCase().includes(search.toLowerCase())) return false
     }
     return true
-  }), [orders, items, customers, search, filterLoai, tuNgay, denNgay, filterSale])
+  }), [orders, items, customers, search, filterLoai, tuNgay, denNgay, filterSale, filterTrangThai, filterNguon])
 
   const [trang, setTrang] = useState(1)
-  useEffect(() => { setTrang(1) }, [search, filterLoai, ky, tu, den, filterSale])
+  useEffect(() => { setTrang(1) }, [search, filterLoai, ky, tu, den, filterSale, filterTrangThai, filterNguon])
   const phanTrang = useMemo(() => filtered.slice((trang - 1) * 20, trang * 20), [filtered, trang])
 
   // Khách đã chuyển sang "Chốt hợp đồng" nhưng chưa có đơn dịch vụ nào
@@ -114,6 +119,61 @@ export default function OrdersPage({ currentProfile }) {
     const coDon = new Set(orders.map((o) => o.customer_id))
     return customers.filter((c) => maTaoDon.includes(c.trang_thai_cham_soc) && !coDon.has(c.id))
   }, [customers, orders, maTaoDon])
+
+  // ---- Số liệu tổng (theo bộ lọc) — doanh số tính chưa VAT ----
+  const laHoanHuy = (o) => o.trang_thai === 'huy' || maHoanHuy.includes(khachCua(o.customer_id)?.trang_thai_cham_soc)
+  const tienChuaVat = (o) => {
+    const ds = items[o.id]
+    return ds && ds.length ? ds.reduce((a, i) => a + giaTruocVat(i.gia), 0) : giaTruocVat(o.gia_tri)
+  }
+  const tong = useMemo(() => {
+    const t = { soDon: filtered.length, moi: 0, soMoi: 0, taiKy: 0, soTaiKy: 0, huy: 0, soHuy: 0, nhom: { Seller: 0, ADS: 0, 'Bổ sung': 0 }, nguon: {} }
+    for (const o of filtered) {
+      const tien = tienChuaVat(o)
+      if (laHoanHuy(o)) { t.huy += tien; t.soHuy += 1; continue }
+      if (o.loai_don === 'tai_ky') { t.taiKy += tien; t.soTaiKy += 1 } else { t.moi += tien; t.soMoi += 1 }
+      for (const i of items[o.id] || []) t.nhom[nhomDichVu(i.ten_dich_vu)] += giaTruocVat(i.gia)
+      const ng = khachCua(o.customer_id)?.nguon_khach || 'khac'
+      t.nguon[ng] = (t.nguon[ng] || 0) + tien
+    }
+    t.thuc = t.moi + t.taiKy
+    return t
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, items, customers, maHoanHuy])
+
+  const dangLoc = !!(search || filterLoai || filterSale || filterTrangThai || filterNguon || ky !== 'tat_ca')
+  function xoaLoc() {
+    setSearch(''); setFilterLoai(''); setFilterSale(''); setFilterTrangThai(''); setFilterNguon(''); setKy('tat_ca'); setTu(''); setDen('')
+  }
+
+  // Xuất Excel: toàn bộ đơn đang lọc (không chỉ trang đang xem)
+  async function xuatExcel() {
+    const XLSX = await import('xlsx')
+    const rows = filtered.map((o, i) => {
+      const k = khachCua(o.customer_id)
+      return {
+        '#': i + 1,
+        'Mã đơn': o.ma_don,
+        'Loại': o.loai_don === 'tai_ky' ? 'Tái ký' : 'Mới',
+        'Mã KH': k?.ma_khach || '',
+        'Khách hàng': k?.ten_khach || '',
+        'Số điện thoại': k?.sdt || '',
+        'Dịch vụ': (items[o.id] || []).map((x) => `${x.ten_dich_vu}${x.ten_goi ? ' · ' + x.ten_goi : ''}`).join('; '),
+        'Giá trị (sau VAT)': Number(o.gia_tri) || 0,
+        'Doanh số (chưa VAT)': tienChuaVat(o),
+        'Ngày chốt': o.ngay_chot || '',
+        'Sale': nameOf(o.sale_id, profiles, 'full_name'),
+        'Trạng thái KH': k?.trang_thai_cham_soc ? tenTrangThai(k.trang_thai_cham_soc) : '',
+        'Hoàn/huỷ': laHoanHuy(o) ? 'Có' : '',
+        'Nguồn khách': labelOf(NGUON_KHACH_OPTIONS, k?.nguon_khach) || '',
+      }
+    })
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Don dich vu')
+    const d = new Date(); const p = (n) => String(n).padStart(2, '0')
+    XLSX.writeFile(wb, `DonDichVu_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.xlsx`)
+  }
 
   function closeForm() {
     setShowForm(false)
@@ -130,6 +190,9 @@ export default function OrdersPage({ currentProfile }) {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="secondary" onClick={xuatExcel} disabled={filtered.length === 0}>
+            <Download size={16} /> Xuất Excel
+          </Button>
           {currentProfile?.role === 'admin' && (
             <Button variant="secondary" onClick={() => setXemGoi(true)}>
               <Tags size={16} /> Bảng giá
@@ -145,10 +208,28 @@ export default function OrdersPage({ currentProfile }) {
         </p>
       )}
 
-      <div className="mx-8 mt-6 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
+      {/* Tổng tiền theo bộ lọc */}
+      <div className="mx-8 mt-6 grid grid-cols-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-5 lg:divide-x">
+        <Kpi nhan="Số đơn" giaTri={tong.soDon} phu={dangLoc ? 'theo bộ lọc' : 'tất cả'} />
+        <Kpi nhan="Doanh số thực (chưa VAT)" giaTri={formatVnd(tong.thuc)} chu="text-indigo-700" phu="đã trừ hoàn/huỷ" />
+        <Kpi nhan="Đơn mới" giaTri={formatVnd(tong.moi)} chu="text-coral-500" phu={`${tong.soMoi} đơn`} />
+        <Kpi nhan="Tái ký" giaTri={formatVnd(tong.taiKy)} chu="text-teal-500" phu={`${tong.soTaiKy} đơn`} />
+        <Kpi nhan="Hoàn / huỷ" giaTri={formatVnd(tong.huy)} chu="text-rose-500" phu={`${tong.soHuy} đơn`} />
+      </div>
+
+      {tong.thuc > 0 && (
+        <div className="mx-8 mt-4 grid gap-4 lg:grid-cols-2">
+          <TyTrong tieuDe="Doanh số theo nhóm dịch vụ"
+            ds={NHOM.map((n, i) => ({ key: n, ten: n === 'Seller' ? 'Xây shop + Tối ưu' : n === 'ADS' ? 'Chạy quảng cáo' : 'Dịch vụ bổ sung', tien: tong.nhom[n], mau: MAU[i] }))} />
+          <TyTrong tieuDe="Doanh số theo nguồn khách"
+            ds={Object.entries(tong.nguon).sort((a, b) => b[1] - a[1]).map(([k, v], i) => ({ key: k, ten: labelOf(NGUON_KHACH_OPTIONS, k) || 'Khác', tien: v, mau: MAU[i % MAU.length] }))} />
+        </div>
+      )}
+
+      <div className="mx-8 mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
         <div className="relative min-w-[200px] flex-1">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-          <Input placeholder="Tìm theo mã đơn, khách hàng, dịch vụ..." value={search}
+          <Input placeholder="Tìm theo mã đơn, khách hàng, SĐT, dịch vụ..." value={search}
             onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Select value={filterLoai} onChange={(e) => setFilterLoai(e.target.value)} className="w-40">
@@ -175,6 +256,19 @@ export default function OrdersPage({ currentProfile }) {
           <option value="">Tất cả sale</option>
           {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
         </Select>
+        <Select value={filterTrangThai} onChange={(e) => setFilterTrangThai(e.target.value)} className="w-44">
+          <option value="">Tất cả trạng thái</option>
+          {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
+        </Select>
+        <Select value={filterNguon} onChange={(e) => setFilterNguon(e.target.value)} className="w-40">
+          <option value="">Tất cả nguồn</option>
+          {NGUON_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </Select>
+        {dangLoc && (
+          <button onClick={xoaLoc} className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-sm text-ink-600 hover:text-coral-500">
+            <X size={14} /> Xoá lọc
+          </button>
+        )}
       </div>
 
       <div className="mx-8 mt-4 flex items-center justify-between">
@@ -209,6 +303,7 @@ export default function OrdersPage({ currentProfile }) {
               {hien('ma') && <th className="px-5 py-3">Mã đơn</th>}
               {hien('loai') && <th className="px-5 py-3">Loại</th>}
               {hien('khach') && <th className="px-5 py-3">Khách hàng</th>}
+              {hien('sdt') && <th className="px-5 py-3">SĐT</th>}
               {hien('dich_vu') && <th className="px-5 py-3">Dịch vụ</th>}
               {hien('gia_tri') && <th className="px-5 py-3 text-right">Giá trị</th>}
               {hien('ngay_chot') && <th className="px-5 py-3">Ngày chốt</th>}
@@ -232,6 +327,7 @@ export default function OrdersPage({ currentProfile }) {
                     <p className="text-xs text-ink-400">{c.ma_khach}</p>
                   </td>
                 )}
+                {hien('sdt') && <td className="whitespace-nowrap px-5 py-3 text-ink-600">{c.sdt || '—'}</td>}
                 {hien('dich_vu') && (
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-1">
@@ -263,8 +359,8 @@ export default function OrdersPage({ currentProfile }) {
             ) : phanTrang.map((o) => (
               <tr key={o.id}
                 onClick={() => { const k = khachCua(o.customer_id); if (k) setXemKhach(k) }}
-                className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50">
-                {hien('ma') && <td className="px-5 py-3 font-medium text-navy-900">{o.ma_don}</td>}
+                className={`cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 ${laHoanHuy(o) ? 'opacity-60' : ''}`}>
+                {hien('ma') && <td className="whitespace-nowrap px-5 py-3 font-medium text-navy-900">{o.ma_don}</td>}
                 {hien('loai') && (
                   <td className="px-5 py-3">
                     {o.loai_don === 'tai_ky'
@@ -278,6 +374,7 @@ export default function OrdersPage({ currentProfile }) {
                     <p className="text-xs text-ink-400">{nameOf(o.customer_id, customers, 'ma_khach')}</p>
                   </td>
                 )}
+                {hien('sdt') && <td className="whitespace-nowrap px-5 py-3 text-ink-600">{khachCua(o.customer_id)?.sdt || '—'}</td>}
                 {hien('dich_vu') && (
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-1">
@@ -289,8 +386,8 @@ export default function OrdersPage({ currentProfile }) {
                     </div>
                   </td>
                 )}
-                {hien('gia_tri') && <td className="px-5 py-3 text-right font-medium text-navy-900">{formatVnd(o.gia_tri)}</td>}
-                {hien('ngay_chot') && <td className="px-5 py-3 text-ink-600">{o.ngay_chot || '—'}</td>}
+                {hien('gia_tri') && <td className="whitespace-nowrap px-5 py-3 text-right font-medium text-navy-900">{formatVnd(o.gia_tri)}</td>}
+                {hien('ngay_chot') && <td className="whitespace-nowrap px-5 py-3 text-ink-600">{o.ngay_chot ? o.ngay_chot.split('-').reverse().join('/') : '—'}</td>}
                 {hien('sale') && <td className="px-5 py-3 text-ink-600">{nameOf(o.sale_id, profiles, 'full_name')}</td>}
                 {hien('trang_thai') && (
                   <td className="px-5 py-3">
@@ -340,6 +437,53 @@ export default function OrdersPage({ currentProfile }) {
           onSaved={() => { closeForm(); load() }}
         />
       )}
+    </div>
+  )
+}
+
+const MAU = [
+  { thanh: 'bg-coral-500', cham: 'bg-coral-500' },
+  { thanh: 'bg-indigo-500', cham: 'bg-indigo-500' },
+  { thanh: 'bg-teal-500', cham: 'bg-teal-500' },
+  { thanh: 'bg-amber-400', cham: 'bg-amber-400' },
+  { thanh: 'bg-slate-400', cham: 'bg-slate-400' },
+]
+
+function Kpi({ nhan, giaTri, phu, chu = 'text-navy-900' }) {
+  return (
+    <div className="px-5 py-4">
+      <p className="text-sm text-ink-600">{nhan}</p>
+      <p className={`mt-1 font-display text-2xl font-bold ${chu}`}>{giaTri}</p>
+      {phu && <p className="mt-0.5 text-xs text-ink-400">{phu}</p>}
+    </div>
+  )
+}
+
+// Thanh tỷ trọng: tiền đến từ đâu
+function TyTrong({ tieuDe, ds }) {
+  const tong = ds.reduce((a, n) => a + n.tien, 0)
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-navy-900">{tieuDe}</h3>
+      {tong > 0 ? (
+        <>
+          <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-slate-100">
+            {ds.map((n) => n.tien > 0 && (
+              <div key={n.key} className={n.mau.thanh} style={{ width: `${(n.tien / tong) * 100}%` }}
+                title={`${n.ten}: ${formatVnd(n.tien)}`} />
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+            {ds.filter((n) => n.tien > 0).map((n) => (
+              <span key={n.key} className="inline-flex items-center gap-1.5 text-ink-600">
+                <span className={`h-2 w-2 rounded-full ${n.mau.cham}`} />
+                {n.ten} <b className="text-navy-900">{formatVnd(n.tien)}</b>
+                <span className="text-xs text-ink-400">({Math.round((n.tien / tong) * 100)}%)</span>
+              </span>
+            ))}
+          </div>
+        </>
+      ) : <p className="mt-3 text-sm text-ink-400">Chưa có số liệu.</p>}
     </div>
   )
 }
