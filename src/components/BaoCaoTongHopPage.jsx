@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Download } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Download, FileDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select } from './ui'
 import { NGUON_KHACH_OPTIONS, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
@@ -53,6 +53,8 @@ export default function BaoCaoTongHopPage() {
   const [den, setDen] = useState('')
   const [sale, setSale] = useState('')
   const [dangXuat, setDangXuat] = useState(false)
+  const [dangXuatPdf, setDangXuatPdf] = useState(false)
+  const baoCaoRef = useRef(null)
 
   useEffect(() => {
     (async () => {
@@ -169,8 +171,23 @@ export default function BaoCaoTongHopPage() {
         ws.getRow(row).height = 62
       }
 
+      // Các chỉ số tổng (giống 4 ô trên màn hình)
+      const kpi = [
+        ['Doanh số (chưa VAT)', tong1.tien, tien],
+        ['Số shop đã chốt', shopChot, '0'],
+        ['Data nhận', tong2.data, '0'],
+        ['Tỷ lệ chốt tổng', phanTram(tong2.tong, tong2.data) === null ? '' : phanTram(tong2.tong, tong2.data) / 100, '0%'],
+      ]
+      kpi.forEach(([nhan, gt, fmt], i) => {
+        const a = ws.getCell(4, i + 1), b = ws.getCell(5, i + 1)
+        a.value = nhan; a.font = { size: 10, color: { argb: 'FF555555' } }
+        b.value = gt; b.numFmt = fmt; b.font = { bold: true, size: 15, color: { argb: 'FF4338CA' } }
+        for (const c of [a, b]) { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }; c.border = vien; c.alignment = { horizontal: 'left', vertical: 'middle' } }
+      })
+      ws.getRow(5).height = 28
+
       // Bảng 1
-      let r = 4
+      let r = 7
       dauBang(r, ['Dịch vụ', 'Số lượng shop', 'Doanh số tổng (chưa tính VAT)'])
       for (const d of bang1) {
         r += 1
@@ -224,6 +241,57 @@ export default function BaoCaoTongHopPage() {
     }
   }
 
+  // Xuất PDF giống hệt màn hình: chụp phần dashboard + 2 bảng rồi ghép thành các trang A4,
+  // chỉ cắt ở khoảng trống giữa các khối (không cắt đôi bảng/biểu đồ nếu vừa 1 trang)
+  async function xuatPdf() {
+    const el = baoCaoRef.current
+    if (!el) return
+    setDangXuatPdf(true)
+    try {
+      await new Promise((ok) => setTimeout(ok, 120))   // chờ tiêu đề báo cáo hiện ra
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas-pro'), import('jspdf')])
+      const cv = await html2canvas(el, { scale: 2, backgroundColor: '#f4f6f9', useCORS: true })
+      const W = el.clientWidth
+      const rongMm = 190, leMm = 10, caoMm = 297 - 2 * leMm
+      const heSo = cv.width / W
+      const cao1Trang = (caoMm / rongMm) * W            // chiều cao 1 trang (px màn hình)
+      const goc = el.getBoundingClientRect()
+      const khoi = [...el.children].map((k) => { const b = k.getBoundingClientRect(); return { top: b.top - goc.top, bottom: b.bottom - goc.top } })
+      const tong = goc.height
+      const cat = []
+      let bd = 0, dem = 0
+      while (bd + cao1Trang < tong - 4 && dem++ < 30) {
+        const gh = bd + cao1Trang
+        const dinh = khoi.find((k) => k.top < gh - 1 && k.bottom > gh + 1)
+        const diem = dinh && dinh.top > bd + cao1Trang * 0.15 ? dinh.top - 8 : gh
+        cat.push(diem); bd = diem
+      }
+      const moc = [0, ...cat.map((y) => Math.round(y * heSo)), cv.height]
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
+      for (let i = 0; i < moc.length - 1; i++) {
+        const y = moc[i], h = moc[i + 1] - moc[i]
+        if (h < 3) continue
+        const p = document.createElement('canvas')
+        p.width = cv.width; p.height = h
+        const pc = p.getContext('2d')
+        pc.fillStyle = '#f4f6f9'; pc.fillRect(0, 0, p.width, h)
+        pc.drawImage(cv, 0, y, cv.width, h, 0, 0, cv.width, h)
+        if (i > 0) pdf.addPage()
+        pdf.setFillColor(244, 246, 249); pdf.rect(0, 0, 210, 297, 'F')
+        pdf.addImage(p.toDataURL('image/jpeg', 0.95), 'JPEG', leMm, leMm, rongMm, (h * rongMm) / cv.width)
+      }
+      const url = URL.createObjectURL(pdf.output('blob'))
+      const a = document.createElement('a')
+      const d = new Date()
+      a.href = url
+      a.download = `BaoCaoTongHop_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 2000)
+    } finally {
+      setDangXuatPdf(false)
+    }
+  }
+
   const th = 'border border-slate-200 px-3 py-3 font-semibold'
   const td = 'border border-slate-200 px-3 py-2.5 tabular-nums'
 
@@ -236,9 +304,14 @@ export default function BaoCaoTongHopPage() {
             Doanh số theo dịch vụ và hiệu quả từng nguồn data — {tenKy}
           </p>
         </div>
-        <Button onClick={xuatExcel} disabled={loading || dangXuat}>
-          <Download size={16} /> {dangXuat ? 'Đang xuất...' : 'Xuất Excel'}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={xuatExcel} disabled={loading || dangXuat}>
+            <Download size={16} /> {dangXuat ? 'Đang xuất...' : 'Xuất Excel (chỉ số liệu)'}
+          </Button>
+          <Button onClick={xuatPdf} disabled={loading || dangXuatPdf}>
+            <FileDown size={16} /> {dangXuatPdf ? 'Đang xuất...' : 'Xuất báo cáo (giống màn hình)'}
+          </Button>
+        </div>
       </header>
 
       <div className="space-y-5 px-8 py-6">
@@ -263,6 +336,15 @@ export default function BaoCaoTongHopPage() {
           </Select>
         </div>
 
+        <div ref={baoCaoRef} className="space-y-5">
+        {dangXuatPdf && (
+          <div className="px-1 pt-1">
+            <h2 className="font-display text-xl font-bold text-navy-900">BÁO CÁO TỔNG HỢP DOANH SỐ &amp; NGUỒN DATA</h2>
+            <p className="text-sm text-ink-600">
+              Kỳ báo cáo: {tenKy} · {sale ? `Sale: ${profiles.find((p) => p.id === sale)?.full_name || ''}` : 'Tất cả sale'}
+            </p>
+          </div>
+        )}
         {/* Chỉ số tổng */}
         <div className="grid grid-cols-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm sm:grid-cols-4 sm:divide-y-0 sm:divide-x">
           <Kpi nhan="Doanh số (chưa VAT)" giaTri={formatVnd(tong1.tien)} chu="text-indigo-700" phu="đã trừ hoàn / huỷ" />
@@ -397,6 +479,7 @@ export default function BaoCaoTongHopPage() {
             Đơn tái ký và đơn hoàn / huỷ không tính vào job chốt.
           </p>
         </section>
+        </div>
       </div>
     </div>
   )
