@@ -20,7 +20,7 @@ const DONG_DV = [
 ]
 
 // Dòng báo cáo của 1 dịch vụ trong đơn
-function phanLoai(ten, loaiDon) {
+export function phanLoai(ten, loaiDon) {
   const t = ten || ''
   if (/mall/i.test(t)) return 'mall'
   if (/follow/i.test(t)) return 'follow'
@@ -243,20 +243,65 @@ export default function BaoCaoTongHopPage() {
 
   // Xuất PDF giống hệt màn hình: chụp phần dashboard + 2 bảng rồi ghép thành các trang A4,
   // chỉ cắt ở khoảng trống giữa các khối (không cắt đôi bảng/biểu đồ nếu vừa 1 trang)
+  // Dựng bản in bằng style trực tiếp (màu hex) nên không phụ thuộc CSS của web
+  function dungBanIn() {
+    const C = { navy: '#0f1f3d', ink: '#475569', mute: '#94a3b8', line: '#e2e8f0', xanh: '#e0f2fe', chu: '#4338ca', cam: '#fff7e0', coral: '#f0624d' }
+    const vnd = (v) => new Intl.NumberFormat('vi-VN').format(Math.round(v))
+    const mauDv = { ads_moi: '#8b5cf6', ads_tai_ky: '#6366f1', xay_shop: '#f0624d', mall: '#0ea5e9', follow: '#14b8a6', nhan_ban: '#fbbf24', khac: '#94a3b8' }
+    const card = 'background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);'
+    const tdS = `border:1px solid ${C.line};padding:10px 12px;font-size:13px;`
+    const thS = `border:1px solid ${C.line};padding:12px;font-size:13px;font-weight:700;background:${C.xanh};color:${C.navy};`
+    const kpi = (n, g, p, m) => `<div style="flex:1;padding:16px 20px;border-left:1px solid ${C.line};"><div style="font-size:13px;color:${C.ink}">${n}</div><div style="font-size:28px;font-weight:700;color:${m || C.navy};margin-top:4px">${g}</div><div style="font-size:11px;color:${C.mute};margin-top:2px">${p || ''}</div></div>`
+    const bar = (pct, mau) => `<div style="height:9px;border-radius:9px;background:#f1f5f9;overflow:hidden;margin-top:4px"><div style="height:100%;width:${Math.max(0, Math.min(100, pct))}%;background:${mau};border-radius:9px"></div></div>`
+    const nguoi = sale ? (profiles.find((p) => p.id === sale)?.full_name || '') : 'Tất cả sale'
+    const h = `
+<div style="width:1100px;padding:24px;background:#f4f6f9;color:${C.navy};font-family:Arial,Helvetica,sans-serif;box-sizing:border-box;">
+ <div data-blk style="padding:0 4px 16px"><div style="font-size:22px;font-weight:700">BÁO CÁO TỔNG HỢP DOANH SỐ &amp; NGUỒN DATA</div><div style="font-size:13px;color:${C.ink};margin-top:4px">Kỳ báo cáo: ${tenKy} · ${nguoi}</div></div>
+ <div data-blk style="display:flex;${card}padding:0;overflow:hidden;margin-bottom:16px">
+  ${kpi('Doanh số (chưa VAT)', formatVnd(tong1.tien), 'đã trừ hoàn / huỷ', C.chu).replace('border-left:1px solid ' + C.line + ';', '')}
+  ${kpi('Số shop đã chốt', shopChot, 'shop có đơn trong kỳ', '#14b8a6')}
+  ${kpi('Data nhận', tong2.data, 'khách mới tạo trong kỳ')}
+  ${kpi('Tỷ lệ chốt tổng', hienPhanTram(phanTram(tong2.tong, tong2.data)), `${tong2.tong} job chốt / ${tong2.data} data`, C.coral)}
+ </div>
+ <div data-blk style="display:flex;gap:16px;margin-bottom:16px">
+  <div style="${card}flex:1"><div style="font-size:14px;font-weight:700;margin-bottom:12px">Doanh số theo dịch vụ</div>
+   ${bang1.map((d) => `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:${C.ink}">${d.ten} <span style="font-size:11px;color:${C.mute}">· ${d.soShop} shop</span></span><b>${formatVnd(d.tien)}</b></div>${bar((d.tien / maxTien1) * 100, mauDv[d.key])}</div>`).join('')}
+  </div>
+  <div style="${card}flex:1"><div style="font-size:14px;font-weight:700;margin-bottom:12px">Nguồn data: data nhận và job chốt <span style="font-size:11px;font-weight:400;color:${C.mute}">(xám: Data · cam: Chốt tổng)</span></div>
+   ${bang2.map((n) => `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:${C.ink}">${n.ten}</span><span style="font-size:11px;color:${C.mute}">${n.data} data · ${n.tong} chốt · <b style="color:${C.coral}">${hienPhanTram(phanTram(n.tong, n.data))}</b></span></div>${bar((n.data / maxData2) * 100, '#cbd5e1')}${bar((n.tong / maxData2) * 100, C.coral)}</div>`).join('')}
+  </div>
+ </div>
+ <div data-blk style="${card}margin-bottom:16px"><div style="font-size:14px;font-weight:700;margin-bottom:12px">Bảng 1 — Doanh số theo dịch vụ</div>
+  <table style="width:100%;border-collapse:collapse"><thead><tr><th style="${thS}text-align:left">Dịch vụ</th><th style="${thS}text-align:right">Số lượng shop</th><th style="${thS}text-align:right">Doanh số tổng (chưa tính VAT)</th></tr></thead><tbody>
+  ${bang1.map((d) => `<tr><td style="${tdS}">${d.ten}</td><td style="${tdS}text-align:right">${d.soShop}</td><td style="${tdS}text-align:right">${formatVnd(d.tien)}</td></tr>`).join('')}
+  <tr style="background:${C.xanh};font-weight:700;color:${C.chu}"><td style="${tdS}font-size:15px">Tổng</td><td style="${tdS}font-size:15px;text-align:right">${tong1.soShop}</td><td style="${tdS}font-size:15px;text-align:right">${formatVnd(tong1.tien)}</td></tr></tbody></table></div>
+ <div data-blk style="${card}"><div style="font-size:14px;font-weight:700;margin-bottom:12px">Bảng 2 — Hiệu quả theo nguồn data</div>
+  <table style="width:100%;border-collapse:collapse"><thead><tr><th style="${thS}text-align:left">Nguồn data</th><th style="${thS}text-align:center">Số lượng data trong tháng</th><th style="${thS}text-align:center">Số job chốt trực tiếp trong tháng</th><th style="${thS}text-align:center">Tỷ lệ chốt trực tiếp %</th><th style="${thS}text-align:center">Số job chốt tổng (bao gồm data tháng cũ)</th><th style="${thS}text-align:center">Tỷ lệ chốt tổng %</th><th style="${thS}text-align:center">Doanh số từ các nguồn (tính cả VAT)</th></tr></thead><tbody>
+  ${bang2.map((n) => `<tr><td style="${tdS}">${n.ten}</td><td style="${tdS}text-align:center">${n.data}</td><td style="${tdS}text-align:center">${n.tt}</td><td style="${tdS}text-align:center">${hienPhanTram(phanTram(n.tt, n.data))}</td><td style="${tdS}text-align:center">${n.tong}</td><td style="${tdS}text-align:center">${hienPhanTram(phanTram(n.tong, n.data))}</td><td style="${tdS}text-align:right;background:${C.cam}">${vnd(n.tien)}</td></tr>`).join('')}
+  <tr style="background:${C.xanh};font-weight:700;color:${C.chu}"><td style="${tdS}font-size:15px">Tổng</td><td style="${tdS}text-align:center">${tong2.data}</td><td style="${tdS}text-align:center">${tong2.tt}</td><td style="${tdS}text-align:center">${hienPhanTram(phanTram(tong2.tt, tong2.data))}</td><td style="${tdS}text-align:center">${tong2.tong}</td><td style="${tdS}text-align:center">${hienPhanTram(phanTram(tong2.tong, tong2.data))}</td><td style="${tdS}text-align:right;background:${C.cam}">${vnd(tong2.tien)}</td></tr></tbody></table>
+  <div style="margin-top:12px;font-size:11px;color:${C.mute}">Job chốt trực tiếp = data tạo trong kỳ và chốt đơn mới trong kỳ. Job chốt tổng = mọi đơn mới chốt trong kỳ (kể cả data tháng cũ), nên tỷ lệ có thể trên 100%. Đơn tái ký và đơn hoàn / huỷ không tính vào job chốt.</div></div>
+</div>`
+    const host = document.createElement('div')
+    host.style.cssText = 'position:fixed;left:-20000px;top:0;'
+    host.innerHTML = h
+    document.body.appendChild(host)
+    return host
+  }
+
   async function xuatPdf() {
-    const el = baoCaoRef.current
-    if (!el) return
     setDangXuatPdf(true)
+    let host
     try {
-      await new Promise((ok) => setTimeout(ok, 120))   // chờ tiêu đề báo cáo hiện ra
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas-pro'), import('jspdf')])
+      host = dungBanIn()
+      const el = host.firstElementChild
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
       const cv = await html2canvas(el, { scale: 2, backgroundColor: '#f4f6f9', useCORS: true })
       const W = el.clientWidth
       const rongMm = 190, leMm = 10, caoMm = 297 - 2 * leMm
       const heSo = cv.width / W
-      const cao1Trang = (caoMm / rongMm) * W            // chiều cao 1 trang (px màn hình)
+      const cao1Trang = (caoMm / rongMm) * W
       const goc = el.getBoundingClientRect()
-      const khoi = [...el.children].map((k) => { const b = k.getBoundingClientRect(); return { top: b.top - goc.top, bottom: b.bottom - goc.top } })
+      const khoi = [...el.querySelectorAll('[data-blk]')].map((k) => { const b = k.getBoundingClientRect(); return { top: b.top - goc.top, bottom: b.bottom - goc.top } })
       const tong = goc.height
       const cat = []
       let bd = 0, dem = 0
@@ -288,6 +333,7 @@ export default function BaoCaoTongHopPage() {
       document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 2000)
     } finally {
+      if (host) host.remove()
       setDangXuatPdf(false)
     }
   }
@@ -337,14 +383,6 @@ export default function BaoCaoTongHopPage() {
         </div>
 
         <div ref={baoCaoRef} className="space-y-5">
-        {dangXuatPdf && (
-          <div className="px-1 pt-1">
-            <h2 className="font-display text-xl font-bold text-navy-900">BÁO CÁO TỔNG HỢP DOANH SỐ &amp; NGUỒN DATA</h2>
-            <p className="text-sm text-ink-600">
-              Kỳ báo cáo: {tenKy} · {sale ? `Sale: ${profiles.find((p) => p.id === sale)?.full_name || ''}` : 'Tất cả sale'}
-            </p>
-          </div>
-        )}
         {/* Chỉ số tổng */}
         <div className="grid grid-cols-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm sm:grid-cols-4 sm:divide-y-0 sm:divide-x">
           <Kpi nhan="Doanh số (chưa VAT)" giaTri={formatVnd(tong1.tien)} chu="text-indigo-700" phu="đã trừ hoàn / huỷ" />
