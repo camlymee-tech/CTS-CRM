@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Download, FileDown, Save, Wand2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Select } from './ui'
@@ -71,6 +71,8 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
   const [dangLuu, setDangLuu] = useState(false)
   const [thongBao, setThongBao] = useState('')
   const [dangXuat, setDangXuat] = useState('')
+  const [manHinh, setManHinh] = useState('')
+  const [mo, setMo] = useState('')
 
   useEffect(() => {
     (async () => {
@@ -294,7 +296,7 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
     const R = (arr, st = '', tongDong = false) => `<tr style="${tongDong ? tot : ''}">${arr.map((x, i) => `<td style="${tdS}${i ? (typeof x === 'string' && x.includes('<span') ? c : c) : 'font-weight:600'}${st}">${x}</td>`).join('')}</tr>`
     const money = (arr, idx) => arr.map((x, i) => (idx.includes(i) ? `<span style="display:block;text-align:right">${x}</span>` : x))
     const Bang = (tieuDe, dongs, tongDong, idxTien = []) => `<table style="width:100%;border-collapse:collapse"><thead>${H(tieuDe, true)}</thead><tbody>${dongs.map((d, j) => R(money(d, idxTien), '', tongDong && j === dongs.length - 1)).join('')}</tbody></table>`
-    const tieuDe = (i, t) => `<div style="font-size:14px;font-weight:700;margin-bottom:10px"><span style="color:${C.coral}">Bước ${i}.</span> ${t}</div>`
+    const tieuDe = (i, t) => `<div style="font-size:14px;font-weight:700;margin-bottom:10px">${t}</div>`
     const o1 = (v) => so1(v)
     const chiTiet = (d) => `<div data-blk style="${card}"><div style="font-size:14px;font-weight:700;margin-bottom:10px">Chi tiết — ${d.ten}</div>
       ${Bang(['Nguồn data', 'Data mục tiêu', 'Data thực tế', 'HĐ mục tiêu', 'Job chốt thực tế', 'Tỷ lệ chốt mục tiêu', 'Tỷ lệ chốt thực tế'],
@@ -314,7 +316,22 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
   ${kpi('Số hợp đồng', so1(kh.tongHd), thucTeam.hd, pt(thucTeam.hd, kh.tongHd))}
   ${kpi('Giá trị TB / HĐ', nghin(kh.giaTb), nghin(thucTeam.hd ? thucTeam.dt / thucTeam.hd : 0))}
  </div>
- <div data-blk style="${card}">${tieuDe(1, 'Thông số đầu vào của team')}
+ <div data-blk style="${card}">${tieuDe(3, 'THEO DÕI KẾT QUẢ — Mục tiêu và thực tế theo nhân sự')}
+  ${Bang(['Nhân sự', '% đảm nhận', 'Data mục tiêu', 'Data thực tế', 'HĐ mục tiêu', 'HĐ thực tế', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành'], [
+    ...dong.map((d) => [d.ten, d.k + '%', nghin(d.m.data), d.t.tongData, o1(d.m.hd), d.t.hd, nghin(d.m.dt), nghin(d.t.dt), bar(pt(d.t.dt, d.m.dt))]),
+    ['Tổng team', o1(tongChia) + '%', nghin(kh.tongData), thucTeam.data, o1(kh.tongHd), thucTeam.hd, nghin(kh.tongDt), nghin(thucTeam.dt), hienPt(pHt)]], true, [6, 7])}</div>
+ <div data-blk style="${card}">${tieuDe(2, 'Kế hoạch của team — data và hợp đồng cần có theo từng nguồn')}
+  ${Bang(['Nguồn data', ...DV.map((d) => `Data ${d.ten}`), 'Tổng data cần có', 'Tỷ lệ chốt mục tiêu', 'Số HĐ cần đạt', 'Data thực tế', 'Job chốt thực tế', 'Tỷ lệ chốt thực tế'], [
+    ...nguon.map((n) => [n.ten, ...DV.map((d) => nghin(kh.ng[n.key].dataDv[d.key])), nghin(kh.ng[n.key].data), kh.ng[n.key].chot + '%', nghin(kh.ng[n.key].hd), tongNg(n.key, 'data'), tongNg(n.key, 'chot'), hienPt(pt(tongNg(n.key, 'chot'), tongNg(n.key, 'data')))]),
+    ['Tổng', ...DV.map((d) => nghin(kh.dv[d.key].data)), nghin(kh.tongData), o1(kh.bq * 100) + '%', nghin(kh.tongHd), thucTeam.data, thucNguonTong('chot'), hienPt(pt(thucNguonTong('chot'), thucTeam.data))]], true)}
+  <div style="height:14px"></div>
+  ${Bang(['Dịch vụ', 'Số HĐ cần đạt', 'Số HĐ thực tế', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành'], [
+    ...DV.map((d) => [d.ten, o1(kh.dv[d.key].hd), tongDvTt(d.key, 'hd'), nghin(kh.dv[d.key].dt), nghin(tongDvTt(d.key, 'dt')), bar(pt(tongDvTt(d.key, 'dt'), kh.dv[d.key].dt))]),
+    ['Tổng', o1(kh.tongHd), thucTeam.hd, nghin(kh.tongDt), nghin(thucTeam.dt), hienPt(pHt)]], true, [3, 4])}
+  <div style="margin-top:10px;font-size:11px;color:${C.mute}">Số tính chính xác (có số lẻ), hiển thị làm tròn nên cộng tay từng ô có thể lệch ±1 so với dòng Tổng.</div></div>
+ ${dong.map(chiTiet).join('')}
+
+ <div data-blk style="${card}">${tieuDe(1, 'THIẾT LẬP MỤC TIÊU — Thông số đầu vào của team')}
   ${Bang(['', ...DV.map((d) => d.ten), 'Tổng'], [
     ['DT mục tiêu dịch vụ (chưa VAT)', ...DV.map((d) => vangIn(nghin(kh.dv[d.key].dt))), nghin(kh.tongDt)],
     ['Giá trị TB / HĐ', ...DV.map((d) => vangIn(nghin(kh.dv[d.key].gia))), nghin(kh.giaTb)],
@@ -325,20 +342,6 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
     ['Kiểm tra tổng cơ cấu', ...DV.map((d) => o1(kh.dv[d.key].tongCc) + '%'), Math.round(kh.dv.ads.tongCc) === 100 && Math.round(kh.dv.xay_shop.tongCc) === 100 && Math.round(kh.dv.mall.tongCc) === 100 ? 'OK' : 'Cần = 100%'],
     ['Tỷ lệ chốt BQ theo dịch vụ', ...DV.map((d) => o1(kh.dv[d.key].bq * 100) + '%'), o1(kh.bq * 100) + '%'],
     ['Số data cần có', ...DV.map((d) => nghin(kh.dv[d.key].data)), nghin(kh.tongData)]], false)}</div>
- <div data-blk style="${card}">${tieuDe(2, 'Kế hoạch của team — data và hợp đồng cần có theo từng nguồn')}
-  ${Bang(['Nguồn data', ...DV.map((d) => `Data ${d.ten}`), 'Tổng data cần có', 'Tỷ lệ chốt mục tiêu', 'Số HĐ cần đạt', 'Data thực tế', 'Job chốt thực tế', 'Tỷ lệ chốt thực tế'], [
-    ...nguon.map((n) => [n.ten, ...DV.map((d) => nghin(kh.ng[n.key].dataDv[d.key])), nghin(kh.ng[n.key].data), kh.ng[n.key].chot + '%', nghin(kh.ng[n.key].hd), tongNg(n.key, 'data'), tongNg(n.key, 'chot'), hienPt(pt(tongNg(n.key, 'chot'), tongNg(n.key, 'data')))]),
-    ['Tổng', ...DV.map((d) => nghin(kh.dv[d.key].data)), nghin(kh.tongData), o1(kh.bq * 100) + '%', nghin(kh.tongHd), thucTeam.data, thucNguonTong('chot'), hienPt(pt(thucNguonTong('chot'), thucTeam.data))]], true)}
-  <div style="height:14px"></div>
-  ${Bang(['Dịch vụ', 'Số HĐ cần đạt', 'Số HĐ thực tế', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành'], [
-    ...DV.map((d) => [d.ten, o1(kh.dv[d.key].hd), tongDvTt(d.key, 'hd'), nghin(kh.dv[d.key].dt), nghin(tongDvTt(d.key, 'dt')), bar(pt(tongDvTt(d.key, 'dt'), kh.dv[d.key].dt))]),
-    ['Tổng', o1(kh.tongHd), thucTeam.hd, nghin(kh.tongDt), nghin(thucTeam.dt), hienPt(pHt)]], true, [3, 4])}
-  <div style="margin-top:10px;font-size:11px;color:${C.mute}">Số tính chính xác (có số lẻ), hiển thị làm tròn nên cộng tay từng ô có thể lệch ±1 so với dòng Tổng.</div></div>
- <div data-blk style="${card}">${tieuDe(3, 'Mục tiêu và thực tế theo nhân sự')}
-  ${Bang(['Nhân sự', '% đảm nhận', 'Data mục tiêu', 'Data thực tế', 'HĐ mục tiêu', 'HĐ thực tế', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành'], [
-    ...dong.map((d) => [d.ten, d.k + '%', nghin(d.m.data), d.t.tongData, o1(d.m.hd), d.t.hd, nghin(d.m.dt), nghin(d.t.dt), bar(pt(d.t.dt, d.m.dt))]),
-    ['Tổng team', o1(tongChia) + '%', nghin(kh.tongData), thucTeam.data, o1(kh.tongHd), thucTeam.hd, nghin(kh.tongDt), nghin(thucTeam.dt), hienPt(pHt)]], true, [6, 7])}</div>
- ${dong.map(chiTiet).join('')}
 </div>`
     const host = document.createElement('div')
     host.style.cssText = 'position:fixed;left:-20000px;top:0;'
@@ -469,12 +472,29 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
     )
   }
 
+  const mauDv = { ads: 'bg-violet-500', xay_shop: 'bg-coral-500', mall: 'bg-sky-500' }
+  const kqNguon = nguon.reduce((a, n) => a + tongNg(n.key, 'chot'), 0)
+  const checkCc = DV.every((d) => Math.round(kh.dv[d.key].tongCc) === 100)
+  const Chip = ({ nhan, gt, phu, mau = 'text-navy-900' }) => (
+    <div className="rounded-xl bg-slate-50 px-4 py-3">
+      <p className="text-xs text-ink-600">{nhan}</p>
+      <p className={`mt-0.5 font-display text-2xl font-bold tabular-nums ${mau}`}>{gt}</p>
+      {phu && <p className="text-xs text-ink-400">{phu}</p>}
+    </div>
+  )
+  const Dong = ({ nhan, children, tinh }) => (
+    <div className={`flex items-center justify-between gap-3 py-1.5 ${tinh ? 'text-sm' : ''}`}>
+      <span className="whitespace-nowrap text-sm text-ink-600">{nhan}</span>{children}
+    </div>
+  )
+  const hienManHinh = manHinh || (kh.tongDt > 0 ? 'theo_doi' : 'thiet_lap')
+
   return (
     <div className="h-full overflow-y-auto">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
         <div>
           <h1 className="font-display text-xl font-bold text-navy-900">Mục tiêu nhân sự hàng tháng</h1>
-          <p className="text-sm text-ink-600">Điền thông số đầu vào của team → app tự tính data, hợp đồng cần đạt → chia cho từng người</p>
+          <p className="text-sm text-ink-600">Thiết lập mục tiêu đầu tháng, theo dõi kết quả trong tháng</p>
         </div>
         <div className="flex items-end gap-2">
           <label className="flex flex-col gap-1.5 text-sm">
@@ -488,150 +508,172 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
         </div>
       </header>
 
+      <div className="flex gap-1 border-b border-slate-200 bg-white px-8">
+        {[['thiet_lap', '1. Thiết lập mục tiêu'], ['theo_doi', '2. Theo dõi kết quả']].map(([k, t]) => (
+          <button key={k} onClick={() => setManHinh(k)}
+            className={`-mb-px border-b-2 px-3 py-2.5 text-sm transition ${hienManHinh === k ? 'border-coral-500 font-medium text-navy-900' : 'border-transparent text-ink-600 hover:text-navy-900'}`}>{t}</button>
+        ))}
+      </div>
+
       <div className="space-y-5 px-8 py-6">
         {thongBao && <p className="rounded-xl bg-sky-50 px-4 py-2.5 text-sm text-navy-900">{thongBao}</p>}
 
-        <div className="grid grid-cols-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm sm:grid-cols-4 sm:divide-y-0 sm:divide-x">
-          <KpiMt nhan="Doanh thu (chưa VAT)" mt={nghin(kh.tongDt)} tt={nghin(thucTeam.dt)} phan={pHt} mau={mauPt(pHt)} />
-          <KpiMt nhan="Số data" mt={nghin(kh.tongData)} tt={thucTeam.data} phan={pt(thucTeam.data, kh.tongData)} mau={mauPt(pt(thucTeam.data, kh.tongData))} />
-          <KpiMt nhan="Số hợp đồng" mt={so1(kh.tongHd)} tt={thucTeam.hd} phan={pt(thucTeam.hd, kh.tongHd)} mau={mauPt(pt(thucTeam.hd, kh.tongHd))} />
-          <KpiMt nhan="Giá trị TB / HĐ" mt={nghin(kh.giaTb)} tt={nghin(thucTeam.hd ? thucTeam.dt / thucTeam.hd : 0)} />
-        </div>
-
-        {/* BƯỚC 1 */}
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <div className="mb-1 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-coral-500 text-xs font-bold text-white">1</span>
-            <h3 className="text-sm font-semibold text-navy-900">Thông số đầu vào của team — chỉ điền các ô vàng</h3></div>
-          <p className="mb-3 text-xs text-ink-400">Chị điền doanh thu cần đạt và giá trị TB mỗi dịch vụ, rồi cơ cấu data theo nguồn và tỷ lệ chốt mục tiêu. Các ô trắng app tự tính.</p>
-
-          <table className="w-full border-collapse text-sm">
-            <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}></th>{DV.map((d) => <th key={d.key} className={th}>{d.ten}</th>)}<th className={th}>Tổng</th></tr></thead>
-            <tbody>
-              <tr><td className={`${td} font-semibold`}>DT mục tiêu dịch vụ (chưa VAT)</td>
-                {DV.map((d) => <td key={d.key} className={vang}><input type="text" inputMode="numeric" className={o()} value={team?.dv?.[d.key]?.dt === undefined || team?.dv?.[d.key]?.dt === '' ? '' : nghin(team.dv[d.key].dt)} onChange={(e) => dat(['dv', d.key, 'dt'], e.target.value.replace(/\D/g, ''))} /></td>)}
-                <td className={`${td} text-center font-bold`}>{nghin(kh.tongDt)}</td></tr>
-              <tr><td className={`${td} font-semibold`}>Giá trị TB / HĐ</td>
-                {DV.map((d) => <td key={d.key} className={vang}><input type="text" inputMode="numeric" className={o()} value={team?.dv?.[d.key]?.gia === undefined || team?.dv?.[d.key]?.gia === '' ? '' : nghin(team.dv[d.key].gia)} onChange={(e) => dat(['dv', d.key, 'gia'], e.target.value.replace(/\D/g, ''))} /></td>)}
-                <td className={`${td} text-center`}>{nghin(kh.giaTb)}</td></tr>
-              <tr><td className={`${td} font-semibold`}>Số HĐ cần đạt</td>
-                {DV.map((d) => <td key={d.key} className={`${td} text-center`}>{so1(kh.dv[d.key].hd)}</td>)}
-                <td className={`${td} text-center font-bold`}>{so1(kh.tongHd)}</td></tr>
-            </tbody>
-          </table>
-
-          <table className="mt-5 w-full border-collapse text-sm">
-            <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Nguồn data</th>
-              {DV.map((d) => <th key={d.key} className={th}>Cơ cấu data {d.ten}</th>)}<th className={th}>Tỷ lệ chốt mục tiêu</th></tr></thead>
-            <tbody>
-              {nguon.map((n) => (
-                <tr key={n.key}><td className={`${td} font-semibold`}>{n.ten}</td>
-                  {DV.map((d) => <td key={d.key} className={vang}><div className="flex items-center justify-center gap-1"><input type="number" min="0" max="100" className={o('w-20')} value={tienIn(team?.cc?.[d.key]?.[n.key])} onChange={(e) => dat(['cc', d.key, n.key], e.target.value)} />%</div></td>)}
-                  <td className={vang}><div className="flex items-center justify-center gap-1"><input type="number" min="0" max="100" className={o('w-20')} value={tienIn(team?.chot?.[n.key])} onChange={(e) => dat(['chot', n.key], e.target.value)} />%</div></td></tr>
-              ))}
-              <tr><td className={`${td} font-semibold`}>Kiểm tra tổng cơ cấu</td>
-                {DV.map((d) => { const ok = Math.round(kh.dv[d.key].tongCc) === 100; return <td key={d.key} className={`${td} text-center font-semibold ${ok ? 'text-teal-600' : 'text-coral-500'}`}>{so1(kh.dv[d.key].tongCc)}% {ok ? '· OK' : '· cần = 100%'}</td> })}
-                <td className={td}></td></tr>
-              <tr><td className={`${td} font-semibold`}>Tỷ lệ chốt BQ theo dịch vụ</td>
-                {DV.map((d) => <td key={d.key} className={`${td} text-center`}>{so1(kh.dv[d.key].bq * 100)}%</td>)}
-                <td className={`${td} text-center font-bold`}>{so1(kh.bq * 100)}%</td></tr>
-              <tr><td className={`${td} font-semibold`}>Số data cần có</td>
-                {DV.map((d) => <td key={d.key} className={`${td} text-center`}>{nghin(kh.dv[d.key].data)}</td>)}
-                <td className={`${td} text-center font-bold`}>{nghin(kh.tongData)}</td></tr>
-            </tbody>
-          </table>
-        </section>
-
-        {/* BƯỚC 2 */}
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <div className="mb-3 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-coral-500 text-xs font-bold text-white">2</span>
-            <h3 className="text-sm font-semibold text-navy-900">Kế hoạch của team — số data và hợp đồng cần có theo từng nguồn</h3></div>
-          <table className="w-full border-collapse text-sm">
-            <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Nguồn data</th>
-              {DV.map((d) => <th key={d.key} className={th}>Data {d.ten}</th>)}
-              <th className={th}>Tổng data cần có</th><th className={th}>Tỷ lệ chốt mục tiêu</th><th className={th}>Số HĐ cần đạt</th>
-              <th className={th}>Data thực tế</th><th className={th}>Job chốt thực tế</th><th className={th}>Tỷ lệ chốt thực tế</th></tr></thead>
-            <tbody>
-              {nguon.map((n) => (
-                <tr key={n.key}><td className={`${td} font-semibold`}>{n.ten}</td>
-                  {DV.map((d) => <td key={d.key} className={`${td} text-center`}>{nghin(kh.ng[n.key].dataDv[d.key])}</td>)}
-                  <td className={`${td} text-center`}>{nghin(kh.ng[n.key].data)}</td><td className={`${td} text-center`}>{kh.ng[n.key].chot}%</td><td className={`${td} text-center`}>{nghin(kh.ng[n.key].hd)}</td>
-                  <td className={`${td} text-center`}>{tongNg(n.key, 'data')}</td><td className={`${td} text-center`}>{tongNg(n.key, 'chot')}</td><td className={`${td} text-center`}>{hienPt(pt(tongNg(n.key, 'chot'), tongNg(n.key, 'data')))}</td></tr>
-              ))}
-              <tr className={dongTong}><td className={td}>Tổng</td>
-                {DV.map((d) => <td key={d.key} className={`${td} text-center`}>{nghin(kh.dv[d.key].data)}</td>)}
-                <td className={`${td} text-center`}>{nghin(kh.tongData)}</td><td className={`${td} text-center`}>{so1(kh.bq * 100)}%</td><td className={`${td} text-center`}>{nghin(kh.tongHd)}</td>
-                <td className={`${td} text-center`}>{thucTeam.data}</td><td className={`${td} text-center`}>{nguon.reduce((a, n) => a + tongNg(n.key, 'chot'), 0)}</td><td className={`${td} text-center`}>{hienPt(pt(nguon.reduce((a, n) => a + tongNg(n.key, 'chot'), 0), thucTeam.data))}</td></tr>
-            </tbody>
-          </table>
-          <table className="mt-5 w-full border-collapse text-sm">
-            <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Dịch vụ</th><th className={th}>Số HĐ cần đạt</th><th className={th}>Số HĐ thực tế</th><th className={th}>Doanh thu mục tiêu</th><th className={th}>Doanh thu thực tế</th><th className={th}>% hoàn thành</th></tr></thead>
-            <tbody>
-              {DV.map((d) => <tr key={d.key}><td className={`${td} font-semibold`}>{d.ten}</td><td className={`${td} text-center`}>{so1(kh.dv[d.key].hd)}</td><td className={`${td} text-center`}>{tongDvTt(d.key, 'hd')}</td><td className={`${td} text-right`}>{nghin(kh.dv[d.key].dt)}</td><td className={`${td} text-right`}>{nghin(tongDvTt(d.key, 'dt'))}</td><td className={td}><Bar v={pt(tongDvTt(d.key, 'dt'), kh.dv[d.key].dt)} /></td></tr>)}
-              <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{so1(kh.tongHd)}</td><td className={`${td} text-center`}>{thucTeam.hd}</td><td className={`${td} text-right`}>{nghin(kh.tongDt)}</td><td className={`${td} text-right`}>{nghin(thucTeam.dt)}</td><td className={`${td} text-center`}>{hienPt(pHt)}</td></tr>
-            </tbody>
-          </table>
-          <p className="mt-3 text-xs text-ink-400">Số tính chính xác (có số lẻ) nhưng hiển thị làm tròn, nên cộng tay từng ô có thể lệch ±1 so với dòng Tổng. Thực tế chỉ tính đơn mới đã chốt trong tháng, đã trừ đơn hoàn / huỷ.</p>
-        </section>
-
-        {/* BƯỚC 3 */}
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-coral-500 text-xs font-bold text-white">3</span>
-              <h3 className="text-sm font-semibold text-navy-900">Chia mục tiêu cho từng nhân sự — điền % mỗi người đảm nhận</h3></div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => chiaTuDong('deu')}><Wand2 size={16} /> Chia đều</Button>
-              <Button variant="secondary" onClick={() => chiaTuDong('truoc')}><Wand2 size={16} /> Chia theo doanh số tháng trước</Button>
+        {hienManHinh === 'thiet_lap' && (
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Chip nhan="Doanh thu mục tiêu (chưa VAT)" gt={nghin(kh.tongDt)} mau="text-indigo-700" />
+              <Chip nhan="Số HĐ cần đạt" gt={so1(kh.tongHd)} phu={`Giá trị TB ${nghin(kh.giaTb)}`} />
+              <Chip nhan="Số data cần có" gt={nghin(kh.tongData)} />
+              <Chip nhan="Tỷ lệ chốt bình quân" gt={`${so1(kh.bq * 100)}%`} mau="text-coral-500" />
             </div>
-          </div>
-          <table className="w-full min-w-[1000px] border-collapse text-sm">
-            <thead>
-              <tr className="bg-sky-100 text-navy-900">
-                <th rowSpan={2} className={`${th} text-left`}>Nhân sự</th><th rowSpan={2} className={th}>% đảm nhận</th>
-                <th colSpan={3} className={th}>Số data</th><th colSpan={3} className={th}>Số hợp đồng</th><th colSpan={3} className={th}>Doanh thu (chưa VAT)</th>
-              </tr>
-              <tr className="bg-sky-100 text-navy-900">{['Mục tiêu', 'Thực tế', '%', 'Mục tiêu', 'Thực tế', '%', 'Mục tiêu', 'Thực tế', '% hoàn thành'].map((x, i) => <th key={i} className={`${th} font-medium`}>{x}</th>)}</tr>
-            </thead>
-            <tbody>
-              {dong.map((r) => (
-                <tr key={r.id} onClick={() => setChon(r.id)} className={`cursor-pointer ${chon === r.id ? 'bg-amber-50/60' : 'hover:bg-slate-50'}`}>
-                  <td className={`${td} font-medium text-navy-900`}>{r.ten}</td>
-                  <td className={vang}><div className="flex items-center justify-center gap-1"><input type="number" min="0" max="100" className={o('w-20')} value={tienIn(team?.tt?.[r.id])} onClick={(e) => e.stopPropagation()} onChange={(e) => dat(['tt', r.id], e.target.value)} />%</div></td>
-                  <td className={`${td} text-center`}>{nghin(r.m.data)}</td><td className={`${td} text-center`}>{r.t.tongData}</td><td className={`${td} text-center`}>{hienPt(pt(r.t.tongData, r.m.data))}</td>
-                  <td className={`${td} text-center`}>{so1(r.m.hd)}</td><td className={`${td} text-center`}>{r.t.hd}</td><td className={`${td} text-center`}>{hienPt(pt(r.t.hd, r.m.hd))}</td>
-                  <td className={`${td} text-right`}>{nghin(r.m.dt)}</td><td className={`${td} text-right`}>{nghin(r.t.dt)}</td>
-                  <td className={`${td} min-w-[140px]`}><Bar v={pt(r.t.dt, r.m.dt)} /></td>
-                </tr>
-              ))}
-              <tr className={dongTong}>
-                <td className={td}>Tổng team</td>
-                <td className={`${td} text-center ${Math.round(tongChia) === 100 ? 'text-teal-600' : 'text-coral-500'}`}>{so1(tongChia)}% {Math.round(tongChia) === 100 ? '· OK' : '· cần = 100%'}</td>
-                <td className={`${td} text-center`}>{nghin(kh.tongData)}</td><td className={`${td} text-center`}>{thucTeam.data}</td><td className={`${td} text-center`}>{hienPt(pt(thucTeam.data, kh.tongData))}</td>
-                <td className={`${td} text-center`}>{so1(kh.tongHd)}</td><td className={`${td} text-center`}>{thucTeam.hd}</td><td className={`${td} text-center`}>{hienPt(pt(thucTeam.hd, kh.tongHd))}</td>
-                <td className={`${td} text-right`}>{nghin(kh.tongDt)}</td><td className={`${td} text-right`}>{nghin(thucTeam.dt)}</td><td className={`${td} text-center`}>{hienPt(pHt)}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p className="mt-3 text-xs text-ink-400">Mục tiêu mỗi người = mục tiêu team × % đảm nhận. Bấm vào một dòng để xem chi tiết theo nguồn và dịch vụ của người đó.</p>
-        </section>
 
-        {sel && (
-          <section className="rounded-2xl bg-white p-5 shadow-sm">
-            <h3 className="mb-3 text-sm font-semibold text-navy-900">Chi tiết — {sel.ten} · tháng {tenThang}</h3>
-            <table className="w-full border-collapse text-sm">
-              <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Nguồn data</th><th className={th}>Data mục tiêu</th><th className={th}>Data thực tế</th><th className={th}>HĐ mục tiêu</th><th className={th}>Job chốt thực tế</th><th className={th}>Tỷ lệ chốt mục tiêu</th><th className={th}>Tỷ lệ chốt thực tế</th></tr></thead>
-              <tbody>
-                {nguon.map((n) => <tr key={n.key}><td className={`${td} font-semibold`}>{n.ten}</td><td className={`${td} text-center`}>{nghin(sel.m.ng[n.key].data)}</td><td className={`${td} text-center`}>{sel.t.data[n.key] || 0}</td><td className={`${td} text-center`}>{so1(sel.m.ng[n.key].hd)}</td><td className={`${td} text-center`}>{sel.t.chot[n.key] || 0}</td><td className={`${td} text-center`}>{kh.ng[n.key].chot}%</td><td className={`${td} text-center`}>{hienPt(pt(sel.t.chot[n.key] || 0, sel.t.data[n.key] || 0))}</td></tr>)}
-                <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{nghin(sel.m.data)}</td><td className={`${td} text-center`}>{sel.t.tongData}</td><td className={`${td} text-center`}>{so1(sel.m.hd)}</td><td className={`${td} text-center`}>{sel.t.tongChot}</td><td className={`${td} text-center`}>{so1(kh.bq * 100)}%</td><td className={`${td} text-center`}>{hienPt(pt(sel.t.tongChot, sel.t.tongData))}</td></tr>
-              </tbody>
-            </table>
-            <table className="mt-5 w-full border-collapse text-sm">
-              <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Dịch vụ</th><th className={th}>HĐ mục tiêu</th><th className={th}>HĐ thực tế</th><th className={th}>Doanh thu mục tiêu</th><th className={th}>Doanh thu thực tế</th><th className={th}>% hoàn thành</th></tr></thead>
-              <tbody>
-                {DV.map((d) => <tr key={d.key}><td className={`${td} font-semibold`}>{d.ten}</td><td className={`${td} text-center`}>{so1(sel.m.dv[d.key].hd)}</td><td className={`${td} text-center`}>{sel.t.dv[d.key].khach.size}</td><td className={`${td} text-right`}>{nghin(sel.m.dv[d.key].dt)}</td><td className={`${td} text-right`}>{nghin(sel.t.dv[d.key].dt)}</td><td className={`${td} text-center`}>{hienPt(pt(sel.t.dv[d.key].dt, sel.m.dv[d.key].dt))}</td></tr>)}
-                <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{so1(sel.m.hd)}</td><td className={`${td} text-center`}>{sel.t.hd}</td><td className={`${td} text-right`}>{nghin(sel.m.dt)}</td><td className={`${td} text-right`}>{nghin(sel.t.dt)}</td><td className={`${td} text-center`}>{hienPt(pt(sel.t.dt, sel.m.dt))}</td></tr>
-              </tbody>
-            </table>
-          </section>
+            <section>
+              <h3 className="mb-1 text-sm font-semibold text-navy-900">Bước 1 · Mỗi dịch vụ: doanh thu, giá trị TB và cơ cấu data</h3>
+              <p className="mb-3 text-xs text-ink-400">Chỉ điền các ô nền vàng. Số HĐ cần đạt, tỷ lệ chốt BQ và số data cần có app tự tính.</p>
+              <div className="grid gap-4 lg:grid-cols-3">
+                {DV.map((d) => {
+                  const v = kh.dv[d.key]; const ok = Math.round(v.tongCc) === 100
+                  return (
+                    <div key={d.key} className="rounded-2xl bg-white p-5 shadow-sm">
+                      <div className="mb-2 flex items-center gap-2"><i className={`h-3 w-3 rounded-full ${mauDv[d.key]}`} /><b className="text-navy-900">{d.ten}</b></div>
+                      <Dong nhan="DT mục tiêu (chưa VAT)"><input type="text" inputMode="numeric" className={o('w-40') + ' bg-amber-50'} value={team?.dv?.[d.key]?.dt === undefined || team?.dv?.[d.key]?.dt === '' ? '' : nghin(team.dv[d.key].dt)} onChange={(e) => dat(['dv', d.key, 'dt'], e.target.value.replace(/\D/g, ''))} /></Dong>
+                      <Dong nhan="Giá trị TB / HĐ"><input type="text" inputMode="numeric" className={o('w-40') + ' bg-amber-50'} value={team?.dv?.[d.key]?.gia === undefined || team?.dv?.[d.key]?.gia === '' ? '' : nghin(team.dv[d.key].gia)} onChange={(e) => dat(['dv', d.key, 'gia'], e.target.value.replace(/\D/g, ''))} /></Dong>
+                      <div className="my-2 rounded-xl bg-slate-50 px-4 py-2.5 text-center"><p className="text-xs text-ink-600">Số HĐ cần đạt</p><p className="font-display text-2xl font-bold text-navy-900">{so1(v.hd)}</p></div>
+                      <p className="mt-3 border-t border-slate-100 pt-3 text-xs font-medium uppercase tracking-wide text-ink-400">Cơ cấu data theo nguồn</p>
+                      {nguon.map((n) => (
+                        <Dong key={n.key} nhan={n.ten}><span className="flex items-center gap-1"><input type="number" min="0" max="100" className={o('w-20') + ' bg-amber-50'} value={tienIn(team?.cc?.[d.key]?.[n.key])} onChange={(e) => dat(['cc', d.key, n.key], e.target.value)} />%</span></Dong>
+                      ))}
+                      <p className={`mt-1 text-right text-xs font-semibold ${ok ? 'text-teal-600' : 'text-coral-500'}`}>Tổng cơ cấu {so1(v.tongCc)}% {ok ? '· OK' : '· cần = 100%'}</p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl bg-slate-50 px-3 py-2 text-center"><p className="text-xs text-ink-600">Tỷ lệ chốt BQ</p><p className="font-semibold text-navy-900">{so1(v.bq * 100)}%</p></div>
+                        <div className="rounded-xl bg-slate-50 px-3 py-2 text-center"><p className="text-xs text-ink-600">Số data cần có</p><p className="font-semibold text-navy-900">{nghin(v.data)}</p></div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold text-navy-900">Bước 2 · Tỷ lệ chốt mục tiêu của từng nguồn data</h3>
+              <div className="grid gap-3 sm:grid-cols-4">
+                {nguon.map((n) => (
+                  <div key={n.key} className="rounded-xl border border-slate-200 p-3">
+                    <p className="text-sm font-medium text-navy-900">{n.ten}</p>
+                    <span className="mt-1 flex items-center gap-1"><input type="number" min="0" max="100" className={o('w-24') + ' bg-amber-50'} value={tienIn(team?.chot?.[n.key])} onChange={(e) => dat(['chot', n.key], e.target.value)} />%</span>
+                    <p className="mt-2 text-xs text-ink-400">Cần {nghin(kh.ng[n.key].data)} data → {nghin(kh.ng[n.key].hd)} HĐ</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-navy-900">Bước 3 · Chia mục tiêu cho từng nhân sự</h3>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => chiaTuDong('deu')}><Wand2 size={16} /> Chia đều</Button>
+                  <Button variant="secondary" onClick={() => chiaTuDong('truoc')}><Wand2 size={16} /> Chia theo doanh số tháng trước</Button>
+                </div>
+              </div>
+              <table className="w-full border-collapse text-sm">
+                <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Nhân sự</th><th className={th}>% đảm nhận</th><th className={th}>Data mục tiêu</th><th className={th}>HĐ mục tiêu</th><th className={th}>Doanh thu mục tiêu</th></tr></thead>
+                <tbody>
+                  {dong.map((r) => (
+                    <tr key={r.id}><td className={`${td} font-medium text-navy-900`}>{r.ten}</td>
+                      <td className={vang}><span className="flex items-center justify-center gap-1"><input type="number" min="0" max="100" className={o('w-20')} value={tienIn(team?.tt?.[r.id])} onChange={(e) => dat(['tt', r.id], e.target.value)} />%</span></td>
+                      <td className={`${td} text-center`}>{nghin(r.m.data)}</td><td className={`${td} text-center`}>{so1(r.m.hd)}</td><td className={`${td} text-right`}>{nghin(r.m.dt)}</td></tr>
+                  ))}
+                  <tr className={dongTong}><td className={td}>Tổng team</td>
+                    <td className={`${td} text-center ${Math.round(tongChia) === 100 ? 'text-teal-600' : 'text-coral-500'}`}>{so1(tongChia)}% {Math.round(tongChia) === 100 ? '· OK' : '· cần = 100%'}</td>
+                    <td className={`${td} text-center`}>{nghin(kh.tongData)}</td><td className={`${td} text-center`}>{so1(kh.tongHd)}</td><td className={`${td} text-right`}>{nghin(kh.tongDt)}</td></tr>
+                </tbody>
+              </table>
+              <p className="mt-3 text-xs text-ink-400">Điền xong bấm <b>Lưu mục tiêu</b> ở góc trên bên phải, rồi sang tab "Theo dõi kết quả" để xem số thực tế.</p>
+            </section>
+          </>
+        )}
+
+        {hienManHinh === 'theo_doi' && (
+          <>
+            <div className="grid grid-cols-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm sm:grid-cols-4 sm:divide-y-0 sm:divide-x">
+              <KpiMt nhan="Doanh thu (chưa VAT)" mt={nghin(kh.tongDt)} tt={nghin(thucTeam.dt)} phan={pHt} mau={mauPt(pHt)} />
+              <KpiMt nhan="Số data" mt={nghin(kh.tongData)} tt={thucTeam.data} phan={pt(thucTeam.data, kh.tongData)} mau={mauPt(pt(thucTeam.data, kh.tongData))} />
+              <KpiMt nhan="Số hợp đồng" mt={so1(kh.tongHd)} tt={thucTeam.hd} phan={pt(thucTeam.hd, kh.tongHd)} mau={mauPt(pt(thucTeam.hd, kh.tongHd))} />
+              <KpiMt nhan="Giá trị TB / HĐ" mt={nghin(kh.giaTb)} tt={nghin(thucTeam.hd ? thucTeam.dt / thucTeam.hd : 0)} />
+            </div>
+
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold text-navy-900">Theo nhân sự <span className="font-normal text-ink-400">· bấm vào tên để xem chi tiết</span></h3>
+              <table className="w-full min-w-[900px] border-collapse text-sm">
+                <thead>
+                  <tr className="bg-sky-100 text-navy-900"><th rowSpan={2} className={`${th} text-left`}>Nhân sự</th><th colSpan={3} className={th}>Số data</th><th colSpan={3} className={th}>Số hợp đồng</th><th colSpan={3} className={th}>Doanh thu (chưa VAT)</th></tr>
+                  <tr className="bg-sky-100 text-navy-900">{['Mục tiêu', 'Thực tế', '%', 'Mục tiêu', 'Thực tế', '%', 'Mục tiêu', 'Thực tế', '% hoàn thành'].map((x, i) => <th key={i} className={`${th} font-medium`}>{x}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {dong.map((r) => (
+                    <Fragment key={r.id}>
+                      <tr onClick={() => setMo(mo === r.id ? '' : r.id)} className={`cursor-pointer ${mo === r.id ? 'bg-amber-50/60' : 'hover:bg-slate-50'}`}>
+                        <td className={`${td} font-medium text-navy-900`}><span className="mr-1 text-ink-400">{mo === r.id ? '▾' : '▸'}</span>{r.ten}</td>
+                        <td className={`${td} text-center`}>{nghin(r.m.data)}</td><td className={`${td} text-center`}>{r.t.tongData}</td><td className={`${td} text-center`}>{hienPt(pt(r.t.tongData, r.m.data))}</td>
+                        <td className={`${td} text-center`}>{so1(r.m.hd)}</td><td className={`${td} text-center`}>{r.t.hd}</td><td className={`${td} text-center`}>{hienPt(pt(r.t.hd, r.m.hd))}</td>
+                        <td className={`${td} text-right`}>{nghin(r.m.dt)}</td><td className={`${td} text-right`}>{nghin(r.t.dt)}</td><td className={`${td} min-w-[140px]`}><Bar v={pt(r.t.dt, r.m.dt)} /></td>
+                      </tr>
+                      {mo === r.id && (
+                        <tr><td colSpan={10} className="border border-slate-200 bg-slate-50/60 p-4">
+                          <div className="grid gap-4 lg:grid-cols-2">
+                            <table className="w-full border-collapse bg-white text-sm">
+                              <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Nguồn data</th><th className={th}>Data MT</th><th className={th}>Data TT</th><th className={th}>HĐ MT</th><th className={th}>Chốt TT</th><th className={th}>Tỷ lệ chốt TT</th></tr></thead>
+                              <tbody>
+                                {nguon.map((n) => <tr key={n.key}><td className={`${td} font-semibold`}>{n.ten}</td><td className={`${td} text-center`}>{nghin(r.m.ng[n.key].data)}</td><td className={`${td} text-center`}>{r.t.data[n.key] || 0}</td><td className={`${td} text-center`}>{so1(r.m.ng[n.key].hd)}</td><td className={`${td} text-center`}>{r.t.chot[n.key] || 0}</td><td className={`${td} text-center`}>{hienPt(pt(r.t.chot[n.key] || 0, r.t.data[n.key] || 0))}</td></tr>)}
+                                <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{nghin(r.m.data)}</td><td className={`${td} text-center`}>{r.t.tongData}</td><td className={`${td} text-center`}>{so1(r.m.hd)}</td><td className={`${td} text-center`}>{r.t.tongChot}</td><td className={`${td} text-center`}>{hienPt(pt(r.t.tongChot, r.t.tongData))}</td></tr>
+                              </tbody>
+                            </table>
+                            <table className="w-full border-collapse bg-white text-sm">
+                              <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Dịch vụ</th><th className={th}>HĐ MT</th><th className={th}>HĐ TT</th><th className={th}>DT mục tiêu</th><th className={th}>DT thực tế</th><th className={th}>%</th></tr></thead>
+                              <tbody>
+                                {DV.map((d) => <tr key={d.key}><td className={`${td} font-semibold`}>{d.ten}</td><td className={`${td} text-center`}>{so1(r.m.dv[d.key].hd)}</td><td className={`${td} text-center`}>{r.t.dv[d.key].khach.size}</td><td className={`${td} text-right`}>{nghin(r.m.dv[d.key].dt)}</td><td className={`${td} text-right`}>{nghin(r.t.dv[d.key].dt)}</td><td className={`${td} text-center`}>{hienPt(pt(r.t.dv[d.key].dt, r.m.dv[d.key].dt))}</td></tr>)}
+                                <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{so1(r.m.hd)}</td><td className={`${td} text-center`}>{r.t.hd}</td><td className={`${td} text-right`}>{nghin(r.m.dt)}</td><td className={`${td} text-right`}>{nghin(r.t.dt)}</td><td className={`${td} text-center`}>{hienPt(pt(r.t.dt, r.m.dt))}</td></tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </td></tr>
+                      )}
+                    </Fragment>
+                  ))}
+                  <tr className={dongTong}>
+                    <td className={td}>Tổng team</td>
+                    <td className={`${td} text-center`}>{nghin(kh.tongData)}</td><td className={`${td} text-center`}>{thucTeam.data}</td><td className={`${td} text-center`}>{hienPt(pt(thucTeam.data, kh.tongData))}</td>
+                    <td className={`${td} text-center`}>{so1(kh.tongHd)}</td><td className={`${td} text-center`}>{thucTeam.hd}</td><td className={`${td} text-center`}>{hienPt(pt(thucTeam.hd, kh.tongHd))}</td>
+                    <td className={`${td} text-right`}>{nghin(kh.tongDt)}</td><td className={`${td} text-right`}>{nghin(thucTeam.dt)}</td><td className={`${td} text-center`}>{hienPt(pHt)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <div className="grid gap-5 xl:grid-cols-2">
+              <section className="rounded-2xl bg-white p-5 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold text-navy-900">Theo dịch vụ</h3>
+                <table className="w-full border-collapse text-sm">
+                  <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Dịch vụ</th><th className={th}>HĐ cần đạt</th><th className={th}>HĐ thực tế</th><th className={th}>DT mục tiêu</th><th className={th}>DT thực tế</th><th className={th}>% hoàn thành</th></tr></thead>
+                  <tbody>
+                    {DV.map((d) => <tr key={d.key}><td className={`${td} font-semibold`}><i className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${mauDv[d.key]}`} />{d.ten}</td><td className={`${td} text-center`}>{so1(kh.dv[d.key].hd)}</td><td className={`${td} text-center`}>{tongDvTt(d.key, 'hd')}</td><td className={`${td} text-right`}>{nghin(kh.dv[d.key].dt)}</td><td className={`${td} text-right`}>{nghin(tongDvTt(d.key, 'dt'))}</td><td className={`${td} min-w-[130px]`}><Bar v={pt(tongDvTt(d.key, 'dt'), kh.dv[d.key].dt)} /></td></tr>)}
+                    <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{so1(kh.tongHd)}</td><td className={`${td} text-center`}>{thucTeam.hd}</td><td className={`${td} text-right`}>{nghin(kh.tongDt)}</td><td className={`${td} text-right`}>{nghin(thucTeam.dt)}</td><td className={`${td} text-center`}>{hienPt(pHt)}</td></tr>
+                  </tbody>
+                </table>
+              </section>
+              <section className="rounded-2xl bg-white p-5 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold text-navy-900">Theo nguồn data</h3>
+                <table className="w-full border-collapse text-sm">
+                  <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Nguồn data</th><th className={th}>Data cần có</th><th className={th}>Data thực tế</th><th className={th}>HĐ cần đạt</th><th className={th}>Chốt thực tế</th><th className={th}>Tỷ lệ chốt MT</th><th className={th}>Tỷ lệ chốt TT</th></tr></thead>
+                  <tbody>
+                    {nguon.map((n) => <tr key={n.key}><td className={`${td} font-semibold`}>{n.ten}</td><td className={`${td} text-center`}>{nghin(kh.ng[n.key].data)}</td><td className={`${td} text-center`}>{tongNg(n.key, 'data')}</td><td className={`${td} text-center`}>{nghin(kh.ng[n.key].hd)}</td><td className={`${td} text-center`}>{tongNg(n.key, 'chot')}</td><td className={`${td} text-center`}>{kh.ng[n.key].chot}%</td><td className={`${td} text-center`}>{hienPt(pt(tongNg(n.key, 'chot'), tongNg(n.key, 'data')))}</td></tr>)}
+                    <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{nghin(kh.tongData)}</td><td className={`${td} text-center`}>{thucTeam.data}</td><td className={`${td} text-center`}>{nghin(kh.tongHd)}</td><td className={`${td} text-center`}>{kqNguon}</td><td className={`${td} text-center`}>{so1(kh.bq * 100)}%</td><td className={`${td} text-center`}>{hienPt(pt(kqNguon, thucTeam.data))}</td></tr>
+                  </tbody>
+                </table>
+                <p className="mt-3 text-xs text-ink-400">Data cần có theo từng dịch vụ (ADS · Xây shop · Mall) xem ở tab "Thiết lập mục tiêu". Thực tế chỉ tính đơn mới đã chốt trong tháng, đã trừ đơn hoàn / huỷ.</p>
+              </section>
+            </div>
+          </>
         )}
       </div>
     </div>
