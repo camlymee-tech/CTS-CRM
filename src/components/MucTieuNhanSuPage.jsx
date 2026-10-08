@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { Download, FileDown, Save, Wand2 } from 'lucide-react'
+import { FileDown, Save, Wand2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Select } from './ui'
 import { NGUON_KHACH_OPTIONS, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
 import { phanLoai } from './BaoCaoTongHopPage'
+import { xuatDashboardXlsx } from '../lib/dashboardXlsx'
 
 // Mục tiêu hàng tháng theo từng nhân sự (theo mẫu Google Sheet của team):
 // Số data theo nguồn → tỷ lệ chốt → số HĐ; Số HĐ × giá trị TB theo dịch vụ → doanh thu mục tiêu.
@@ -18,8 +19,9 @@ const DV = [
 const pad = (n) => String(n).padStart(2, '0')
 const so = (v) => Number(v) || 0
 const nghin = (v) => new Intl.NumberFormat('vi-VN').format(Math.round(so(v)))
-const pt = (a, b) => (b > 0 ? Math.round((a / b) * 100) : null)
-const hienPt = (v) => (v === null ? '—' : `${v}%`)
+const pt = (a, b) => (b > 0 ? Math.round((a / b) * 10000) / 100 : null)
+const pt2 = (v) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(v)
+const hienPt = (v) => (v === null ? '—' : `${pt2(v)}%`)
 const ngayCua = (v) => {
   if (!v) return ''
   const d = new Date(v)
@@ -159,7 +161,9 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
   const sua = (fn) => { setTeam((cu) => { const b = JSON.parse(JSON.stringify(cu || {})); fn(b); return b }); setDaSua(true) }
   const dat = (duongDan, v) => sua((b) => {
     let o = b; duongDan.slice(0, -1).forEach((k) => { o = o[k] ||= {} })
-    o[duongDan[duongDan.length - 1]] = v === '' ? '' : Math.max(0, Number(v))
+    let t = String(v).replace(',', '.').replace(/[^\d.]/g, '')
+    const i = t.indexOf('.'); if (i >= 0) t = t.slice(0, i + 1) + t.slice(i + 1).replace(/\./g, '')
+    o[duongDan[duongDan.length - 1]] = t
   })
 
   function chiaTuDong(cach) {
@@ -190,208 +194,66 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
   const pHt = pt(thucTeam.dt, kh.tongDt)
   const tienIn = (v) => (v === '' || v === undefined ? '' : v)
   const dongTong = 'bg-sky-100 font-bold text-indigo-700'
-  const Bar = ({ v }) => (
-    <div className="flex items-center gap-2">
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${mauPt(v)}`} style={{ width: `${Math.min(100, v || 0)}%` }} /></div>
-      <b className="w-11 text-right">{hienPt(v)}</b>
-    </div>
-  )
 
-  const tai = (blob, ten) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = ten
-    document.body.appendChild(a); a.click(); a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 2000)
-  }
   const thucNguonTong = (f) => nguon.reduce((a, n) => a + tongNg(n.key, f), 0)
 
-  async function xuatExcel() {
-    setDangXuat('xlsx')
+  // Xuất file Excel dạng dashboard (giống màn hình)
+  async function xuatDashboard() {
+    setDangXuat('db')
     try {
-      const { default: ExcelJS } = await import('exceljs')
-      const wb = new ExcelJS.Workbook()
-      const XANH = 'FFC9DAF8', VANG = 'FFFFF2CC'
-      const vien = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }
-      const tien = '#,##0', pc = '0%', so1f = '#,##0.0'
-      const p100 = (a, b) => (b > 0 ? a / b : '')
-      const bang = (ws, r0, tieuDe, dongs, fmts, opt = {}) => {
-        tieuDe.forEach((t, i) => { const c = ws.getCell(r0, i + 1); c.value = t; c.font = { bold: true }; c.border = vien; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XANH } }; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true } })
-        ws.getRow(r0).height = 36
-        dongs.forEach((d, j) => {
-          const tong = opt.tong && j === dongs.length - 1
-          d.forEach((x, i) => {
-            const c = ws.getCell(r0 + 1 + j, i + 1); c.value = x; c.border = vien
-            if (fmts[i]) c.numFmt = fmts[i]
-            if (i) c.alignment = { horizontal: 'center' }
-            if (tong) { c.font = { bold: true }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XANH } } }
-            else if (opt.vang && opt.vang(i, j)) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: VANG } }
-          })
-        })
-        return r0 + dongs.length + 2
-      }
-      const ws = wb.addWorksheet('Thông số & kế hoạch')
-      ws.columns = [{ width: 32 }, ...Array(10).fill({ width: 17 })]
-      ws.mergeCells('A1:K1'); ws.getCell('A1').value = `MỤC TIÊU DATA MỚI VÀ DOANH THU MỚI — THÁNG ${tenThang}`; ws.getCell('A1').font = { bold: true, size: 14 }
-      ws.getCell('A2').value = 'Các ô nền vàng là thông số đầu vào, các ô còn lại được tính tự động.'; ws.getCell('A2').font = { italic: true, color: { argb: 'FF555555' } }
-      let r = bang(ws, 4, ['THÔNG SỐ ĐẦU VÀO', ...DV.map((d) => d.ten), 'Tổng'], [
-        ['DT mục tiêu dịch vụ (chưa VAT)', ...DV.map((d) => kh.dv[d.key].dt), kh.tongDt],
-        ['Giá trị TB / HĐ', ...DV.map((d) => kh.dv[d.key].gia), Math.round(kh.giaTb)],
-        ['Số HĐ cần đạt', ...DV.map((d) => kh.dv[d.key].hd), kh.tongHd],
-      ], [null, tien, tien, tien, tien], { vang: (i, j) => i >= 1 && i <= 3 && j < 2 })
-      ws.getCell(r - 2, 2).numFmt = so1f; for (let i = 2; i <= 5; i++) ws.getCell(r - 2, i).numFmt = so1f
-      r = bang(ws, r + 1, ['Nguồn data', ...DV.map((d) => `Cơ cấu data ${d.ten}`), 'Tỷ lệ chốt mục tiêu'], [
-        ...nguon.map((n) => [n.ten, ...DV.map((d) => so(team?.cc?.[d.key]?.[n.key]) / 100), so(team?.chot?.[n.key]) / 100]),
-        ['Kiểm tra tổng cơ cấu', ...DV.map((d) => kh.dv[d.key].tongCc / 100), Math.round(kh.dv.ads.tongCc) === 100 && Math.round(kh.dv.xay_shop.tongCc) === 100 && Math.round(kh.dv.mall.tongCc) === 100 ? 'OK' : 'Cần = 100%'],
-        ['Tỷ lệ chốt BQ theo dịch vụ', ...DV.map((d) => kh.dv[d.key].bq), kh.bq],
-        ['Số data cần có', ...DV.map((d) => Math.round(kh.dv[d.key].data)), Math.round(kh.tongData)],
-      ], [null, pc, pc, pc, pc], { vang: (i, j) => i >= 1 && j < nguon.length })
-      const lastR = r - 2
-      for (let i = 2; i <= 5; i++) ws.getCell(lastR, i).numFmt = tien
-      ws.getCell(lastR - 1, 2).numFmt = '0.0%'; for (let i = 2; i <= 5; i++) ws.getCell(lastR - 1, i).numFmt = '0.0%'
-      r = bang(ws, r + 1, ['KẾ HOẠCH — Nguồn data', ...DV.map((d) => `Data ${d.ten}`), 'Tổng data cần có', 'Tỷ lệ chốt mục tiêu', 'Số HĐ cần đạt', 'Data thực tế', 'Job chốt thực tế', 'Tỷ lệ chốt thực tế'], [
-        ...nguon.map((n) => [n.ten, ...DV.map((d) => Math.round(kh.ng[n.key].dataDv[d.key])), Math.round(kh.ng[n.key].data), kh.ng[n.key].chot / 100, Math.round(kh.ng[n.key].hd), tongNg(n.key, 'data'), tongNg(n.key, 'chot'), p100(tongNg(n.key, 'chot'), tongNg(n.key, 'data'))]),
-        ['Tổng', ...DV.map((d) => Math.round(kh.dv[d.key].data)), Math.round(kh.tongData), kh.bq, Math.round(kh.tongHd), thucTeam.data, thucNguonTong('chot'), p100(thucNguonTong('chot'), thucTeam.data)],
-      ], [null, tien, tien, tien, tien, pc, tien, tien, tien, pc], { tong: true })
-      r = bang(ws, r + 1, ['Dịch vụ', 'Số HĐ cần đạt', 'Số HĐ thực tế', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành'], [
-        ...DV.map((d) => [d.ten, kh.dv[d.key].hd, tongDvTt(d.key, 'hd'), kh.dv[d.key].dt, tongDvTt(d.key, 'dt'), p100(tongDvTt(d.key, 'dt'), kh.dv[d.key].dt)]),
-        ['Tổng', kh.tongHd, thucTeam.hd, kh.tongDt, thucTeam.dt, p100(thucTeam.dt, kh.tongDt)],
-      ], [null, so1f, tien, tien, tien, pc], { tong: true })
-
-      const w2 = wb.addWorksheet('Theo nhân sự')
-      w2.columns = [{ width: 30 }, ...Array(10).fill({ width: 16 })]
-      w2.mergeCells('A1:K1'); w2.getCell('A1').value = `MỤC TIÊU VÀ THỰC TẾ THEO NHÂN SỰ — THÁNG ${tenThang}`; w2.getCell('A1').font = { bold: true, size: 14 }
-      let q = bang(w2, 3, ['Nhân sự', '% đảm nhận', 'Data mục tiêu', 'Data thực tế', '% data', 'HĐ mục tiêu', 'HĐ thực tế', '% HĐ', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành'], [
-        ...dong.map((d) => [d.ten, d.k / 100, Math.round(d.m.data), d.t.tongData, p100(d.t.tongData, d.m.data), d.m.hd, d.t.hd, p100(d.t.hd, d.m.hd), d.m.dt, d.t.dt, p100(d.t.dt, d.m.dt)]),
-        ['Tổng team', tongChia / 100, Math.round(kh.tongData), thucTeam.data, p100(thucTeam.data, kh.tongData), kh.tongHd, thucTeam.hd, p100(thucTeam.hd, kh.tongHd), kh.tongDt, thucTeam.dt, p100(thucTeam.dt, kh.tongDt)],
-      ], [null, '0.0%', tien, tien, pc, so1f, tien, pc, tien, tien, pc], { tong: true, vang: (i, j) => i === 1 })
+      const f = (a, b) => (b > 0 ? a / b : '')
+      const P = '0.00%', T = '#,##0', S1 = '#,##0.0'
+      const pc = (v) => ({ v, f: P })
+      const bar = (v) => ({ v: '', bar: v })
+      const muc = []
+      muc.push({ loai: 'muc', text: 'Theo nhân sự' })
+      muc.push({ loai: 'bang', heads: ['Nhân sự', 'Data mục tiêu', 'Data thực tế', '% data', 'HĐ mục tiêu', 'HĐ thực tế', '% HĐ', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành', 'Tiến độ doanh thu'], rows: [
+        ...dong.map((d) => [d.ten, Math.round(d.m.data), d.t.tongData, pc(f(d.t.tongData, d.m.data)), { v: d.m.hd, f: S1 }, d.t.hd, pc(f(d.t.hd, d.m.hd)), { v: d.m.dt, f: T }, { v: d.t.dt, f: T }, pc(f(d.t.dt, d.m.dt)), bar(f(d.t.dt, d.m.dt))]),
+        ['Tổng team', Math.round(kh.tongData), thucTeam.data, pc(f(thucTeam.data, kh.tongData)), { v: kh.tongHd, f: S1 }, thucTeam.hd, pc(f(thucTeam.hd, kh.tongHd)), { v: kh.tongDt, f: T }, { v: thucTeam.dt, f: T }, pc(f(thucTeam.dt, kh.tongDt)), ''],
+      ] })
+      muc.push({ loai: 'muc', text: 'Theo dịch vụ' })
+      muc.push({ loai: 'bang', heads: ['Dịch vụ', 'HĐ cần đạt', 'HĐ thực tế', 'DT mục tiêu', 'DT thực tế', '% hoàn thành', 'Tiến độ'], rows: [
+        ...DV.map((d) => [d.ten, { v: kh.dv[d.key].hd, f: S1 }, tongDvTt(d.key, 'hd'), { v: kh.dv[d.key].dt, f: T }, { v: tongDvTt(d.key, 'dt'), f: T }, pc(f(tongDvTt(d.key, 'dt'), kh.dv[d.key].dt)), bar(f(tongDvTt(d.key, 'dt'), kh.dv[d.key].dt))]),
+        ['Tổng', { v: kh.tongHd, f: S1 }, thucTeam.hd, { v: kh.tongDt, f: T }, { v: thucTeam.dt, f: T }, pc(f(thucTeam.dt, kh.tongDt)), ''],
+      ] })
+      muc.push({ loai: 'muc', text: 'Theo nguồn data' })
+      muc.push({ loai: 'bang', heads: ['Nguồn data', 'Data cần có', 'Data thực tế', 'HĐ cần đạt', 'Chốt thực tế', 'Tỷ lệ chốt mục tiêu', 'Tỷ lệ chốt thực tế', 'Tiến độ data'], rows: [
+        ...nguon.map((n) => [n.ten, Math.round(kh.ng[n.key].data), tongNg(n.key, 'data'), Math.round(kh.ng[n.key].hd), tongNg(n.key, 'chot'), pc(kh.ng[n.key].chot / 100), pc(f(tongNg(n.key, 'chot'), tongNg(n.key, 'data'))), bar(f(tongNg(n.key, 'data'), kh.ng[n.key].data))]),
+        ['Tổng', Math.round(kh.tongData), thucTeam.data, Math.round(kh.tongHd), thucNguonTong('chot'), pc(kh.bq), pc(f(thucNguonTong('chot'), thucTeam.data)), ''],
+      ] })
+      muc.push({ loai: 'muc', text: 'Thiết lập mục tiêu của team' })
+      muc.push({ loai: 'bang', heads: ['Dịch vụ', 'DT mục tiêu', 'Giá trị TB / HĐ', 'Số HĐ cần đạt', 'Tỷ lệ chốt BQ', 'Số data cần có'], rows: [
+        ...DV.map((d) => [d.ten, { v: kh.dv[d.key].dt, f: T }, { v: kh.dv[d.key].gia, f: T }, { v: kh.dv[d.key].hd, f: S1 }, pc(kh.dv[d.key].bq), Math.round(kh.dv[d.key].data)]),
+        ['Tổng', { v: kh.tongDt, f: T }, { v: Math.round(kh.giaTb), f: T }, { v: kh.tongHd, f: S1 }, pc(kh.bq), Math.round(kh.tongData)],
+      ] })
+      muc.push({ loai: 'bang', heads: ['Nguồn data', ...DV.map((d) => `Data ${d.ten}`), 'Tổng data cần có', 'Tỷ lệ chốt mục tiêu', 'Số HĐ cần đạt'], rows: [
+        ...nguon.map((n) => [n.ten, ...DV.map((d) => Math.round(kh.ng[n.key].dataDv[d.key])), Math.round(kh.ng[n.key].data), pc(kh.ng[n.key].chot / 100), Math.round(kh.ng[n.key].hd)]),
+        ['Tổng', ...DV.map((d) => Math.round(kh.dv[d.key].data)), Math.round(kh.tongData), pc(kh.bq), Math.round(kh.tongHd)],
+      ] })
+      muc.push({ loai: 'muc', text: 'Chi tiết từng nhân sự' })
       for (const d of dong) {
-        w2.getCell(q, 1).value = `Chi tiết — ${d.ten}`; w2.getCell(q, 1).font = { bold: true }
-        q = bang(w2, q + 1, ['Nguồn data', 'Data mục tiêu', 'Data thực tế', 'HĐ mục tiêu', 'Job chốt thực tế', 'Tỷ lệ chốt mục tiêu', 'Tỷ lệ chốt thực tế'], [
-          ...nguon.map((n) => [n.ten, Math.round(d.m.ng[n.key].data), d.t.data[n.key] || 0, d.m.ng[n.key].hd, d.t.chot[n.key] || 0, kh.ng[n.key].chot / 100, p100(d.t.chot[n.key] || 0, d.t.data[n.key] || 0)]),
-          ['Tổng', Math.round(d.m.data), d.t.tongData, d.m.hd, d.t.tongChot, kh.bq, p100(d.t.tongChot, d.t.tongData)],
-        ], [null, tien, tien, so1f, tien, pc, pc], { tong: true })
-        q = bang(w2, q, ['Dịch vụ', 'HĐ mục tiêu', 'HĐ thực tế', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành'], [
-          ...DV.map((v) => [v.ten, d.m.dv[v.key].hd, d.t.dv[v.key].khach.size, d.m.dv[v.key].dt, d.t.dv[v.key].dt, p100(d.t.dv[v.key].dt, d.m.dv[v.key].dt)]),
-          ['Tổng', d.m.hd, d.t.hd, d.m.dt, d.t.dt, p100(d.t.dt, d.m.dt)],
-        ], [null, so1f, tien, tien, tien, pc], { tong: true })
-        q += 1
+        muc.push({ loai: 'dai', text: `${d.ten} — đảm nhận ${pt2(d.k)}% mục tiêu team` })
+        muc.push({ loai: 'bang', heads: ['Nguồn data', 'Data mục tiêu', 'Data thực tế', 'HĐ mục tiêu', 'Chốt thực tế', 'Tỷ lệ chốt mục tiêu', 'Tỷ lệ chốt thực tế'], rows: [
+          ...nguon.map((n) => [n.ten, Math.round(d.m.ng[n.key].data), d.t.data[n.key] || 0, { v: d.m.ng[n.key].hd, f: S1 }, d.t.chot[n.key] || 0, pc(kh.ng[n.key].chot / 100), pc(f(d.t.chot[n.key] || 0, d.t.data[n.key] || 0))]),
+          ['Tổng', Math.round(d.m.data), d.t.tongData, { v: d.m.hd, f: S1 }, d.t.tongChot, pc(kh.bq), pc(f(d.t.tongChot, d.t.tongData))],
+        ] })
+        muc.push({ loai: 'bang', heads: ['Dịch vụ', 'HĐ mục tiêu', 'HĐ thực tế', 'DT mục tiêu', 'DT thực tế', '% hoàn thành', 'Tiến độ'], rows: [
+          ...DV.map((v) => [v.ten, { v: d.m.dv[v.key].hd, f: S1 }, d.t.dv[v.key].khach.size, { v: d.m.dv[v.key].dt, f: T }, { v: d.t.dv[v.key].dt, f: T }, pc(f(d.t.dv[v.key].dt, d.m.dv[v.key].dt)), bar(f(d.t.dv[v.key].dt, d.m.dv[v.key].dt))]),
+          ['Tổng', { v: d.m.hd, f: S1 }, d.t.hd, { v: d.m.dt, f: T }, { v: d.t.dt, f: T }, pc(f(d.t.dt, d.m.dt)), ''],
+        ] })
       }
-      const buf = await wb.xlsx.writeBuffer()
-      tai(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `MucTieuNhanSu_${thang}.xlsx`)
+      await xuatDashboardXlsx({
+        tieuDe: `MỤC TIÊU NHÂN SỰ — THÁNG ${tenThang}`,
+        phuDe: 'Mục tiêu và kết quả thực tế của team. Thực tế chỉ tính đơn mới đã chốt trong tháng, đã trừ đơn hoàn / huỷ. Doanh thu chưa VAT.',
+        the: [
+          { nhan: 'Doanh thu (chưa VAT)', gt: thucTeam.dt, fmt: '#,##0', phu: `mục tiêu ${nghin(kh.tongDt)}`, pc: f(thucTeam.dt, kh.tongDt) },
+          { nhan: 'Số data', gt: thucTeam.data, fmt: '#,##0', phu: `mục tiêu ${nghin(kh.tongData)}`, pc: f(thucTeam.data, kh.tongData) },
+          { nhan: 'Số hợp đồng', gt: thucTeam.hd, fmt: '#,##0', phu: `mục tiêu ${so1(kh.tongHd)}`, pc: f(thucTeam.hd, kh.tongHd) },
+          { nhan: 'Giá trị TB / HĐ', gt: Math.round(thucTeam.hd ? thucTeam.dt / thucTeam.hd : 0), fmt: '#,##0', phu: `mục tiêu ${nghin(kh.giaTb)}`, pc: '' },
+        ],
+        muc, tenFile: `MucTieuNhanSu_${thang}.xlsx`,
+      })
     } finally { setDangXuat('') }
-  }
-
-  // Bản in dựng bằng style trực tiếp để PDF luôn đủ màu, giống màn hình
-  function dungBanIn() {
-    const C = { navy: '#0f1f3d', ink: '#475569', mute: '#94a3b8', line: '#e2e8f0', xanh: '#e0f2fe', chu: '#4338ca', coral: '#f0624d', teal: '#14b8a6', vang: '#fbbf24', vangNen: '#fffbeb' }
-    const card = 'background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:16px;'
-    const tdS = `border:1px solid ${C.line};padding:9px 10px;font-size:12px;`
-    const thS = `border:1px solid ${C.line};padding:10px;font-size:12px;font-weight:700;background:${C.xanh};color:${C.navy};text-align:center;`
-    const tot = `background:${C.xanh};font-weight:700;color:${C.chu};`
-    const c = 'text-align:center;', rr = 'text-align:right;'
-    const mau = (v) => (v === null ? '#e2e8f0' : v >= 100 ? C.teal : v >= 70 ? C.vang : C.coral)
-    const bar = (v) => `<span style="display:inline-block;width:70px;height:8px;border-radius:8px;background:#f1f5f9;vertical-align:middle;position:relative"><span style="position:absolute;left:0;top:0;height:8px;border-radius:8px;width:${Math.round(Math.min(100, v || 0) * 0.7)}px;background:${mau(v)}"></span></span> <b>${hienPt(v)}</b>`
-    const kpi = (n, m, t, v) => `<div style="flex:1;padding:16px 20px;border-left:1px solid ${C.line}"><div style="font-size:13px;color:${C.ink}">${n}</div><div style="font-size:26px;font-weight:700;margin-top:4px">${t}</div><div style="font-size:11px;color:${C.mute}">thực tế · mục tiêu ${m}</div>${v === undefined ? '' : `<div style="margin-top:8px">${bar(v)}</div>`}</div>`
-    const H = (arr, left) => `<tr>${arr.map((x, i) => `<th style="${thS}${i === 0 && left ? 'text-align:left' : ''}">${x}</th>`).join('')}</tr>`
-    const R = (arr, st = '', tongDong = false) => `<tr style="${tongDong ? tot : ''}">${arr.map((x, i) => `<td style="${tdS}${i ? (typeof x === 'string' && x.includes('<span') ? c : c) : 'font-weight:600'}${st}">${x}</td>`).join('')}</tr>`
-    const money = (arr, idx) => arr.map((x, i) => (idx.includes(i) ? `<span style="display:block;text-align:right">${x}</span>` : x))
-    const Bang = (tieuDe, dongs, tongDong, idxTien = []) => `<table style="width:100%;border-collapse:collapse"><thead>${H(tieuDe, true)}</thead><tbody>${dongs.map((d, j) => R(money(d, idxTien), '', tongDong && j === dongs.length - 1)).join('')}</tbody></table>`
-    const tieuDe = (i, t) => `<div style="font-size:14px;font-weight:700;margin-bottom:10px">${t}</div>`
-    const o1 = (v) => so1(v)
-    const chiTiet = (d) => `<div data-blk style="${card}"><div style="font-size:14px;font-weight:700;margin-bottom:10px">Chi tiết — ${d.ten}</div>
-      ${Bang(['Nguồn data', 'Data mục tiêu', 'Data thực tế', 'HĐ mục tiêu', 'Job chốt thực tế', 'Tỷ lệ chốt mục tiêu', 'Tỷ lệ chốt thực tế'],
-        [...nguon.map((n) => [n.ten, nghin(d.m.ng[n.key].data), d.t.data[n.key] || 0, o1(d.m.ng[n.key].hd), d.t.chot[n.key] || 0, kh.ng[n.key].chot + '%', hienPt(pt(d.t.chot[n.key] || 0, d.t.data[n.key] || 0))]),
-          ['Tổng', nghin(d.m.data), d.t.tongData, o1(d.m.hd), d.t.tongChot, o1(kh.bq * 100) + '%', hienPt(pt(d.t.tongChot, d.t.tongData))]], true)}
-      <div style="height:14px"></div>
-      ${Bang(['Dịch vụ', 'HĐ mục tiêu', 'HĐ thực tế', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành'],
-        [...DV.map((v) => [v.ten, o1(d.m.dv[v.key].hd), d.t.dv[v.key].khach.size, nghin(d.m.dv[v.key].dt), nghin(d.t.dv[v.key].dt), bar(pt(d.t.dv[v.key].dt, d.m.dv[v.key].dt))]),
-          ['Tổng', o1(d.m.hd), d.t.hd, nghin(d.m.dt), nghin(d.t.dt), hienPt(pt(d.t.dt, d.m.dt))]], true, [3, 4])}</div>`
-    const vangIn = (v) => `<span style="display:block;background:${C.vangNen};color:${C.chu};font-weight:600;border-radius:4px;padding:2px 0">${v}</span>`
-    const h = `
-<div style="width:1100px;padding:24px;background:#f4f6f9;color:${C.navy};font-family:Arial,Helvetica,sans-serif;box-sizing:border-box;">
- <div data-blk style="padding:0 4px 16px"><div style="font-size:22px;font-weight:700">MỤC TIÊU DATA MỚI VÀ DOANH THU MỚI — THÁNG ${tenThang}</div><div style="font-size:13px;color:${C.ink};margin-top:4px">Thông số đầu vào → kế hoạch của team → mục tiêu từng nhân sự so với thực tế</div></div>
- <div data-blk style="display:flex;${card}padding:0;overflow:hidden">
-  ${kpi('Doanh thu (chưa VAT)', nghin(kh.tongDt), nghin(thucTeam.dt), pHt).replace(`border-left:1px solid ${C.line}`, '')}
-  ${kpi('Số data', nghin(kh.tongData), thucTeam.data, pt(thucTeam.data, kh.tongData))}
-  ${kpi('Số hợp đồng', so1(kh.tongHd), thucTeam.hd, pt(thucTeam.hd, kh.tongHd))}
-  ${kpi('Giá trị TB / HĐ', nghin(kh.giaTb), nghin(thucTeam.hd ? thucTeam.dt / thucTeam.hd : 0))}
- </div>
- <div data-blk style="${card}">${tieuDe(3, 'THEO DÕI KẾT QUẢ — Mục tiêu và thực tế theo nhân sự')}
-  ${Bang(['Nhân sự', '% đảm nhận', 'Data mục tiêu', 'Data thực tế', 'HĐ mục tiêu', 'HĐ thực tế', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành'], [
-    ...dong.map((d) => [d.ten, d.k + '%', nghin(d.m.data), d.t.tongData, o1(d.m.hd), d.t.hd, nghin(d.m.dt), nghin(d.t.dt), bar(pt(d.t.dt, d.m.dt))]),
-    ['Tổng team', o1(tongChia) + '%', nghin(kh.tongData), thucTeam.data, o1(kh.tongHd), thucTeam.hd, nghin(kh.tongDt), nghin(thucTeam.dt), hienPt(pHt)]], true, [6, 7])}</div>
- <div data-blk style="${card}">${tieuDe(2, 'Kế hoạch của team — data và hợp đồng cần có theo từng nguồn')}
-  ${Bang(['Nguồn data', ...DV.map((d) => `Data ${d.ten}`), 'Tổng data cần có', 'Tỷ lệ chốt mục tiêu', 'Số HĐ cần đạt', 'Data thực tế', 'Job chốt thực tế', 'Tỷ lệ chốt thực tế'], [
-    ...nguon.map((n) => [n.ten, ...DV.map((d) => nghin(kh.ng[n.key].dataDv[d.key])), nghin(kh.ng[n.key].data), kh.ng[n.key].chot + '%', nghin(kh.ng[n.key].hd), tongNg(n.key, 'data'), tongNg(n.key, 'chot'), hienPt(pt(tongNg(n.key, 'chot'), tongNg(n.key, 'data')))]),
-    ['Tổng', ...DV.map((d) => nghin(kh.dv[d.key].data)), nghin(kh.tongData), o1(kh.bq * 100) + '%', nghin(kh.tongHd), thucTeam.data, thucNguonTong('chot'), hienPt(pt(thucNguonTong('chot'), thucTeam.data))]], true)}
-  <div style="height:14px"></div>
-  ${Bang(['Dịch vụ', 'Số HĐ cần đạt', 'Số HĐ thực tế', 'Doanh thu mục tiêu', 'Doanh thu thực tế', '% hoàn thành'], [
-    ...DV.map((d) => [d.ten, o1(kh.dv[d.key].hd), tongDvTt(d.key, 'hd'), nghin(kh.dv[d.key].dt), nghin(tongDvTt(d.key, 'dt')), bar(pt(tongDvTt(d.key, 'dt'), kh.dv[d.key].dt))]),
-    ['Tổng', o1(kh.tongHd), thucTeam.hd, nghin(kh.tongDt), nghin(thucTeam.dt), hienPt(pHt)]], true, [3, 4])}
-  <div style="margin-top:10px;font-size:11px;color:${C.mute}">Số tính chính xác (có số lẻ), hiển thị làm tròn nên cộng tay từng ô có thể lệch ±1 so với dòng Tổng.</div></div>
- ${dong.map(chiTiet).join('')}
-
- <div data-blk style="${card}">${tieuDe(1, 'THIẾT LẬP MỤC TIÊU — Thông số đầu vào của team')}
-  ${Bang(['', ...DV.map((d) => d.ten), 'Tổng'], [
-    ['DT mục tiêu dịch vụ (chưa VAT)', ...DV.map((d) => vangIn(nghin(kh.dv[d.key].dt))), nghin(kh.tongDt)],
-    ['Giá trị TB / HĐ', ...DV.map((d) => vangIn(nghin(kh.dv[d.key].gia))), nghin(kh.giaTb)],
-    ['Số HĐ cần đạt', ...DV.map((d) => o1(kh.dv[d.key].hd)), o1(kh.tongHd)]], false)}
-  <div style="height:14px"></div>
-  ${Bang(['Nguồn data', ...DV.map((d) => `Cơ cấu data ${d.ten}`), 'Tỷ lệ chốt mục tiêu'], [
-    ...nguon.map((n) => [n.ten, ...DV.map((d) => vangIn(so(team?.cc?.[d.key]?.[n.key]) + '%')), vangIn(so(team?.chot?.[n.key]) + '%')]),
-    ['Kiểm tra tổng cơ cấu', ...DV.map((d) => o1(kh.dv[d.key].tongCc) + '%'), Math.round(kh.dv.ads.tongCc) === 100 && Math.round(kh.dv.xay_shop.tongCc) === 100 && Math.round(kh.dv.mall.tongCc) === 100 ? 'OK' : 'Cần = 100%'],
-    ['Tỷ lệ chốt BQ theo dịch vụ', ...DV.map((d) => o1(kh.dv[d.key].bq * 100) + '%'), o1(kh.bq * 100) + '%'],
-    ['Số data cần có', ...DV.map((d) => nghin(kh.dv[d.key].data)), nghin(kh.tongData)]], false)}</div>
-</div>`
-    const host = document.createElement('div')
-    host.style.cssText = 'position:fixed;left:-20000px;top:0;'
-    host.innerHTML = h
-    document.body.appendChild(host)
-    return host
-  }
-
-  async function xuatPdf() {
-    setDangXuat('pdf')
-    let host
-    try {
-      host = dungBanIn()
-      const el = host.firstElementChild
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
-      const cv = await html2canvas(el, { scale: 2, backgroundColor: '#f4f6f9', useCORS: true })
-      const W = el.clientWidth
-      const rongMm = 190, leMm = 10, caoMm = 297 - 2 * leMm
-      const heSo = cv.width / W
-      const cao1Trang = (caoMm / rongMm) * W
-      const goc = el.getBoundingClientRect()
-      const khoi = [...el.querySelectorAll('[data-blk]')].map((k) => { const b = k.getBoundingClientRect(); return { top: b.top - goc.top, bottom: b.bottom - goc.top } })
-      const tongCao = goc.height
-      const cat = []
-      let bd = 0, dem = 0
-      while (bd + cao1Trang < tongCao - 4 && dem++ < 60) {
-        const gh = bd + cao1Trang
-        const dinh = khoi.find((k) => k.top < gh - 1 && k.bottom > gh + 1)
-        const diem = dinh && dinh.top > bd + cao1Trang * 0.15 ? dinh.top - 8 : gh
-        cat.push(diem); bd = diem
-      }
-      const moc = [0, ...cat.map((y) => Math.round(y * heSo)), cv.height]
-      const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
-      for (let i = 0; i < moc.length - 1; i++) {
-        const y = moc[i], hh = moc[i + 1] - moc[i]
-        if (hh < 3) continue
-        const pcv = document.createElement('canvas')
-        pcv.width = cv.width; pcv.height = hh
-        const pc2 = pcv.getContext('2d')
-        pc2.fillStyle = '#f4f6f9'; pc2.fillRect(0, 0, pcv.width, hh)
-        pc2.drawImage(cv, 0, y, cv.width, hh, 0, 0, cv.width, hh)
-        if (i > 0) pdf.addPage()
-        pdf.setFillColor(244, 246, 249); pdf.rect(0, 0, 210, 297, 'F')
-        pdf.addImage(pcv.toDataURL('image/jpeg', 0.95), 'JPEG', leMm, leMm, rongMm, (hh * rongMm) / cv.width)
-      }
-      tai(pdf.output('blob'), `MucTieuNhanSu_${thang}.pdf`)
-    } finally {
-      if (host) host.remove()
-      setDangXuat('')
-    }
   }
 
   // ===== Màn hình của nhân viên: chỉ xem mục tiêu và kết quả của chính mình =====
@@ -449,7 +311,7 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
                   <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Nguồn data</th><th className={th}>Data mục tiêu</th><th className={th}>Data thực tế</th><th className={th}>HĐ mục tiêu</th><th className={th}>Job chốt thực tế</th><th className={th}>Tỷ lệ chốt mục tiêu</th><th className={th}>Tỷ lệ chốt thực tế</th></tr></thead>
                   <tbody>
                     {nguon.map((n) => <tr key={n.key}><td className={`${td} font-semibold`}>{n.ten}</td><td className={`${td} text-center`}>{nghin(m.ng[n.key].data)}</td><td className={`${td} text-center`}>{t.data[n.key] || 0}</td><td className={`${td} text-center`}>{so1(m.ng[n.key].hd)}</td><td className={`${td} text-center`}>{t.chot[n.key] || 0}</td><td className={`${td} text-center`}>{kh.ng[n.key].chot}%</td><td className={`${td} text-center`}>{hienPt(pt(t.chot[n.key] || 0, t.data[n.key] || 0))}</td></tr>)}
-                    <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{nghin(m.data)}</td><td className={`${td} text-center`}>{t.tongData}</td><td className={`${td} text-center`}>{so1(m.hd)}</td><td className={`${td} text-center`}>{t.tongChot}</td><td className={`${td} text-center`}>{so1(kh.bq * 100)}%</td><td className={`${td} text-center`}>{hienPt(pt(t.tongChot, t.tongData))}</td></tr>
+                    <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{nghin(m.data)}</td><td className={`${td} text-center`}>{t.tongData}</td><td className={`${td} text-center`}>{so1(m.hd)}</td><td className={`${td} text-center`}>{t.tongChot}</td><td className={`${td} text-center`}>{pt2(kh.bq * 100)}%</td><td className={`${td} text-center`}>{hienPt(pt(t.tongChot, t.tongData))}</td></tr>
                   </tbody>
                 </table>
               </section>
@@ -475,18 +337,6 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
   const mauDv = { ads: 'bg-violet-500', xay_shop: 'bg-coral-500', mall: 'bg-sky-500' }
   const kqNguon = nguon.reduce((a, n) => a + tongNg(n.key, 'chot'), 0)
   const checkCc = DV.every((d) => Math.round(kh.dv[d.key].tongCc) === 100)
-  const Chip = ({ nhan, gt, phu, mau = 'text-navy-900' }) => (
-    <div className="rounded-xl bg-slate-50 px-4 py-3">
-      <p className="text-xs text-ink-600">{nhan}</p>
-      <p className={`mt-0.5 font-display text-2xl font-bold tabular-nums ${mau}`}>{gt}</p>
-      {phu && <p className="text-xs text-ink-400">{phu}</p>}
-    </div>
-  )
-  const Dong = ({ nhan, children, tinh }) => (
-    <div className={`flex items-center justify-between gap-3 py-1.5 ${tinh ? 'text-sm' : ''}`}>
-      <span className="whitespace-nowrap text-sm text-ink-600">{nhan}</span>{children}
-    </div>
-  )
   const hienManHinh = manHinh || (kh.tongDt > 0 ? 'theo_doi' : 'thiet_lap')
 
   return (
@@ -502,8 +352,7 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
             <input type="month" value={thang} onChange={(e) => e.target.value && setThang(e.target.value)}
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500" />
           </label>
-          <Button variant="secondary" onClick={xuatExcel} disabled={loading || !!dangXuat}><Download size={16} /> {dangXuat === 'xlsx' ? 'Đang xuất...' : 'Xuất Excel'}</Button>
-          <Button variant="secondary" onClick={xuatPdf} disabled={loading || !!dangXuat}><FileDown size={16} /> {dangXuat === 'pdf' ? 'Đang xuất...' : 'Xuất báo cáo (giống màn hình)'}</Button>
+          <Button variant="secondary" onClick={xuatDashboard} disabled={loading || !!dangXuat}><FileDown size={16} /> {dangXuat === 'db' ? 'Đang xuất...' : 'Xuất báo cáo (giống màn hình)'}</Button>
           <Button onClick={luu} disabled={!daSua || dangLuu}><Save size={16} /> {dangLuu ? 'Đang lưu...' : 'Lưu mục tiêu'}</Button>
         </div>
       </header>
@@ -524,7 +373,7 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
               <Chip nhan="Doanh thu mục tiêu (chưa VAT)" gt={nghin(kh.tongDt)} mau="text-indigo-700" />
               <Chip nhan="Số HĐ cần đạt" gt={so1(kh.tongHd)} phu={`Giá trị TB ${nghin(kh.giaTb)}`} />
               <Chip nhan="Số data cần có" gt={nghin(kh.tongData)} />
-              <Chip nhan="Tỷ lệ chốt bình quân" gt={`${so1(kh.bq * 100)}%`} mau="text-coral-500" />
+              <Chip nhan="Tỷ lệ chốt bình quân" gt={`${pt2(kh.bq * 100)}%`} mau="text-coral-500" />
             </div>
 
             <section>
@@ -541,11 +390,11 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
                       <div className="my-2 rounded-xl bg-slate-50 px-4 py-2.5 text-center"><p className="text-xs text-ink-600">Số HĐ cần đạt</p><p className="font-display text-2xl font-bold text-navy-900">{so1(v.hd)}</p></div>
                       <p className="mt-3 border-t border-slate-100 pt-3 text-xs font-medium uppercase tracking-wide text-ink-400">Cơ cấu data theo nguồn</p>
                       {nguon.map((n) => (
-                        <Dong key={n.key} nhan={n.ten}><span className="flex items-center gap-1"><input type="number" min="0" max="100" className={o('w-20') + ' bg-amber-50'} value={tienIn(team?.cc?.[d.key]?.[n.key])} onChange={(e) => dat(['cc', d.key, n.key], e.target.value)} />%</span></Dong>
+                        <Dong key={n.key} nhan={n.ten}><span className="flex items-center gap-1"><input type="text" inputMode="decimal" className={o('w-20') + ' bg-amber-50'} value={tienIn(team?.cc?.[d.key]?.[n.key])} onChange={(e) => dat(['cc', d.key, n.key], e.target.value)} />%</span></Dong>
                       ))}
-                      <p className={`mt-1 text-right text-xs font-semibold ${ok ? 'text-teal-600' : 'text-coral-500'}`}>Tổng cơ cấu {so1(v.tongCc)}% {ok ? '· OK' : '· cần = 100%'}</p>
+                      <p className={`mt-1 text-right text-xs font-semibold ${ok ? 'text-teal-600' : 'text-coral-500'}`}>Tổng cơ cấu {pt2(v.tongCc)}% {ok ? '· OK' : '· cần = 100%'}</p>
                       <div className="mt-3 grid grid-cols-2 gap-2">
-                        <div className="rounded-xl bg-slate-50 px-3 py-2 text-center"><p className="text-xs text-ink-600">Tỷ lệ chốt BQ</p><p className="font-semibold text-navy-900">{so1(v.bq * 100)}%</p></div>
+                        <div className="rounded-xl bg-slate-50 px-3 py-2 text-center"><p className="text-xs text-ink-600">Tỷ lệ chốt BQ</p><p className="font-semibold text-navy-900">{pt2(v.bq * 100)}%</p></div>
                         <div className="rounded-xl bg-slate-50 px-3 py-2 text-center"><p className="text-xs text-ink-600">Số data cần có</p><p className="font-semibold text-navy-900">{nghin(v.data)}</p></div>
                       </div>
                     </div>
@@ -560,7 +409,7 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
                 {nguon.map((n) => (
                   <div key={n.key} className="rounded-xl border border-slate-200 p-3">
                     <p className="text-sm font-medium text-navy-900">{n.ten}</p>
-                    <span className="mt-1 flex items-center gap-1"><input type="number" min="0" max="100" className={o('w-24') + ' bg-amber-50'} value={tienIn(team?.chot?.[n.key])} onChange={(e) => dat(['chot', n.key], e.target.value)} />%</span>
+                    <span className="mt-1 flex items-center gap-1"><input type="text" inputMode="decimal" className={o('w-24') + ' bg-amber-50'} value={tienIn(team?.chot?.[n.key])} onChange={(e) => dat(['chot', n.key], e.target.value)} />%</span>
                     <p className="mt-2 text-xs text-ink-400">Cần {nghin(kh.ng[n.key].data)} data → {nghin(kh.ng[n.key].hd)} HĐ</p>
                   </div>
                 ))}
@@ -580,11 +429,11 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
                 <tbody>
                   {dong.map((r) => (
                     <tr key={r.id}><td className={`${td} font-medium text-navy-900`}>{r.ten}</td>
-                      <td className={vang}><span className="flex items-center justify-center gap-1"><input type="number" min="0" max="100" className={o('w-20')} value={tienIn(team?.tt?.[r.id])} onChange={(e) => dat(['tt', r.id], e.target.value)} />%</span></td>
+                      <td className={vang}><span className="flex items-center justify-center gap-1"><input type="text" inputMode="decimal" className={o('w-20')} value={tienIn(team?.tt?.[r.id])} onChange={(e) => dat(['tt', r.id], e.target.value)} />%</span></td>
                       <td className={`${td} text-center`}>{nghin(r.m.data)}</td><td className={`${td} text-center`}>{so1(r.m.hd)}</td><td className={`${td} text-right`}>{nghin(r.m.dt)}</td></tr>
                   ))}
                   <tr className={dongTong}><td className={td}>Tổng team</td>
-                    <td className={`${td} text-center ${Math.round(tongChia) === 100 ? 'text-teal-600' : 'text-coral-500'}`}>{so1(tongChia)}% {Math.round(tongChia) === 100 ? '· OK' : '· cần = 100%'}</td>
+                    <td className={`${td} text-center ${Math.round(tongChia) === 100 ? 'text-teal-600' : 'text-coral-500'}`}>{pt2(tongChia)}% {Math.round(tongChia) === 100 ? '· OK' : '· cần = 100%'}</td>
                     <td className={`${td} text-center`}>{nghin(kh.tongData)}</td><td className={`${td} text-center`}>{so1(kh.tongHd)}</td><td className={`${td} text-right`}>{nghin(kh.tongDt)}</td></tr>
                 </tbody>
               </table>
@@ -667,7 +516,7 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
                   <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Nguồn data</th><th className={th}>Data cần có</th><th className={th}>Data thực tế</th><th className={th}>HĐ cần đạt</th><th className={th}>Chốt thực tế</th><th className={th}>Tỷ lệ chốt MT</th><th className={th}>Tỷ lệ chốt TT</th></tr></thead>
                   <tbody>
                     {nguon.map((n) => <tr key={n.key}><td className={`${td} font-semibold`}>{n.ten}</td><td className={`${td} text-center`}>{nghin(kh.ng[n.key].data)}</td><td className={`${td} text-center`}>{tongNg(n.key, 'data')}</td><td className={`${td} text-center`}>{nghin(kh.ng[n.key].hd)}</td><td className={`${td} text-center`}>{tongNg(n.key, 'chot')}</td><td className={`${td} text-center`}>{kh.ng[n.key].chot}%</td><td className={`${td} text-center`}>{hienPt(pt(tongNg(n.key, 'chot'), tongNg(n.key, 'data')))}</td></tr>)}
-                    <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{nghin(kh.tongData)}</td><td className={`${td} text-center`}>{thucTeam.data}</td><td className={`${td} text-center`}>{nghin(kh.tongHd)}</td><td className={`${td} text-center`}>{kqNguon}</td><td className={`${td} text-center`}>{so1(kh.bq * 100)}%</td><td className={`${td} text-center`}>{hienPt(pt(kqNguon, thucTeam.data))}</td></tr>
+                    <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{nghin(kh.tongData)}</td><td className={`${td} text-center`}>{thucTeam.data}</td><td className={`${td} text-center`}>{nghin(kh.tongHd)}</td><td className={`${td} text-center`}>{kqNguon}</td><td className={`${td} text-center`}>{pt2(kh.bq * 100)}%</td><td className={`${td} text-center`}>{hienPt(pt(kqNguon, thucTeam.data))}</td></tr>
                   </tbody>
                 </table>
                 <p className="mt-3 text-xs text-ink-400">Data cần có theo từng dịch vụ (ADS · Xây shop · Mall) xem ở tab "Thiết lập mục tiêu". Thực tế chỉ tính đơn mới đã chốt trong tháng, đã trừ đơn hoàn / huỷ.</p>
@@ -679,6 +528,28 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
     </div>
   )
 }
+
+const mauPtM = (v) => (v === null ? 'bg-slate-200' : v >= 100 ? 'bg-teal-500' : v >= 70 ? 'bg-amber-400' : 'bg-coral-500')
+const Chip = ({ nhan, gt, phu, mau = 'text-navy-900' }) => (
+  <div className="rounded-xl bg-slate-50 px-4 py-3">
+    <p className="text-xs text-ink-600">{nhan}</p>
+    <p className={`mt-0.5 font-display text-2xl font-bold tabular-nums ${mau}`}>{gt}</p>
+    {phu && <p className="text-xs text-ink-400">{phu}</p>}
+  </div>
+)
+const Dong = ({ nhan, children, tinh }) => (
+  <div className={`flex items-center justify-between gap-3 py-1.5 ${tinh ? 'text-sm' : ''}`}>
+    <span className="whitespace-nowrap text-sm text-ink-600">{nhan}</span>{children}
+  </div>
+)
+
+
+const Bar = ({ v }) => (
+  <div className="flex items-center gap-2">
+    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${mauPtM(v)}`} style={{ width: `${Math.min(100, v || 0)}%` }} /></div>
+    <b className="w-11 text-right">{hienPt(v)}</b>
+  </div>
+)
 
 function KpiMt({ nhan, mt, tt, phan, mau }) {
   return (
