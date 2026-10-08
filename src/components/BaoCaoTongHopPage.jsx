@@ -202,7 +202,7 @@ export default function BaoCaoTongHopPage() {
         </div>
         <div className="flex gap-2">
           <Button onClick={xuatDashboard} disabled={loading || dangXuat}>
-            <FileDown size={16} /> {dangXuat ? 'Đang xuất...' : 'Xuất báo cáo (giống màn hình)'}
+            <FileDown size={16} /> {dangXuat ? 'Đang xuất...' : 'Xuất báo cáo'}
           </Button>
         </div>
       </header>

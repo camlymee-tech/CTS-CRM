@@ -352,7 +352,7 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
             <input type="month" value={thang} onChange={(e) => e.target.value && setThang(e.target.value)}
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500" />
           </label>
-          <Button variant="secondary" onClick={xuatDashboard} disabled={loading || !!dangXuat}><FileDown size={16} /> {dangXuat === 'db' ? 'Đang xuất...' : 'Xuất báo cáo (giống màn hình)'}</Button>
+          <Button variant="secondary" onClick={xuatDashboard} disabled={loading || !!dangXuat}><FileDown size={16} /> {dangXuat === 'db' ? 'Đang xuất...' : 'Xuất báo cáo'}</Button>
           <Button onClick={luu} disabled={!daSua || dangLuu}><Save size={16} /> {dangLuu ? 'Đang lưu...' : 'Lưu mục tiêu'}</Button>
         </div>
       </header>
@@ -442,34 +442,82 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
           </>
         )}
 
-        {hienManHinh === 'theo_doi' && (
-          <>
-            <div className="grid grid-cols-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm sm:grid-cols-4 sm:divide-y-0 sm:divide-x">
-              <KpiMt nhan="Doanh thu (chưa VAT)" mt={nghin(kh.tongDt)} tt={nghin(thucTeam.dt)} phan={pHt} mau={mauPt(pHt)} />
-              <KpiMt nhan="Số data" mt={nghin(kh.tongData)} tt={thucTeam.data} phan={pt(thucTeam.data, kh.tongData)} mau={mauPt(pt(thucTeam.data, kh.tongData))} />
-              <KpiMt nhan="Số hợp đồng" mt={so1(kh.tongHd)} tt={thucTeam.hd} phan={pt(thucTeam.hd, kh.tongHd)} mau={mauPt(pt(thucTeam.hd, kh.tongHd))} />
-              <KpiMt nhan="Giá trị TB / HĐ" mt={nghin(kh.giaTb)} tt={nghin(thucTeam.hd ? thucTeam.dt / thucTeam.hd : 0)} />
-            </div>
+        {hienManHinh === 'theo_doi' && (() => {
+          const [yy, mm] = thang.split('-').map(Number)
+          const cuoiThang = new Date(yy, mm, 0).getDate()
+          const nay = new Date()
+          const thoiGian = nay.getFullYear() === yy && nay.getMonth() + 1 === mm ? Math.round((nay.getDate() / cuoiThang) * 100) : (nay > new Date(yy, mm, 0) ? 100 : 0)
+          const xep = [...dong].sort((x, y) => (pt(y.t.dt, y.m.dt) ?? -1) - (pt(x.t.dt, x.m.dt) ?? -1))
+          const ten2 = (t) => (t || '?').trim().split(/\s+/).slice(-1)[0].slice(0, 1).toUpperCase()
+          const kqChot = nguon.reduce((a, n) => a + tongNg(n.key, 'chot'), 0)
+          return (
+            <>
+              {/* Tổng quan */}
+              <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
+                <div className="flex flex-col items-center justify-center rounded-2xl bg-white p-6 shadow-sm">
+                  <p className="mb-3 text-sm font-medium text-ink-600">Doanh thu so với mục tiêu</p>
+                  <Ring v={pHt} />
+                  <p className="mt-3 font-display text-xl font-bold tabular-nums text-navy-900">{nghin(thucTeam.dt)}</p>
+                  <p className="text-xs text-ink-400">mục tiêu {nghin(kh.tongDt)}</p>
+                  {thoiGian > 0 && thoiGian < 100 && <p className="mt-3 rounded-full bg-slate-100 px-3 py-1 text-xs text-ink-600">Tháng đã qua {thoiGian}%</p>}
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <The nhan="Số data" gt={thucTeam.data} mt={`mục tiêu ${nghin(kh.tongData)}`} v={pt(thucTeam.data, kh.tongData)} moc={thoiGian} />
+                  <The nhan="Số hợp đồng" gt={thucTeam.hd} mt={`mục tiêu ${so1(kh.tongHd)}`} v={pt(thucTeam.hd, kh.tongHd)} moc={thoiGian} />
+                  <The nhan="Giá trị TB / HĐ" gt={nghin(thucTeam.hd ? thucTeam.dt / thucTeam.hd : 0)} mt={`mục tiêu ${nghin(kh.giaTb)}`} v={kh.giaTb > 0 && thucTeam.hd ? Math.round((thucTeam.dt / thucTeam.hd / kh.giaTb) * 10000) / 100 : null} />
+                  <div className="rounded-2xl bg-white p-5 shadow-sm sm:col-span-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div><p className="text-sm font-medium text-navy-900">Tỷ lệ chốt</p><p className="text-xs text-ink-400">{kqChot} job chốt / {thucTeam.data} data</p></div>
+                      <div className="flex gap-6 text-sm">
+                        <div><p className="text-xs text-ink-400">Mục tiêu</p><p className="font-display text-xl font-bold tabular-nums text-navy-900">{pt2(kh.bq * 100)}%</p></div>
+                        <div><p className="text-xs text-ink-400">Thực tế</p><p className={`font-display text-xl font-bold tabular-nums ${pt(kqChot, thucTeam.data) !== null && pt(kqChot, thucTeam.data) >= kh.bq * 100 ? 'text-teal-600' : 'text-coral-500'}`}>{hienPt(pt(kqChot, thucTeam.data))}</p></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
-              <h3 className="mb-3 text-sm font-semibold text-navy-900">Theo nhân sự <span className="font-normal text-ink-400">· bấm vào tên để xem chi tiết</span></h3>
-              <table className="w-full min-w-[900px] border-collapse text-sm">
-                <thead>
-                  <tr className="bg-sky-100 text-navy-900"><th rowSpan={2} className={`${th} text-left`}>Nhân sự</th><th colSpan={3} className={th}>Số data</th><th colSpan={3} className={th}>Số hợp đồng</th><th colSpan={3} className={th}>Doanh thu (chưa VAT)</th></tr>
-                  <tr className="bg-sky-100 text-navy-900">{['Mục tiêu', 'Thực tế', '%', 'Mục tiêu', 'Thực tế', '%', 'Mục tiêu', 'Thực tế', '% hoàn thành'].map((x, i) => <th key={i} className={`${th} font-medium`}>{x}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {dong.map((r) => (
-                    <Fragment key={r.id}>
-                      <tr onClick={() => setMo(mo === r.id ? '' : r.id)} className={`cursor-pointer ${mo === r.id ? 'bg-amber-50/60' : 'hover:bg-slate-50'}`}>
-                        <td className={`${td} font-medium text-navy-900`}><span className="mr-1 text-ink-400">{mo === r.id ? '▾' : '▸'}</span>{r.ten}</td>
-                        <td className={`${td} text-center`}>{nghin(r.m.data)}</td><td className={`${td} text-center`}>{r.t.tongData}</td><td className={`${td} text-center`}>{hienPt(pt(r.t.tongData, r.m.data))}</td>
-                        <td className={`${td} text-center`}>{so1(r.m.hd)}</td><td className={`${td} text-center`}>{r.t.hd}</td><td className={`${td} text-center`}>{hienPt(pt(r.t.hd, r.m.hd))}</td>
-                        <td className={`${td} text-right`}>{nghin(r.m.dt)}</td><td className={`${td} text-right`}>{nghin(r.t.dt)}</td><td className={`${td} min-w-[140px]`}><Bar v={pt(r.t.dt, r.m.dt)} /></td>
-                      </tr>
-                      {mo === r.id && (
-                        <tr><td colSpan={10} className="border border-slate-200 bg-slate-50/60 p-4">
-                          <div className="grid gap-4 lg:grid-cols-2">
+              {/* Theo dịch vụ */}
+              <section>
+                <h3 className="mb-3 text-sm font-semibold text-navy-900">Theo dịch vụ</h3>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {DV.map((d) => {
+                    const v = pt(tongDvTt(d.key, 'dt'), kh.dv[d.key].dt)
+                    return (
+                      <div key={d.key} className="rounded-2xl bg-white p-5 shadow-sm">
+                        <div className="flex items-center justify-between"><span className="flex items-center gap-2 font-semibold text-navy-900"><i className={`h-3 w-3 rounded-full ${mauDv[d.key]}`} />{d.ten}</span><b className={`text-lg tabular-nums ${mauChu(v)}`}>{hienPt(v)}</b></div>
+                        <p className="mt-3 font-display text-xl font-bold tabular-nums text-navy-900">{nghin(tongDvTt(d.key, 'dt'))}</p>
+                        <p className="text-xs text-ink-400">mục tiêu {nghin(kh.dv[d.key].dt)}</p>
+                        <Bar v={v} gon />
+                        <p className="mt-2 text-xs text-ink-600">Hợp đồng: <b>{tongDvTt(d.key, 'hd')}</b> / {so1(kh.dv[d.key].hd)}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* Theo nhân sự */}
+              <section>
+                <h3 className="mb-3 text-sm font-semibold text-navy-900">Theo nhân sự <span className="font-normal text-ink-400">· xếp theo % hoàn thành doanh thu · bấm "Chi tiết" để xem theo nguồn và dịch vụ</span></h3>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {xep.map((r, i) => {
+                    const v = pt(r.t.dt, r.m.dt), dang = mo === r.id
+                    return (
+                      <div key={r.id} className={`rounded-2xl bg-white p-5 shadow-sm ${dang ? 'lg:col-span-2' : ''}`}>
+                        <div className="flex items-center gap-3">
+                          <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${i === 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-ink-600'}`}>{i + 1}</span>
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-900 text-sm font-semibold text-white">{ten2(r.ten)}</span>
+                          <div className="flex-1"><p className="font-semibold text-navy-900">{r.ten}</p><p className="text-xs text-ink-400">đảm nhận {pt2(r.k)}% mục tiêu team</p></div>
+                          <div className="text-right"><p className={`font-display text-2xl font-bold tabular-nums ${mauChu(v)}`}>{hienPt(v)}</p><p className="text-xs text-ink-400">hoàn thành</p></div>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                          <Muc nhan="Doanh thu" tt={nghin(r.t.dt)} mt={nghin(r.m.dt)} v={v} />
+                          <Muc nhan="Số data" tt={r.t.tongData} mt={nghin(r.m.data)} v={pt(r.t.tongData, r.m.data)} />
+                          <Muc nhan="Số hợp đồng" tt={r.t.hd} mt={so1(r.m.hd)} v={pt(r.t.hd, r.m.hd)} />
+                        </div>
+                        <button onClick={() => setMo(dang ? '' : r.id)} className="mt-4 text-sm font-medium text-coral-500 hover:underline">{dang ? 'Thu gọn ▴' : 'Chi tiết ▾'}</button>
+                        {dang && (
+                          <div className="mt-3 grid gap-4 lg:grid-cols-2">
                             <table className="w-full border-collapse bg-white text-sm">
                               <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Nguồn data</th><th className={th}>Data MT</th><th className={th}>Data TT</th><th className={th}>HĐ MT</th><th className={th}>Chốt TT</th><th className={th}>Tỷ lệ chốt TT</th></tr></thead>
                               <tbody>
@@ -485,45 +533,37 @@ export default function MucTieuNhanSuPage({ currentProfile }) {
                               </tbody>
                             </table>
                           </div>
-                        </td></tr>
-                      )}
-                    </Fragment>
-                  ))}
-                  <tr className={dongTong}>
-                    <td className={td}>Tổng team</td>
-                    <td className={`${td} text-center`}>{nghin(kh.tongData)}</td><td className={`${td} text-center`}>{thucTeam.data}</td><td className={`${td} text-center`}>{hienPt(pt(thucTeam.data, kh.tongData))}</td>
-                    <td className={`${td} text-center`}>{so1(kh.tongHd)}</td><td className={`${td} text-center`}>{thucTeam.hd}</td><td className={`${td} text-center`}>{hienPt(pt(thucTeam.hd, kh.tongHd))}</td>
-                    <td className={`${td} text-right`}>{nghin(kh.tongDt)}</td><td className={`${td} text-right`}>{nghin(thucTeam.dt)}</td><td className={`${td} text-center`}>{hienPt(pHt)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </section>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
 
-            <div className="grid gap-5 xl:grid-cols-2">
-              <section className="rounded-2xl bg-white p-5 shadow-sm">
-                <h3 className="mb-3 text-sm font-semibold text-navy-900">Theo dịch vụ</h3>
-                <table className="w-full border-collapse text-sm">
-                  <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Dịch vụ</th><th className={th}>HĐ cần đạt</th><th className={th}>HĐ thực tế</th><th className={th}>DT mục tiêu</th><th className={th}>DT thực tế</th><th className={th}>% hoàn thành</th></tr></thead>
-                  <tbody>
-                    {DV.map((d) => <tr key={d.key}><td className={`${td} font-semibold`}><i className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${mauDv[d.key]}`} />{d.ten}</td><td className={`${td} text-center`}>{so1(kh.dv[d.key].hd)}</td><td className={`${td} text-center`}>{tongDvTt(d.key, 'hd')}</td><td className={`${td} text-right`}>{nghin(kh.dv[d.key].dt)}</td><td className={`${td} text-right`}>{nghin(tongDvTt(d.key, 'dt'))}</td><td className={`${td} min-w-[130px]`}><Bar v={pt(tongDvTt(d.key, 'dt'), kh.dv[d.key].dt)} /></td></tr>)}
-                    <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{so1(kh.tongHd)}</td><td className={`${td} text-center`}>{thucTeam.hd}</td><td className={`${td} text-right`}>{nghin(kh.tongDt)}</td><td className={`${td} text-right`}>{nghin(thucTeam.dt)}</td><td className={`${td} text-center`}>{hienPt(pHt)}</td></tr>
-                  </tbody>
-                </table>
-              </section>
-              <section className="rounded-2xl bg-white p-5 shadow-sm">
+              {/* Theo nguồn */}
+              <section>
                 <h3 className="mb-3 text-sm font-semibold text-navy-900">Theo nguồn data</h3>
-                <table className="w-full border-collapse text-sm">
-                  <thead><tr className="bg-sky-100 text-navy-900"><th className={`${th} text-left`}>Nguồn data</th><th className={th}>Data cần có</th><th className={th}>Data thực tế</th><th className={th}>HĐ cần đạt</th><th className={th}>Chốt thực tế</th><th className={th}>Tỷ lệ chốt MT</th><th className={th}>Tỷ lệ chốt TT</th></tr></thead>
-                  <tbody>
-                    {nguon.map((n) => <tr key={n.key}><td className={`${td} font-semibold`}>{n.ten}</td><td className={`${td} text-center`}>{nghin(kh.ng[n.key].data)}</td><td className={`${td} text-center`}>{tongNg(n.key, 'data')}</td><td className={`${td} text-center`}>{nghin(kh.ng[n.key].hd)}</td><td className={`${td} text-center`}>{tongNg(n.key, 'chot')}</td><td className={`${td} text-center`}>{kh.ng[n.key].chot}%</td><td className={`${td} text-center`}>{hienPt(pt(tongNg(n.key, 'chot'), tongNg(n.key, 'data')))}</td></tr>)}
-                    <tr className={dongTong}><td className={td}>Tổng</td><td className={`${td} text-center`}>{nghin(kh.tongData)}</td><td className={`${td} text-center`}>{thucTeam.data}</td><td className={`${td} text-center`}>{nghin(kh.tongHd)}</td><td className={`${td} text-center`}>{kqNguon}</td><td className={`${td} text-center`}>{pt2(kh.bq * 100)}%</td><td className={`${td} text-center`}>{hienPt(pt(kqNguon, thucTeam.data))}</td></tr>
-                  </tbody>
-                </table>
-                <p className="mt-3 text-xs text-ink-400">Data cần có theo từng dịch vụ (ADS · Xây shop · Mall) xem ở tab "Thiết lập mục tiêu". Thực tế chỉ tính đơn mới đã chốt trong tháng, đã trừ đơn hoàn / huỷ.</p>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {nguon.map((n) => {
+                    const dT = tongNg(n.key, 'data'), cT = tongNg(n.key, 'chot'), rate = pt(cT, dT)
+                    return (
+                      <div key={n.key} className="rounded-2xl bg-white p-5 shadow-sm">
+                        <p className="mb-3 font-semibold text-navy-900">{n.ten}</p>
+                        <Muc nhan="Data" tt={dT} mt={nghin(kh.ng[n.key].data)} v={pt(dT, kh.ng[n.key].data)} />
+                        <div className="mt-3"><Muc nhan="Job chốt" tt={cT} mt={nghin(kh.ng[n.key].hd)} v={pt(cT, kh.ng[n.key].hd)} /></div>
+                        <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs">
+                          <span className="text-ink-600">Tỷ lệ chốt</span>
+                          <span>mục tiêu <b className="text-navy-900">{pt2(kh.ng[n.key].chot)}%</b> · thực tế <b className={rate !== null && rate >= kh.ng[n.key].chot ? 'text-teal-600' : 'text-coral-500'}>{hienPt(rate)}</b></span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="mt-3 text-xs text-ink-400">Thực tế chỉ tính đơn mới đã chốt trong tháng, đã trừ đơn hoàn / huỷ. Data cần có theo từng dịch vụ xem ở tab "Thiết lập mục tiêu".</p>
               </section>
-            </div>
-          </>
-        )}
+            </>
+          )
+        })()}
       </div>
     </div>
   )
@@ -544,12 +584,47 @@ const Dong = ({ nhan, children, tinh }) => (
 )
 
 
-const Bar = ({ v }) => (
-  <div className="flex items-center gap-2">
-    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${mauPtM(v)}`} style={{ width: `${Math.min(100, v || 0)}%` }} /></div>
-    <b className="w-11 text-right">{hienPt(v)}</b>
+const Bar = ({ v, moc, gon }) => (
+  <div className={`flex items-center gap-2 ${gon ? 'mt-3' : ''}`}>
+    <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+      <div className={`h-full rounded-full ${mauPtM(v)}`} style={{ width: `${Math.min(100, v || 0)}%` }} />
+      {moc > 0 && moc < 100 && <i className="absolute top-0 h-full w-0.5 bg-navy-900/60" style={{ left: `${moc}%` }} />}
+    </div>
+    <b className={`${gon ? 'w-16' : 'w-11'} text-right text-sm tabular-nums`}>{hienPt(v)}</b>
   </div>
 )
+const mauChu = (v) => (v === null ? 'text-ink-400' : v >= 100 ? 'text-teal-600' : v >= 70 ? 'text-amber-500' : 'text-coral-500')
+const strokeRing = (v) => (v === null ? 'stroke-slate-300' : v >= 100 ? 'stroke-teal-500' : v >= 70 ? 'stroke-amber-400' : 'stroke-coral-500')
+function Ring({ v }) {
+  const r = 58, c = 2 * Math.PI * r, p = Math.max(0, Math.min(100, v || 0))
+  return (
+    <div className="relative h-36 w-36">
+      <svg viewBox="0 0 140 140" className="h-full w-full -rotate-90">
+        <circle cx="70" cy="70" r={r} fill="none" strokeWidth="12" className="stroke-slate-100" />
+        <circle cx="70" cy="70" r={r} fill="none" strokeWidth="12" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * p) / 100} className={strokeRing(v)} />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center"><span className={`font-display text-3xl font-bold tabular-nums ${mauChu(v)}`}>{hienPt(v)}</span></div>
+    </div>
+  )
+}
+function The({ nhan, gt, mt, v, moc }) {
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm">
+      <p className="text-sm text-ink-600">{nhan}</p>
+      <p className="mt-1 font-display text-3xl font-bold tabular-nums text-navy-900">{gt}</p>
+      <p className="text-xs text-ink-400">{mt}</p>
+      <Bar v={v} moc={moc} gon />
+    </div>
+  )
+}
+function Muc({ nhan, tt, mt, v }) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-sm"><span className="text-ink-600">{nhan}</span><span className="tabular-nums text-ink-600"><b className="text-navy-900">{tt}</b> / {mt} · <b className={mauChu(v)}>{hienPt(v)}</b></span></div>
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${mauPtM(v)}`} style={{ width: `${Math.min(100, v || 0)}%` }} /></div>
+    </div>
+  )
+}
 
 function KpiMt({ nhan, mt, tt, phan, mau }) {
   return (
