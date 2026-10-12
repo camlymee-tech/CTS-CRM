@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Upload, FileSpreadsheet, ClipboardPaste, CircleCheck, TriangleAlert } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select } from './ui'
+import { docBangTuPdf } from '../lib/docPdf'
 
 // Nhận diện cột theo tên tiêu đề, không phụ thuộc thứ tự
 const NHAN = {
@@ -114,6 +115,15 @@ export default function FeesImportModal({ onXong }) {
     setLoi(''); setRows([]); setXong(null)
     try {
       const buf = await f.arrayBuffer()
+      if (/\.pdf$/i.test(f.name)) {
+        const pdfjs = await import('pdfjs-dist')
+        pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
+        const bangPdf = await docBangTuPdf(pdfjs, buf)
+        if (bangPdf.length < 2) { setLoi('Không đọc được dòng dữ liệu nào trong file PDF. Nếu PDF là ảnh chụp/scan thì cần dùng file Excel.'); return }
+        xuLyBang(bangPdf)
+        if (inputRef.current) inputRef.current.value = ''
+        return
+      }
       const XLSX = await import('xlsx')
       const wb = XLSX.read(buf, { type: 'array' })
       const sheet = wb.Sheets[wb.SheetNames[0]]
@@ -168,12 +178,12 @@ export default function FeesImportModal({ onXong }) {
         File cần có các cột <b>Ngành hàng cấp 1</b>, <b>Ngành hàng cấp 2</b>, <b>Ngành hàng cấp 3</b>,
         {' '}<b>Mức phí tiêu chuẩn</b> và (nếu có) <b>Mức phí ưu đãi cho Người bán mới</b>.
         App tự tìm đúng cột theo tên tiêu đề nên thứ tự cột thế nào cũng được.
-        Nhận file Excel (.xlsx, .xls) và CSV.
+        Nhận file Excel (.xlsx, .xls), CSV và PDF (PDF có chữ chọn được, không phải ảnh chụp).
       </div>
 
       {!rows.length && (
         <>
-          <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={chonFile} />
+          <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv,.pdf" hidden onChange={chonFile} />
           <Button type="button" onClick={() => inputRef.current?.click()} className="w-full">
             <Upload size={16} /> Chọn file bảng phí
           </Button>
