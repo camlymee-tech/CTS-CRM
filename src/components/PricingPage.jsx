@@ -11,6 +11,18 @@ import { gomDuLieu } from '../lib/pricing'
 import { xuatBangGia } from '../lib/pricingXlsx'
 import FeesImportModal from './FeesImportModal'
 
+// Supabase chỉ trả tối đa 1000 dòng mỗi lần, nên đọc nối tiếp từng trang cho đủ toàn bộ bảng phí
+async function layHet(truyVan) {
+  const tatCa = []
+  for (let tu = 0; tu < 100000; tu += 1000) {
+    const { data, error } = await truyVan().range(tu, tu + 999)
+    if (error || !data) break
+    tatCa.push(...data)
+    if (data.length < 1000) break
+  }
+  return tatCa
+}
+
 const nhap = (v) => (v === '' || v === null || v === undefined ? '' : Number(v).toLocaleString('vi-VN'))
 const vnd = (n) => formatVnd(Math.round(Number(n) || 0))
 const pt2 = (n) => (Number(n) || 0).toFixed(2).replace('.', ',') + '%'
@@ -64,7 +76,7 @@ export default function PricingPage({ currentProfile }) {
   async function load() {
     setLoading(true)
     const [{ data: fs }, { data: st }] = await Promise.all([
-      supabase.from('shopee_fees').select('*').eq('active', true).order('nganh_1').order('nganh_2'),
+      layHet(() => supabase.from('shopee_fees').select('*').eq('active', true).order('nganh_1').order('nganh_2').order('id')),
       supabase.from('shopee_settings').select('*').eq('id', 1).single(),
     ])
     setFees(fs || [])
@@ -688,7 +700,7 @@ function FeesModal({ cfg, onClose }) {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase.from('shopee_fees').select('*').order('nganh_1').order('nganh_2')
+    const data = await layHet(() => supabase.from('shopee_fees').select('*').order('nganh_1').order('nganh_2').order('id'))
     setFees(data || [])
     setLoading(false)
   }

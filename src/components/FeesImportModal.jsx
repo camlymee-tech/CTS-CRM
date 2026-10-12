@@ -5,14 +5,32 @@ import { Button, Input, Select } from './ui'
 
 // Nhận diện cột theo tên tiêu đề, không phụ thuộc thứ tự
 const NHAN = {
+  uudai: ['ưu đãi', 'uu dai', 'người bán mới', 'nguoi ban moi'],
   cap1: ['ngành hàng cấp 1', 'nganh hang cap 1', 'cấp 1', 'cap 1'],
   cap2: ['ngành hàng cấp 2', 'nganh hang cap 2', 'cấp 2', 'cap 2'],
   cap3: ['ngành hàng cấp 3', 'nganh hang cap 3', 'cấp 3', 'cap 3'],
   chuan: ['mức phí tiêu chuẩn', 'muc phi tieu chuan', 'phí cố định', 'phi co dinh', 'mức phí', 'phí'],
-  uudai: ['ưu đãi', 'uu dai', 'người bán mới', 'nguoi ban moi'],
 }
 
-const chuanHoa = (s) => String(s ?? '').trim().toLowerCase()
+const chuanHoa = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/\s+/g, ' ').trim().toLowerCase()
+
+// Đọc dữ liệu dán từ Excel: ô tiêu đề có xuống dòng bên trong được Excel bọc trong dấu ngoặc kép
+function tachBang(text) {
+  const rows = []; let row = []; let cell = ''; let q = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++ } else q = false }
+      else cell += ch
+    } else if (ch === '"' && cell === '') q = true
+    else if (ch === '\t') { row.push(cell); cell = '' }
+    else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = '' }
+    else if (ch !== '\r') cell += ch
+  }
+  row.push(cell); rows.push(row)
+  return rows.filter((r) => r.some((c) => String(c).trim() !== ''))
+}
 
 function doanCot(headers) {
   const map = {}
@@ -21,7 +39,7 @@ function doanCot(headers) {
     if (!t) return
     for (const [khoa, tuKhoa] of Object.entries(NHAN)) {
       if (map[khoa] !== undefined) continue
-      if (tuKhoa.some((k) => t.includes(k))) { map[khoa] = i; return }
+      if (tuKhoa.some((k) => t.includes(chuanHoa(k)))) { map[khoa] = i; return }
     }
   })
   return map
@@ -55,12 +73,12 @@ export default function FeesImportModal({ onXong }) {
 
     // Tìm dòng tiêu đề trong 15 dòng đầu
     let iHeader = -1, cot = null
-    for (let i = 0; i < Math.min(bang.length, 15); i++) {
+    for (let i = 0; i < Math.min(bang.length, 60); i++) {
       const m = doanCot(bang[i])
       if (m.cap1 !== undefined && m.chuan !== undefined) { iHeader = i; cot = m; break }
     }
     if (iHeader === -1) {
-      setLoi('Không tìm thấy dòng tiêu đề. File cần có cột "Ngành hàng cấp 1" và "Mức phí tiêu chuẩn".')
+      setLoi('Không tìm thấy dòng tiêu đề. File cần có cột "Ngành hàng cấp 1" và cột phí (VD "Mức phí tiêu chuẩn" hoặc "Phí cố định..."). Nếu chị copy từ file PDF thì không dán được, chị dùng file Excel và bấm "Chọn file bảng phí" nhé.')
       return
     }
 
@@ -109,7 +127,7 @@ export default function FeesImportModal({ onXong }) {
 
   function xuLyDan() {
     if (!dan.trim()) return
-    const bang = dan.trim().split('\n').map((d) => d.split('\t'))
+    const bang = tachBang(dan.trim())
     xuLyBang(bang)
   }
 
@@ -199,22 +217,22 @@ export default function FeesImportModal({ onXong }) {
           )}
 
           <div className="max-h-52 overflow-y-auto rounded-lg border border-slate-200">
-            <table className="border-collapse w-full text-xs">
+            <table className="w-full text-xs">
               <thead className="sticky top-0 bg-slate-50">
-                <tr className="bg-slate-50 text-left text-ink-600">
-                  <th className="border border-slate-200 px-3 py-2">Ngành cấp 1</th>
-                  <th className="border border-slate-200 px-3 py-2">Ngành hàng</th>
-                  <th className="border border-slate-200 px-3 py-2 text-right">Tiêu chuẩn</th>
-                  <th className="border border-slate-200 px-3 py-2 text-right">Người bán mới</th>
+                <tr className="text-left text-ink-400">
+                  <th className="px-3 py-2">Ngành cấp 1</th>
+                  <th className="px-3 py-2">Ngành hàng</th>
+                  <th className="px-3 py-2 text-right">Tiêu chuẩn</th>
+                  <th className="px-3 py-2 text-right">Người bán mới</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.slice(0, 60).map((r, i) => (
                   <tr key={i} className="border-t border-slate-50">
-                    <td className="border border-slate-200 px-3 py-1.5 text-ink-600">{r.nganh_1}</td>
-                    <td className="border border-slate-200 px-3 py-1.5 text-navy-900">{r.nganh_2}</td>
-                    <td className="border border-slate-200 px-3 py-1.5 text-right font-medium text-coral-500">{r.phi_phan_tram}%</td>
-                    <td className="border border-slate-200 px-3 py-1.5 text-right text-emerald-600">
+                    <td className="px-3 py-1.5 text-ink-600">{r.nganh_1}</td>
+                    <td className="px-3 py-1.5 text-navy-900">{r.nganh_2}</td>
+                    <td className="px-3 py-1.5 text-right font-medium text-coral-500">{r.phi_phan_tram}%</td>
+                    <td className="px-3 py-1.5 text-right text-emerald-600">
                       {r.phi_nguoi_ban_moi != null ? r.phi_nguoi_ban_moi + '%' : '—'}
                     </td>
                   </tr>
