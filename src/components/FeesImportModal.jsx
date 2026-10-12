@@ -137,6 +137,11 @@ export default function FeesImportModal({ onXong }) {
 
   function xuLyDan() {
     if (!dan.trim()) return
+    if (!dan.includes('\t')) {
+      setRows([]); setXong(null); setCanhBao('')
+      setLoi('Chữ dán vào đây không tách được thành cột (thường do copy từ file PDF). Chị bấm nút "Chọn file bảng phí" ở trên rồi chọn thẳng file PDF, app sẽ tự đọc bảng.')
+      return
+    }
     const bang = tachBang(dan.trim())
     xuLyBang(bang)
   }
