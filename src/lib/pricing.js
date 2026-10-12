@@ -118,3 +118,84 @@ export function timGiaBan(d, bienMongMuon) {
 export function timGiaHoaVon(d) {
   return timGiaBan(d, 0)
 }
+
+// Giá niêm yết để đạt lợi nhuận mục tiêu tính bằng TIỀN mỗi đơn
+export function timGiaTheoTien(d, tienMuc) {
+  const muc = Number(tienMuc) || 0
+  let thap = 0
+  let cao = Math.max(so(d.giaVon), 10000) * 200 + 10_000_000 + muc * 50
+  for (let i = 0; i < 60; i++) {
+    const giua = (thap + cao) / 2
+    const r = tinhToan({ ...d, giaNiemYet: giua })
+    if (r.loiNhuan < muc) thap = giua
+    else cao = giua
+  }
+  return Math.ceil(cao / 1000) * 1000
+}
+
+// Gom dữ liệu nhập + tham số phí sàn thành đầu vào cho tinhToan
+export function gomDuLieu(f, cfg) {
+  return {
+    ...f,
+    phiXuLyPct: cfg?.phi_xu_ly ?? 6,
+    phiHaTang: cfg?.phi_ha_tang ?? 3000,
+    vxPct: cfg?.voucher_xtra_pct ?? 4,
+    vxCap: cfg?.voucher_xtra_cap ?? 50000,
+    fsPct: cfg?.freeship_xtra_pct ?? 6,
+    dtdPct: cfg?.dong_tai_tro_pct ?? 30,
+    dtdCap: cfg?.dong_tai_tro_cap ?? 50000,
+    thuePct: cfg?.thue_pct ?? 1.5,
+    pishipPhi: cfg?.piship_phi ?? 2700,
+  }
+}
+
+export const CACH_TINH = {
+  loi_nhuan: 'Theo mục tiêu lợi nhuận',
+  gia_ban: 'Theo giá bán cạnh tranh',
+}
+
+/**
+ * Tính một sản phẩm theo 1 trong 3 cách định giá.
+ * sp = { cheDo, kieu ('pct'|'tien'), f: {...} }
+ */
+export function tinhSanPham(sp, cfg) {
+  const d = gomDuLieu(sp.f, cfg)
+  const chiPhiThat = so(d.giaVon) + so(d.dongGoi) + so(d.chiPhiKhac)
+  let gia = 0
+  if (chiPhiThat > 0) {
+    if (sp.cheDo === 'gia_ban') gia = so(d.giaNiemYet)
+    else if (sp.kieu === 'tien') gia = timGiaTheoTien(d, so(d.loiTien))
+    else gia = timGiaBan(d, so(d.bienMongMuon))
+  }
+  const dd = { ...d, giaNiemYet: gia }
+  const kq = tinhToan(dd)
+  const chuaDu = chiPhiThat <= 0 || kq.giaSauGiam <= 0
+  const hoaVon = chuaDu ? 0 : timGiaHoaVon(d)
+  const khongSale = tinhToan({ ...dd, giamGiaPct: 0, voucherShop: 0 })
+  return { d: dd, kq, chuaDu, lo: !chuaDu && kq.loiNhuan < 0, hoaVon, khongSale, gia }
+}
+
+// Các dòng của bảng dòng tiền (dùng chung cho màn hình và file Excel)
+export function dongTien(kq, d) {
+  const r = []
+  const them = (nhan, tien, loai = '') => r.push({ nhan, tien, loai })
+  them('Giá niêm yết', kq.giaNiemYet, 'dam')
+  if (kq.giamGia > 0) them(`Giảm giá chương trình (${so(d.giamGiaPct)}%)`, -kq.giamGia)
+  if (kq.voucherShop > 0) them('Mã giảm của shop', -kq.voucherShop)
+  them('Khách thực trả', kq.giaSauGiam, 'dam')
+  them('Giá vốn', -kq.giaVon)
+  if (kq.dongGoi > 0) them('Đóng gói, nhân công', -kq.dongGoi)
+  if (kq.chiPhiKhac > 0) them('Chi phí khác', -kq.chiPhiKhac)
+  them(`Phí cố định (${kq.phiCoDinhPct}%)`, -kq.phiCoDinh)
+  them(`Phí xử lý giao dịch (${d.phiXuLyPct}%)`, -kq.phiXuLy)
+  them('Phí hạ tầng', -kq.phiHaTang)
+  if (kq.phiVoucherXtra > 0) them('Voucher Xtra', -kq.phiVoucherXtra)
+  if (kq.phiDongTaiTro > 0) them('Đồng tài trợ mã ưu đãi', -kq.phiDongTaiTro)
+  if (kq.phiFreeship > 0) them('Freeship Xtra', -kq.phiFreeship)
+  if (kq.phiPiShip > 0) them('Gói PiShip', -kq.phiPiShip)
+  if (kq.phiAffiliate > 0) them(`Tiếp thị liên kết (${so(d.affiliatePct)}%)`, -kq.phiAffiliate)
+  if (kq.phiQuangCao > 0) them(`Quảng cáo (${so(d.quangCaoPct)}%)`, -kq.phiQuangCao)
+  if (kq.thue > 0) them(`Thuế (${d.thuePct}%)`, -kq.thue)
+  them('Lợi nhuận còn lại', kq.loiNhuan, 'tong')
+  return r
+}
