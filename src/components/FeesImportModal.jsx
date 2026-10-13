@@ -121,6 +121,7 @@ export default function FeesImportModal({ onXong }) {
         const bangPdf = await docBangTuPdf(pdfjs, buf)
         if (bangPdf.length < 2) { setLoi('Không đọc được dòng dữ liệu nào trong file PDF. Nếu PDF là ảnh chụp/scan thì cần dùng file Excel.'); return }
         xuLyBang(bangPdf)
+        if (!bangPdf.slice(1).some((r) => r[0])) setLoi('Không đọc được dòng dữ liệu hợp lệ từ PDF. ' + (bangPdf.info || '') + ' Chị gửi em file PDF này để em chỉnh.')
         if (inputRef.current) inputRef.current.value = ''
         return
       }

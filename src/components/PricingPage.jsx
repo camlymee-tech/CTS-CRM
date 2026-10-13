@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Settings2, Plus, Trash2, Pencil, TriangleAlert, Tag, Search, X, Copy, Save, FileDown,
-  FolderOpen, Target, Swords, Percent, ChevronDown, FilePlus2,
+  FolderOpen, ImagePlus, Target, Swords, Percent, ChevronDown, FilePlus2,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Badge, Modal } from './ui'
@@ -16,11 +16,26 @@ async function layHet(truyVan) {
   const tatCa = []
   for (let tu = 0; tu < 100000; tu += 1000) {
     const { data, error } = await truyVan().range(tu, tu + 999)
-    if (error || !data) break
+    if (error) throw error
+    if (!data) break
     tatCa.push(...data)
     if (data.length < 1000) break
   }
   return tatCa
+}
+
+// Thu nhỏ ảnh về tối đa 500px (JPEG) để lưu gọn cùng nhóm sản phẩm
+async function nenAnh(file) {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Không đọc được ảnh')); i.src = url })
+    const k = Math.min(1, 500 / Math.max(img.width, img.height))
+    const cv = document.createElement('canvas')
+    cv.width = Math.max(1, Math.round(img.width * k)); cv.height = Math.max(1, Math.round(img.height * k))
+    const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height)
+    cx.drawImage(img, 0, 0, cv.width, cv.height)
+    return cv.toDataURL('image/jpeg', 0.82)
+  } finally { URL.revokeObjectURL(url) }
 }
 
 const nhap = (v) => (v === '' || v === null || v === undefined ? '' : Number(v).toLocaleString('vi-VN'))
@@ -37,9 +52,10 @@ const F_MAC_DINH = {
   voucherXtra: false, maUuDai: '', freeshipXtra: false, piship: false,
   coThue: true, nguoiBanMoi: false,
   bienMongMuon: 20, loiTien: '', laiVonPct: 30,
+  dongGoiKieu: 'tien', dongGoiPct: '',
 }
 const spMoi = (goc) => ({
-  id: uid(), ten: '', nganh1: '', nganh2: '', khoangPhi: null,
+  id: uid(), ten: '', anh: '', nganh1: '', nganh2: '', khoangPhi: null,
   cheDo: goc?.cheDo || 'loi_nhuan', kieu: goc?.kieu || 'pct',
   f: { ...F_MAC_DINH, ...(goc ? { quangCaoPct: goc.f.quangCaoPct, coThue: goc.f.coThue, nguoiBanMoi: goc.f.nguoiBanMoi } : {}) },
 })
@@ -53,6 +69,7 @@ export default function PricingPage({ currentProfile }) {
   const [fees, setFees] = useState([])
   const [cfg, setCfg] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loiTai, setLoiTai] = useState('')
   const [moBangPhi, setMoBangPhi] = useState(false)
 
   const [sps, setSps] = useState(() => [spMoi()])
@@ -75,10 +92,11 @@ export default function PricingPage({ currentProfile }) {
 
   async function load() {
     setLoading(true)
-    const [{ data: fs }, { data: st }] = await Promise.all([
-      layHet(() => supabase.from('shopee_fees').select('*').eq('active', true).order('nganh_1').order('nganh_2').order('id')),
-      supabase.from('shopee_settings').select('*').eq('id', 1).single(),
-    ])
+    setLoiTai('')
+    let fs = []
+    try { fs = await layHet(() => supabase.from('shopee_fees').select('*').eq('active', true).order('nganh_1').order('nganh_2').order('id')) }
+    catch (e) { setLoiTai(e.message || 'Không tải được bảng phí ngành hàng') }
+    const { data: st } = await supabase.from('shopee_settings').select('*').eq('id', 1).single()
     setFees(fs || [])
     setCfg(st || null)
     setLoading(false)
@@ -98,11 +116,12 @@ export default function PricingPage({ currentProfile }) {
   const suaSp = (patch) => sua(sp.id, (x) => ({ ...x, ...patch }))
   const suaF = (patch) => sua(sp.id, (x) => ({ ...x, f: { ...x.f, ...patch } }))
 
+  const feesKhoa = useMemo(() => fees.map((x) => ({ ...x, _k: boDau(`${x.nganh_1} ${x.nganh_2}`) })), [fees])
   const ketQuaTim = useMemo(() => {
     const tu = boDau(timNganh).trim().split(/\s+/).filter(Boolean)
     if (!tu.length) return []
-    return fees.filter((x) => tu.every((t) => boDau(`${x.nganh_1} ${x.nganh_2}`).includes(t))).slice(0, 40)
-  }, [fees, timNganh])
+    return feesKhoa.filter((x) => tu.every((t) => x._k.includes(t))).slice(0, 40)
+  }, [feesKhoa, timNganh])
 
   function chonNganh(item) {
     const coKhoang = item.phi_min != null && item.phi_max != null && item.phi_min !== item.phi_max
@@ -237,6 +256,7 @@ export default function PricingPage({ currentProfile }) {
                     <div className="flex items-start gap-2">
                       <span className={`mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold ${
                         dangChon ? 'bg-coral-500 text-white' : 'bg-slate-100 text-ink-600'}`}>{i + 1}</span>
+                      {x.anh && <img src={x.anh} alt="" className="h-9 w-9 flex-none rounded-md border border-slate-200 object-cover" />}
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-navy-900">{tenSp(x, i)}</p>
                         <p className="truncate text-xs text-ink-400">{CACH_TINH[x.cheDo]}</p>
@@ -287,6 +307,9 @@ export default function PricingPage({ currentProfile }) {
                   )}
                 </div>
                 <Panel so={1} title="Thông tin sản phẩm">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-[150px_1fr]">
+                  <AnhSp anh={sp.anh} onChange={(v) => suaSp({ anh: v })} onLoi={(t) => setTb({ loi: true, text: t })} />
+                  <div>
                   <Input label="Tên sản phẩm" value={sp.ten} placeholder={`Sản phẩm ${idx + 1}`}
                     onChange={(e) => suaSp({ ten: e.target.value })} />
                   <div className="relative mt-3">
@@ -308,7 +331,11 @@ export default function PricingPage({ currentProfile }) {
                     {moGoiY && timNganh.trim() && (
                       <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
                         {ketQuaTim.length === 0 ? (
-                          <p className="px-3 py-3 text-sm text-ink-400">Không tìm thấy ngành hàng nào. Thử từ khoá ngắn hơn.</p>
+                          <p className="px-3 py-3 text-sm text-ink-400">
+                            {loiTai ? `Không tải được bảng phí: ${loiTai}`
+                              : fees.length === 0 ? 'Chưa có dữ liệu ngành hàng. Quản trị vào "Bảng phí sàn" → "Nhập từ file" để nhập bảng phí.'
+                              : 'Không tìm thấy ngành hàng nào. Thử từ khoá ngắn hơn.'}
+                          </p>
                         ) : ketQuaTim.map((x) => (
                           <button type="button" key={x.id} onClick={() => chonNganh(x)}
                             className="flex w-full items-center gap-3 border-b border-slate-50 px-3 py-2 text-left last:border-0 hover:bg-slate-50">
@@ -328,12 +355,17 @@ export default function PricingPage({ currentProfile }) {
                       </div>
                     )}
                   </div>
+                  </div>
+                  </div>
                 </Panel>
 
                 <Panel so={2} title="Chi phí thật của sản phẩm">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                     <OTien label="Giá vốn / giá nhập" value={sp.f.giaVon} onChange={(v) => suaF({ giaVon: v })} />
-                    <OTien label="Đóng gói, nhân công" value={sp.f.dongGoi} onChange={(v) => suaF({ dongGoi: v })} />
+                    <OTienPt label="Đóng gói, nhân công" kieu={sp.f.dongGoiKieu} onKieu={(k) => suaF({ dongGoiKieu: k })}
+                      tien={sp.f.dongGoi} pct={sp.f.dongGoiPct}
+                      onTien={(v) => suaF({ dongGoi: v })} onPct={(v) => suaF({ dongGoiPct: v })}
+                      goiY={sp.f.dongGoiKieu === 'pct' ? `% trên giá vốn = ${vnd(tt.d.dongGoi)}` : 'Nhập số tiền hoặc chuyển sang %'} />
                     <OTien label="Chi phí khác" value={sp.f.chiPhiKhac} onChange={(v) => suaF({ chiPhiKhac: v })}
                       goiY="Kho bãi, dự phòng đổi trả..." />
                   </div>
@@ -479,8 +511,8 @@ export default function PricingPage({ currentProfile }) {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr>
-                    {['STT', 'Sản phẩm', 'Ngành hàng', 'Cách định giá', 'Chi phí thật', 'Giá niêm yết', 'Khách trả', 'Tổng phí sàn', 'Lợi nhuận / đơn', 'Biên LN', 'Lãi / vốn'].map((h, i) => (
-                      <th key={h} className={`border border-slate-300 bg-slate-100 px-2 py-2 text-xs font-semibold text-navy-900 ${i > 3 ? 'text-right' : 'text-left'}`}>{h}</th>
+                    {['STT', 'Hình', 'Sản phẩm', 'Ngành hàng', 'Cách định giá', 'Chi phí thật', 'Giá niêm yết', 'Khách trả', 'Tổng phí sàn', 'Lợi nhuận / đơn', 'Biên LN', 'Lãi / vốn'].map((h, i) => (
+                      <th key={h} className={`border border-slate-300 bg-slate-100 px-2 py-2 text-xs font-semibold text-navy-900 ${i > 4 ? 'text-right' : 'text-left'}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -492,6 +524,9 @@ export default function PricingPage({ currentProfile }) {
                       <tr key={x.id} onClick={() => setChon(x.id)}
                         className={`cursor-pointer ${x.id === sp.id ? 'bg-coral-50' : 'hover:bg-slate-50'}`}>
                         <td className="border border-slate-300 px-2 py-1.5 text-center">{i + 1}</td>
+                        <td className="border border-slate-300 p-1 text-center">
+                          {x.anh ? <img src={x.anh} alt="" className="mx-auto h-10 w-10 rounded object-cover" /> : <span className="text-ink-400">—</span>}
+                        </td>
                         <td className="border border-slate-300 px-2 py-1.5 font-medium text-navy-900">{tenSp(x, i)}</td>
                         <td className="border border-slate-300 px-2 py-1.5 text-ink-600">{x.nganh2 || '—'}</td>
                         <td className="border border-slate-300 px-2 py-1.5 text-ink-600">{CACH_TINH[x.cheDo]}</td>
@@ -520,6 +555,48 @@ export default function PricingPage({ currentProfile }) {
       )}
 
       {moBangPhi && <FeesModal cfg={cfg} onClose={() => { setMoBangPhi(false); load() }} />}
+    </div>
+  )
+}
+
+function AnhSp({ anh, onChange, onLoi }) {
+  const [keo, setKeo] = useState(false)
+  async function nhan(file) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { onLoi('Chị chọn file ảnh (JPG, PNG...) nhé.'); return }
+    try { onChange(await nenAnh(file)) } catch (e) { onLoi(e.message) }
+  }
+  return (
+    <div>
+      <span className="mb-1.5 block text-sm font-medium text-navy-900">Hình ảnh</span>
+      <div tabIndex={0}
+        onPaste={(e) => { const f = [...(e.clipboardData?.files || [])][0]; if (f) { e.preventDefault(); nhan(f) } }}
+        onDragOver={(e) => { e.preventDefault(); setKeo(true) }}
+        onDragLeave={() => setKeo(false)}
+        onDrop={(e) => { e.preventDefault(); setKeo(false); nhan(e.dataTransfer.files?.[0]) }}
+        className={`relative flex h-[150px] w-full items-center justify-center overflow-hidden rounded-xl border-2 border-dashed text-center outline-none focus:border-coral-500 ${
+          keo ? 'border-coral-500 bg-coral-50' : 'border-slate-300 bg-slate-50'}`}>
+        {anh ? (
+          <>
+            <img src={anh} alt="" className="h-full w-full object-contain" />
+            <button type="button" title="Xoá ảnh" onClick={() => onChange('')}
+              className="absolute right-1.5 top-1.5 rounded-full bg-white/90 p-1 text-ink-600 shadow hover:text-rose-500"><X size={14} /></button>
+          </>
+        ) : (
+          <label className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-1 px-2 text-xs text-ink-400">
+            <ImagePlus size={24} className="text-ink-400" />
+            <span className="font-medium text-ink-600">Tải ảnh lên</span>
+            <span>hoặc kéo thả, hoặc dán (Ctrl+V)</span>
+            <input type="file" accept="image/*" hidden onChange={(e) => { nhan(e.target.files?.[0]); e.target.value = '' }} />
+          </label>
+        )}
+      </div>
+      {anh && (
+        <label className="mt-1.5 block cursor-pointer text-center text-xs text-coral-500 hover:underline">
+          Đổi ảnh
+          <input type="file" accept="image/*" hidden onChange={(e) => { nhan(e.target.files?.[0]); e.target.value = '' }} />
+        </label>
+      )}
     </div>
   )
 }
@@ -658,6 +735,34 @@ function MocGia({ nhan, tien }) {
   )
 }
 
+function OTienPt({ label, kieu, onKieu, tien, pct, onTien, onPct, goiY }) {
+  const laPct = kieu === 'pct'
+  return (
+    <label className="flex flex-col gap-1.5 text-sm">
+      <span className="flex items-center justify-between font-medium text-navy-900">
+        {label}
+        <span className="inline-flex rounded-md bg-slate-100 p-0.5 text-xs font-normal">
+          {[['tien', 'đ'], ['pct', '%']].map(([k, l]) => (
+            <button key={k} type="button" onClick={() => onKieu(k)}
+              className={`rounded px-2 py-0.5 ${kieu === k || (!kieu && k === 'tien') ? 'bg-navy-900 text-white' : 'text-ink-600'}`}>{l}</button>
+          ))}
+        </span>
+      </span>
+      <div className="relative">
+        {laPct ? (
+          <input type="number" step="0.01" value={pct} placeholder="0" onChange={(e) => onPct(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-8 text-right text-sm outline-none focus:border-coral-500" />
+        ) : (
+          <input type="text" inputMode="numeric" value={nhap(tien)} placeholder="0" onChange={(e) => onTien(e.target.value.replace(/\D/g, ''))}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-8 text-right text-sm outline-none focus:border-coral-500" />
+        )}
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">{laPct ? '%' : 'đ'}</span>
+      </div>
+      {goiY && <span className="text-xs text-ink-400">{goiY}</span>}
+    </label>
+  )
+}
+
 function OTien({ label, value, onChange, goiY }) {
   return (
     <label className="flex flex-col gap-1.5 text-sm">
@@ -700,7 +805,8 @@ function FeesModal({ cfg, onClose }) {
 
   async function load() {
     setLoading(true)
-    const data = await layHet(() => supabase.from('shopee_fees').select('*').order('nganh_1').order('nganh_2').order('id'))
+    let data = []
+    try { data = await layHet(() => supabase.from('shopee_fees').select('*').order('nganh_1').order('nganh_2').order('id')) } catch (e) { data = [] }
     setFees(data || [])
     setLoading(false)
   }

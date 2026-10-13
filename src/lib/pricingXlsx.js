@@ -7,6 +7,11 @@ const fill = (c, argb) => { c.fill = { type: 'pattern', pattern: 'solid', fgColo
 const TIEN = '#,##0'
 const PT = '0.00%'
 
+const kichThuoc = (url) => new Promise((res) => {
+  const i = new Image(); i.onload = () => res([i.width, i.height]); i.onerror = () => res([1, 1]); i.src = url
+})
+const vuaKhung = (w, h, max) => { const k = Math.min(max / w, max / h); return { width: Math.round(w * k), height: Math.round(h * k) } }
+
 export async function xuatBangGia({ tenNhom, sps, kqs, cfg }) {
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
@@ -15,8 +20,8 @@ export async function xuatBangGia({ tenNhom, sps, kqs, cfg }) {
 
   // ===== Sheet 1: Tổng hợp =====
   const ws = wb.addWorksheet('Tổng hợp', { views: [{ showGridLines: false }], pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } })
-  const heads = ['STT', 'Sản phẩm', 'Ngành hàng', 'Cách định giá', 'Giá vốn', 'Chi phí thật', 'Giảm giá', 'Giá niêm yết', 'Khách trả', 'Tổng phí sàn', 'Lợi nhuận / đơn', 'Biên lợi nhuận', 'Lãi / vốn', 'Giá hoà vốn']
-  ws.columns = [6, 30, 28, 24, 14, 14, 11, 15, 15, 15, 16, 14, 12, 15].map((width) => ({ width }))
+  const heads = ['STT', 'Hình ảnh', 'Sản phẩm', 'Ngành hàng', 'Cách định giá', 'Giá vốn', 'Chi phí thật', 'Giảm giá', 'Giá niêm yết', 'Khách trả', 'Tổng phí sàn', 'Lợi nhuận / đơn', 'Biên lợi nhuận', 'Lãi / vốn', 'Giá hoà vốn']
+  ws.columns = [6, 13, 30, 28, 24, 14, 14, 11, 15, 15, 15, 16, 14, 12, 15].map((width) => ({ width }))
   const n = heads.length
   ws.mergeCells(1, 1, 1, n)
   let c = ws.getCell(1, 1); c.value = 'BẢNG TÍNH GIÁ BÁN SHOPEE'; c.font = { bold: true, size: 18, color: { argb: 'FFFFFFFF' } }; c.alignment = { vertical: 'middle', indent: 1 }; fill(c, NAVY); ws.getRow(1).height = 36
@@ -27,7 +32,7 @@ export async function xuatBangGia({ tenNhom, sps, kqs, cfg }) {
   const lai = coDu.filter((k) => !k.lo).length
   const bienTb = coDu.length ? coDu.reduce((s, k) => s + k.kq.bien, 0) / coDu.length : 0
   const the = [['Số sản phẩm', sps.length, '0'], ['Sản phẩm có lãi', lai, '0'], ['Sản phẩm bị lỗ', coDu.length - lai, '0'], ['Biên lợi nhuận trung bình', bienTb / 100, PT]]
-  const toa = [[1, 3], [4, 6], [7, 10], [11, 14]]
+  const toa = [[1, 4], [5, 7], [8, 11], [12, 15]]
   the.forEach(([nhan, gt, fmt], i) => {
     const [c1, c2] = toa[i]
     ws.mergeCells(4, c1, 4, c2); ws.mergeCells(5, c1, 5, c2)
@@ -48,19 +53,26 @@ export async function xuatBangGia({ tenNhom, sps, kqs, cfg }) {
     r += 1
     const k = kqs[i]; const o = k.kq
     const giaTri = k.chuaDu
-      ? [i + 1, ten(x, i), x.nganh2 || '', CACH_TINH[x.cheDo], o.giaVon, o.chiPhiThat, '', '', '', '', '', '', '', '']
-      : [i + 1, ten(x, i), x.nganh2 || '', CACH_TINH[x.cheDo], o.giaVon, o.chiPhiThat, Number(x.f.giamGiaPct || 0) / 100, o.giaNiemYet, o.giaSauGiam, o.tongPhi, o.loiNhuan, o.bien / 100, o.tyLeVon / 100, k.hoaVon]
-    const fmts = [0, 0, 0, 0, TIEN, TIEN, PT, TIEN, TIEN, TIEN, TIEN, PT, PT, TIEN]
+      ? [i + 1, '', ten(x, i), x.nganh2 || '', CACH_TINH[x.cheDo], o.giaVon, o.chiPhiThat, '', '', '', '', '', '', '', '']
+      : [i + 1, '', ten(x, i), x.nganh2 || '', CACH_TINH[x.cheDo], o.giaVon, o.chiPhiThat, Number(x.f.giamGiaPct || 0) / 100, o.giaNiemYet, o.giaSauGiam, o.tongPhi, o.loiNhuan, o.bien / 100, o.tyLeVon / 100, k.hoaVon]
+    const fmts = [0, 0, 0, 0, 0, TIEN, TIEN, PT, TIEN, TIEN, TIEN, TIEN, PT, PT, TIEN]
     giaTri.forEach((v, j) => {
       const cell = ws.getCell(r, j + 1); cell.value = v; if (fmts[j]) cell.numFmt = fmts[j]
       cell.border = vien
-      cell.alignment = { vertical: 'middle', horizontal: j === 0 ? 'center' : j < 4 ? 'left' : 'right', indent: j === 1 || j === 2 || j === 3 ? 1 : 0, wrapText: j === 2 }
+      cell.alignment = { vertical: 'middle', horizontal: j < 2 ? 'center' : j < 5 ? 'left' : 'right', indent: j >= 2 && j <= 4 ? 1 : 0, wrapText: j === 3 || j === 2 }
       if (i % 2) fill(cell, 'FFFAFBFC')
-      if (j === 7) cell.font = { bold: true, color: { argb: CHU } }
-      if (j === 10 && !k.chuaDu) cell.font = { bold: true, color: { argb: k.lo ? LO : LAI } }
+      if (j === 8) cell.font = { bold: true, color: { argb: CHU } }
+      if (j === 11 && !k.chuaDu) cell.font = { bold: true, color: { argb: k.lo ? LO : LAI } }
     })
-    ws.getRow(r).height = 24
+    ws.getRow(r).height = x.anh ? 60 : 24
   })
+  for (let i = 0; i < sps.length; i++) {
+    if (!sps[i].anh) continue
+    const [w, h] = await kichThuoc(sps[i].anh)
+    const id = wb.addImage({ base64: sps[i].anh, extension: 'jpeg' })
+    const kt = vuaKhung(w, h, 54)
+    ws.addImage(id, { tl: { col: 1.08, row: 7 + i + 0.07 }, ext: kt })
+  }
   r += 2
   ws.mergeCells(r, 1, r, n)
   c = ws.getCell(r, 1)
@@ -87,9 +99,21 @@ export async function xuatBangGia({ tenNhom, sps, kqs, cfg }) {
     x.alignment = { horizontal: i ? 'center' : 'left', vertical: 'middle', wrapText: true, indent: i ? 0 : 1 }; x.border = vien
   })
   hd.height = 34
-  w2.getCell(2, 1).value = ''
+  const coAnh = sps.some((x) => x.anh)
+  if (coAnh) {
+    const rA = w2.getRow(4)
+    const xa = rA.getCell(1); xa.value = 'Hình ảnh'; xa.border = vien; xa.font = { color: { argb: CHU } }; xa.alignment = { vertical: 'middle', indent: 1 }
+    for (let i = 0; i < sps.length; i++) {
+      const cell = rA.getCell(i + 2); cell.border = vien
+      if (!sps[i].anh) continue
+      const [w, h] = await kichThuoc(sps[i].anh)
+      const id = wb.addImage({ base64: sps[i].anh, extension: 'jpeg' })
+      w2.addImage(id, { tl: { col: i + 1.1, row: 3.07 }, ext: vuaKhung(w, h, 84) })
+    }
+    rA.height = 70
+  }
   dsNhan.forEach((nh, j) => {
-    const row = w2.getRow(4 + j)
+    const row = w2.getRow((coAnh ? 5 : 4) + j)
     const dam = ['Giá niêm yết', 'Khách thực trả', 'Lợi nhuận còn lại'].includes(nh)
     const x = row.getCell(1); x.value = nh; x.border = vien; x.alignment = { vertical: 'middle', indent: 1 }
     x.font = { bold: dam, color: { argb: CHU } }; if (dam) fill(x, nh === 'Lợi nhuận còn lại' ? XANH : XAM)

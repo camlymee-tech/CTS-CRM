@@ -135,8 +135,11 @@ export function timGiaTheoTien(d, tienMuc) {
 
 // Gom dữ liệu nhập + tham số phí sàn thành đầu vào cho tinhToan
 export function gomDuLieu(f, cfg) {
+  // Đóng gói, nhân công nhập theo % thì quy ra tiền: % trên giá vốn
+  const dongGoi = f.dongGoiKieu === 'pct' ? Math.round((so(f.giaVon) * so(f.dongGoiPct)) / 100) : f.dongGoi
   return {
     ...f,
+    dongGoi,
     phiXuLyPct: cfg?.phi_xu_ly ?? 6,
     phiHaTang: cfg?.phi_ha_tang ?? 3000,
     vxPct: cfg?.voucher_xtra_pct ?? 4,

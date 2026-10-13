@@ -5,6 +5,7 @@ const laPhanTram = (s) => /^\d{1,3}([.,]\d+)?\s*%?$/.test(String(s).trim())
 
 export async function docBangTuPdf(pdfjs, buf) {
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise
+  let tongSo = 0, tongChu = 0
   const bang = [['Ngành hàng cấp 1', 'Ngành hàng cấp 2', 'Ngành hàng cấp 3', 'Mức phí tiêu chuẩn', 'Mức phí ưu đãi cho Người bán mới']]
   let cot = null // vị trí các cột, lấy từ dòng tiêu đề (cột nào ở trang nào cũng dùng lại cho trang sau)
 
@@ -27,26 +28,18 @@ export async function docBangTuPdf(pdfjs, buf) {
         tam2: ud ? ud.x + ud.w / 2 : null,
         yTieuDe: Math.min(c1.y, c2?.y ?? c1.y, c3?.y ?? c1.y) - 1,
       }
-      // tiêu đề "Phí cố định áp dụng từ …" thường xuống nhiều dòng: lấy tâm của cả khối chữ nằm cùng cột
-      if (phi) {
-        const cung = it.filter((x) => x.x > (c3?.x ?? c2?.x ?? c1.x) + 60 && x.y >= cot.yTieuDe - 70 && !laPhanTram(x.s) && !(ud && Math.abs(x.x + x.w / 2 - cot.tam2) < 40 && x !== phi))
-        const trai = cung.filter((x) => !ud || x.x + x.w / 2 < (phi.x + (ud.x)) / 2)
-        if (trai.length) cot.tam1 = trai.reduce((s, x) => s + x.x + x.w / 2, 0) / trai.length
-      }
     }
     if (!cot) continue
 
-    if (c1) {
-      // tiêu đề nhiều dòng: đi xuống theo các dòng chữ (không phải số) nằm ở cột phí cho tới khi hết
-      let day = cot.yTieuDe
-      const trongCotPhi = it.filter((x) => !laPhanTram(x.s) && [cot.tam1, cot.tam2].some((t) => t != null && Math.abs(x.x + x.w / 2 - t) < 90) && x.y <= cot.yTieuDe + 12)
-        .sort((a, b) => b.y - a.y)
-      for (const x of trongCotPhi) { if (day - x.y <= 16) day = Math.min(day, x.y) }
-      cot.yTieuDe = day
-    }
-    const duoi = c1 ? cot.yTieuDe - 4 : Infinity // trang có tiêu đề thì chỉ lấy phần dưới tiêu đề
-    const chu = it.filter((x) => x.y < duoi && !(c1 && /^(stt|nganh hang cap|phi co dinh|muc phi|\(da bao gom)/.test(boDau(x.s))))
-    const so = chu.filter((x) => laPhanTram(x.s) && x.x + x.w / 2 > (cot.a3 ?? cot.a2 ?? cot.a1) + 40)
+    const kieuTieuDe = /^(stt|nganh hang cap|phi co dinh|muc phi|\(da bao gom|gtgt)/
+    const goc = it.filter((x) => !(c1 && kieuTieuDe.test(boDau(x.s))))
+    const phaiCot = (cot.a3 ?? cot.a2 ?? cot.a1) + 40
+    const so0 = goc.filter((x) => laPhanTram(x.s) && x.x + x.w / 2 > phaiCot && (!c1 || x.y < c1.y - 8))
+    // trang có tiêu đề: bỏ mọi chữ nằm trên dòng dữ liệu đầu tiên (tiêu đề nhiều dòng, nền đen/đỏ)
+    const yTren = c1 && so0.length ? Math.max(...so0.map((x) => x.y)) + 5 : Infinity
+    const chu = goc.filter((x) => x.y <= yTren)
+    const so = so0
+    tongSo += so.length; tongChu += chu.length
     if (!so.length) continue
 
     // mỗi số % tạo thành một dòng; số ở cột tiêu chuẩn thì xác định dòng, số ở cột ưu đãi gắn vào dòng cùng y
@@ -85,5 +78,6 @@ export async function docBangTuPdf(pdfjs, buf) {
     if (h[0]) { if (h[0] !== g1) { g1 = h[0]; if (!h[1]) g2 = '' } } else h[0] = g1
     if (h[1]) g2 = h[1]; else if (!h[2] && g2 && !h[1]) h[1] = g2; else if (h[2] && !h[1]) h[1] = g2
   }
+  bang.info = `Đọc ${pdf.numPages} trang, tìm thấy ${tongSo} số %, ${tongChu} ô chữ, ${bang.length - 1} dòng.`
   return bang
 }
