@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 import DanhSachBaoGia from './DanhSachBaoGia'
 import { Button } from './ui'
 import {
-  so, tinhThue, tinhXNK, TEN_DV, khungXNK,
+  so, tinhThue, tinhXNK, tinhOrder, TEN_DV, khungXNK, ORDER_MAC_DINH, SP_ORDER,
   MUA_BAN_MAC_DINH, VAN_CHUYEN_MAC_DINH, UY_THAC_MAC_DINH, SP_THUE, HINH_THUC_UT,
 } from '../lib/baoGia'
 import { xuatBaoGia } from '../lib/baoGiaXlsx'
@@ -50,17 +50,18 @@ function ThongTinChung({ st, up }) {
 }
 
 // ================= BẢNG KHAI BÁO THUẾ (Uỷ thác) =================
-function BangThue({ st, up }) {
+function BangThue({ st, up, khoa = false, phang = false, tieuDe }) {
   const th = useMemo(() => tinhThue(st), [st])
   const setSp = (i, p) => up({ sp: st.sp.map((x, j) => (j === i ? { ...x, ...p } : x)) })
   const heads = ['STT', 'Sản phẩm', 'Số lượng', 'Đơn giá khách báo (tệ)', 'Giá trị (tệ)', 'Tiền hàng (VND)', 'Đơn giá khai (USD)', 'Giá trị khai (USD)', 'Giá trị khai (VND)', 'TS thuế NK (%)', 'TS GTGT (%)', 'CBPG (%)', 'TTDB (%)', 'BVMT (VND)', 'Thuế NK', 'CBPG', 'TTDB', 'Thuế GTGT', 'Tổng thuế', '']
   return (
-    <div className="overflow-x-auto rounded-2xl bg-white p-4 shadow-sm">
+    <div className={phang ? 'overflow-x-auto' : 'overflow-x-auto rounded-2xl bg-white p-4 shadow-sm'}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="font-display font-semibold text-navy-900">1. Khai báo thuế theo sản phẩm</p>
+        <p className="font-display font-semibold text-navy-900">{tieuDe === undefined ? '1. Khai báo thuế theo sản phẩm' : tieuDe}</p>
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-sm"><span className="font-medium text-navy-900">Tỷ giá tệ (VND)</span>
-            <span className="w-28"><O v={st.tyGiaTe} set={(v) => up({ tyGiaTe: v })} /></span></label>
+            {khoa ? <span className="font-semibold text-navy-900">{vnd(so(st.tyGiaTe))}</span>
+              : <span className="w-28"><O v={st.tyGiaTe} set={(v) => up({ tyGiaTe: v })} /></span>}</label>
           <label className="flex items-center gap-2 text-sm"><span className="font-medium text-navy-900">Tỷ giá USD (VND)</span>
             <span className="w-28"><O v={st.tyGiaUsd} set={(v) => up({ tyGiaUsd: v })} /></span></label>
         </div>
@@ -73,9 +74,19 @@ function BangThue({ st, up }) {
             return (
               <tr key={i}>
                 <td className={`${TD} text-center`}>{i + 1}</td>
-                <td className={`${TD} min-w-[170px]`}><Chu v={p.ten} set={(v) => setSp(i, { ten: v })} ph={`Sản phẩm ${i + 1}`} /></td>
-                <td className={`${TD} w-24`}><O v={p.sl} set={(v) => setSp(i, { sl: v })} /></td>
-                <td className={`${TD} w-28`}><O v={p.dg} set={(v) => setSp(i, { dg: v })} tp /></td>
+                {khoa ? (
+                  <>
+                    <td className={`${TD} min-w-[170px]`}>{p.ten || `Sản phẩm ${i + 1}`}</td>
+                    <td className={`${TD} text-right`}>{vnd(so(p.sl))}</td>
+                    <td className={`${TD} text-right`}>{p.dg ? String(p.dg) : ''}</td>
+                  </>
+                ) : (
+                  <>
+                    <td className={`${TD} min-w-[170px]`}><Chu v={p.ten} set={(v) => setSp(i, { ten: v })} ph={`Sản phẩm ${i + 1}`} /></td>
+                    <td className={`${TD} w-24`}><O v={p.sl} set={(v) => setSp(i, { sl: v })} /></td>
+                    <td className={`${TD} w-28`}><O v={p.dg} set={(v) => setSp(i, { dg: v })} tp /></td>
+                  </>
+                )}
                 <td className={`${TD} text-right`}>{vnd(d.tri)}</td>
                 <td className={`${TD} text-right`}>{vnd(d.W)}</td>
                 <td className={`${TD} w-28`}><O v={p.dgUsd} set={(v) => setSp(i, { dgUsd: v })} tp /></td>
@@ -89,7 +100,7 @@ function BangThue({ st, up }) {
                 <td className={`${TD} text-right`}>{vnd(d.gtgt)}</td>
                 <td className={`${TD} bg-slate-50 text-right font-semibold`}>{vnd(d.tong)}</td>
                 <td className={`${TD} w-10 text-center`}>
-                  {st.sp.length > 1 && <button type="button" onClick={() => up({ sp: st.sp.filter((_, j) => j !== i) })} className="text-ink-400 hover:text-rose-500"><Trash2 size={15} /></button>}
+                  {!khoa && st.sp.length > 1 && <button type="button" onClick={() => up({ sp: st.sp.filter((_, j) => j !== i) })} className="text-ink-400 hover:text-rose-500"><Trash2 size={15} /></button>}
                 </td>
               </tr>
             )
@@ -112,7 +123,7 @@ function BangThue({ st, up }) {
         </tbody>
       </table>
       <div className="mt-3 flex items-center justify-between">
-        <Button variant="secondary" className="shrink-0 whitespace-nowrap" onClick={() => up({ sp: [...st.sp, SP_THUE()] })}><Plus size={16} />Thêm sản phẩm</Button>
+        {khoa ? <span /> : <Button variant="secondary" className="shrink-0 whitespace-nowrap" onClick={() => up({ sp: [...st.sp, SP_THUE()] })}><Plus size={16} />Thêm sản phẩm</Button>}
         <p className="ml-4 text-xs text-ink-400">Có đơn giá khai USD thì tính thuế trên giá trị khai (VND), không có thì tính trên tiền hàng theo tệ · Thuế NK = giá trị × TS NK · TTDB = (giá trị + thuế NK) × TS TTDB · GTGT = (giá trị + NK + CBPG + TTDB + BVMT) × TS GTGT</p>
       </div>
     </div>
@@ -120,17 +131,18 @@ function BangThue({ st, up }) {
 }
 
 // ================= VẬN CHUYỂN / UỶ THÁC (khung báo giá XNK) =================
-function BangXNK({ st, up, loai }) {
-  const kq = useMemo(() => tinhXNK(st, loai), [st, loai])
-  const khung = useMemo(() => khungXNK(st, kq, loai), [st, kq, loai])
+function BangXNK({ st, up, loai, order = false, phang = false, tieuDe }) {
+  const kq = useMemo(() => tinhXNK(st, loai, order), [st, loai, order])
+  const khung = useMemo(() => khungXNK(st, kq, loai, order), [st, kq, loai, order])
+  const KHUNG = phang ? 'overflow-x-auto rounded-xl border border-slate-200 p-4' : 'overflow-x-auto rounded-2xl bg-white p-4 shadow-sm'
   const nhapO = (x) => <O v={st[x.k]} set={(v) => up({ [x.k]: v })} tp={!!x.tp} />
   const hienO = (x) => (x && typeof x === 'object' ? nhapO(x) : x === undefined || x === null ? '' : vnd(x))
 
   return (
     <div className="space-y-5">
-      <div className="overflow-x-auto rounded-2xl bg-white p-4 shadow-sm">
+      <div className={KHUNG}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="font-display font-semibold text-navy-900">2. Báo giá {loai === 'uy_thac' ? 'dịch vụ uỷ thác xuất nhập khẩu' : loai === 'mua_ban' ? 'dịch vụ mua bán' : 'dịch vụ vận chuyển'}</p>
+          <p className="font-display font-semibold text-navy-900">{tieuDe !== undefined ? tieuDe : `2. Báo giá ${loai === 'uy_thac' ? 'dịch vụ uỷ thác xuất nhập khẩu' : loai === 'mua_ban' ? 'dịch vụ mua bán' : 'dịch vụ vận chuyển'}`}</p>
           <label className="flex items-center gap-2 text-sm"><span className="font-medium text-navy-900">Tuyến</span>
             <span className="w-28"><Chu v={st.tuyen} set={(v) => up({ tuyen: v })} /></span></label>
         </div>
@@ -162,7 +174,8 @@ function BangXNK({ st, up, loai }) {
         </table>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl bg-white p-4 shadow-sm">
+      {!order && (
+      <div className={KHUNG}>
         <p className="mb-3 font-display font-semibold text-navy-900">Tổng hợp so sánh: theo KG và theo M3</p>
         <table className="w-full min-w-[640px] border-collapse">
           <thead><tr>{['Nội dung', 'Theo KG', 'Theo M3'].map((h) => <th key={h} className={TH}>{h}</th>)}</tr></thead>
@@ -183,18 +196,208 @@ function BangXNK({ st, up, loai }) {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   )
 }
 
 // ================= TRANG CHÍNH =================
 const TABS = [
+  { key: 'order', ten: 'Báo giá Order' },
   { key: 'mua_ban', ten: 'Mua bán' },
   { key: 'van_chuyen', ten: 'Vận chuyển' },
   { key: 'uy_thac', ten: 'Uỷ thác' },
 ]
-const MAC_DINH = { mua_ban: MUA_BAN_MAC_DINH, van_chuyen: VAN_CHUYEN_MAC_DINH, uy_thac: UY_THAC_MAC_DINH }
+const MAC_DINH = { order: ORDER_MAC_DINH, mua_ban: MUA_BAN_MAC_DINH, van_chuyen: VAN_CHUYEN_MAC_DINH, uy_thac: UY_THAC_MAC_DINH }
 
+
+
+// ================= BÁO GIÁ ORDER: 4 bước =================
+const te2 = (n) => (Number(n) || 0).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const BUOC = [
+  { n: 1, ten: 'Giá xưởng', id: 'order-b1' },
+  { n: 2, ten: 'Khai thuế', id: 'order-b2' },
+  { n: 3, ten: 'Vận chuyển', id: 'order-b3' },
+  { n: 4, ten: 'Giá về tay', id: 'order-b4' },
+]
+const DICH_VU = [
+  { k: 'van_chuyen', ten: 'Vận chuyển', mota: 'Khách tự mua hàng, CTS vận chuyển và làm thủ tục' },
+  { k: 'uy_thac', ten: 'Uỷ thác XNK', mota: 'CTS đứng ra nhập khẩu uỷ thác cho khách' },
+  { k: 'mua_ban', ten: 'Mua bán', mota: 'CTS mua hàng và bán lại cho khách' },
+]
+
+function Buoc({ n, id, ten, mota, children }) {
+  return (
+    <section id={id} className="flex min-h-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+      <div className="flex items-start gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+        <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-coral-500 font-display text-sm font-bold text-white shadow-sm shadow-coral-500/30">{n}</span>
+        <div className="min-w-0">
+          <h2 className="font-display text-base font-bold text-navy-900">{ten}</h2>
+          <p className="text-xs text-ink-600">{mota}</p>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-4">{children}</div>
+    </section>
+  )
+}
+
+function OrderFlow({ st, up }) {
+  const kq = useMemo(() => tinhOrder(st), [st])
+  const setSp = (i, p) => {
+    const sp = st.sp.map((x, j) => (j === i ? { ...x, ...p } : x))
+    const extra = {}
+    if ('can' in p || 'khoi' in p) {
+      // cân và khối tổng tự chuyển sang bước vận chuyển
+      const tong = (k) => sp.reduce((a, x) => a + so(x[k]), 0)
+      const chuoi = (n) => (n > 0 ? String(Math.round(n * 1000) / 1000).replace('.', ',') : '')
+      extra.kg = chuoi(tong('can')); extra.m3 = chuoi(tong('khoi'))
+    }
+    up({ sp, ...extra })
+  }
+  const nhay = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const tongCan = st.sp.reduce((a, x) => a + so(x.can), 0)
+  const tongKhoi = st.sp.reduce((a, x) => a + so(x.khoi), 0)
+  const reHon = kq.ve.kg.motSp && kq.ve.m3.motSp ? (kq.ve.kg.motSp <= kq.ve.m3.motSp ? 'kg' : 'm3') : null
+  const heads1 = ['STT', 'Sản phẩm', 'Link SP', 'Cân (KG)', 'Khối (M3)', 'Số lượng', 'Giá web (¥)', 'Ship nội địa (¥)', 'Giá trị đơn hàng (¥)', '']
+
+  return (
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2" style={{ gridAutoRows: 'minmax(430px, calc((100vh - 270px) / 2))' }}>
+      {/* BƯỚC 1 */}
+      <Buoc n={1} id="order-b1" ten="Giá xưởng" mota="Sản phẩm khách order: số lượng, giá web (tệ), ship nội địa TQ, cân và khối">
+        <div className="mb-3 flex flex-wrap items-end gap-3">
+          {[['tyGiaTe', 'Tỷ giá tệ (VND)', false], ['phiDVPct', 'Tỷ lệ phí dịch vụ mua hàng (%)', true], ['tamUngPct', 'Tiền tạm ứng (%)', true]].map(([k, nhan, tp]) => (
+            <label key={k} className="flex w-44 flex-col gap-1 text-xs"><span className="font-medium text-navy-900">{nhan}</span>
+              <O v={st[k]} set={(v) => up({ [k]: v })} tp={tp} /></label>
+          ))}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] border-collapse">
+            <thead><tr>{heads1.map((h, i) => <th key={i} className={TH}>{h}</th>)}</tr></thead>
+            <tbody>
+              {st.sp.map((p, i) => (
+                <tr key={i}>
+                  <td className={`${TD} text-center`}>{i + 1}</td>
+                  <td className={`${TD} min-w-[170px]`}><Chu v={p.ten} set={(v) => setSp(i, { ten: v })} ph={`Sản phẩm ${i + 1}`} /></td>
+                  <td className={`${TD} min-w-[140px]`}><Chu v={p.link} set={(v) => setSp(i, { link: v })} ph="Dán link" /></td>
+                  <td className={`${TD} w-24`}><O v={p.can} set={(v) => setSp(i, { can: v })} tp /></td>
+                  <td className={`${TD} w-24`}><O v={p.khoi} set={(v) => setSp(i, { khoi: v })} tp /></td>
+                  <td className={`${TD} w-24`}><O v={p.sl} set={(v) => setSp(i, { sl: v })} /></td>
+                  <td className={`${TD} w-28`}><O v={p.dg} set={(v) => setSp(i, { dg: v })} tp /></td>
+                  <td className={`${TD} w-28`}><O v={p.ship} set={(v) => setSp(i, { ship: v })} tp /></td>
+                  <td className={`${TD} bg-amber-50 text-right font-semibold`}>{te2(kq.tri[i])}</td>
+                  <td className={`${TD} w-10 text-center`}>
+                    {st.sp.length > 1 && <button type="button" onClick={() => { const sp = st.sp.filter((_, j) => j !== i); up({ sp }) }} className="text-ink-400 hover:text-rose-500"><Trash2 size={15} /></button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-3">
+          <Button variant="secondary" className="whitespace-nowrap" onClick={() => up({ sp: [...st.sp, SP_ORDER()] })}><Plus size={16} />Thêm sản phẩm</Button>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead><tr>{['STT', 'Nội dung', 'Số tiền (¥ - RMB)', 'Quy đổi VND'].map((h) => <th key={h} className={TH}>{h}</th>)}</tr></thead>
+            <tbody>
+              {[
+                ['1', 'Giá trị đơn hàng', kq.gt1],
+                ['2', 'Tổng tiền ship nội địa', kq.ship],
+                ['3', 'Giá trị đơn hàng + ship nội địa TQ', kq.gt3],
+                ['4', `Phí dịch vụ mua hàng (${pt2(so(st.phiDVPct))})`, kq.phi],
+                ['5', 'TỔNG PHẢI THANH TOÁN', kq.tong, 'bg-orange-100 font-bold'],
+                ['6', `${pt2(so(st.tamUngPct))} tiền tạm ứng`, kq.tamUng],
+              ].map(([stt, nd, v, cls = '']) => (
+                <tr key={stt} className={cls}>
+                  <td className={`${TD} w-14 text-center`}>{stt}</td><td className={TD}>{nd}</td>
+                  <td className={`${TD} text-right`}>¥ {te2(v.te)}</td><td className={`${TD} text-right`}>{vnd(v.vnd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Buoc>
+
+      {/* BƯỚC 2 */}
+      <Buoc n={2} id="order-b2" ten="Khai thuế" mota="Số lượng và giá lấy từ bước 1. Nhập giá khai USD (nếu có) và thuế suất">
+        <BangThue st={st} up={up} khoa phang tieuDe={null} />
+      </Buoc>
+
+      {/* BƯỚC 3 */}
+      <Buoc n={3} id="order-b3" ten="Vận chuyển" mota="Chọn 1 trong 3 dịch vụ. Tiền hàng và phí mua hàng đã tính ở bước 1">
+        <div className="mb-3 grid gap-2 sm:grid-cols-3">
+          {DICH_VU.map((d) => (
+            <button key={d.k} type="button"
+              onClick={() => up({ dichVu: d.k, ...(d.k === 'uy_thac' ? { phiTach: HINH_THUC_UT[st.hinhThuc]?.phiTach || st.phiTach } : {}) })}
+              className={`rounded-xl border-2 px-3 py-2 text-left transition ${st.dichVu === d.k ? 'border-coral-500 bg-orange-50' : 'border-slate-200 hover:border-slate-300'}`}>
+              <p className="font-semibold text-navy-900">{d.ten}</p>
+              <p className="hidden text-xs text-ink-600 2xl:block">{d.mota}</p>
+            </button>
+          ))}
+        </div>
+        {st.dichVu === 'uy_thac' && (
+          <label className="mb-4 flex max-w-sm flex-col gap-1 text-sm"><span className="font-medium text-navy-900">Hình thức uỷ thác</span>
+            <select value={st.hinhThuc} onChange={(e) => up({ hinhThuc: e.target.value, phiTach: HINH_THUC_UT[e.target.value].phiTach })}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500">
+              {Object.entries(HINH_THUC_UT).map(([k, v]) => <option key={k} value={k}>{v.ten}</option>)}
+            </select></label>
+        )}
+        <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-ink-600">
+          Cân và khối lấy từ bước 1: <b className="text-navy-900">{tongCan.toLocaleString('vi-VN')} KG</b> và <b className="text-navy-900">{tongKhoi.toLocaleString('vi-VN')} M3</b>. Cần chỉnh thì sửa trực tiếp ở dòng cước bên dưới.
+        </p>
+        <BangXNK st={st} up={up} loai={st.dichVu} order phang tieuDe="Báo giá vận chuyển" />
+      </Buoc>
+
+      {/* BƯỚC 4 */}
+      <Buoc n={4} id="order-b4" ten="Giá về tay" mota="Tiền hàng bước 1 + vận chuyển và thuế bước 2, 3, chia cho số lượng">
+        <div className="mb-3 grid gap-3 sm:grid-cols-2">
+          {[['kg', 'Vận chuyển theo KG'], ['m3', 'Vận chuyển theo M3']].map(([k, nhan]) => (
+            <div key={k} className={`rounded-2xl border-2 p-4 ${reHon === k ? 'border-emerald-400 bg-emerald-50/60' : 'border-slate-200 bg-slate-50'}`}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-ink-600">{nhan}</p>
+                {reHon === k && <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-xs font-semibold text-white">Rẻ hơn</span>}
+              </div>
+              <p className="mt-1 font-display text-2xl font-bold text-navy-900">{vnd(kq.ve[k].motSp)} <span className="text-base font-medium text-ink-600">đ / sản phẩm</span></p>
+              <p className="mt-1 text-sm text-ink-600">Tổng tiền hàng về tay: <b className="text-navy-900">{vnd(kq.ve[k].tongVe)}</b></p>
+            </div>
+          ))}
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead><tr>{['Nội dung', 'Theo KG', 'Theo M3'].map((h) => <th key={h} className={TH}>{h}</th>)}</tr></thead>
+            <tbody>
+              <tr><td className={TD}>Tổng số lượng sản phẩm</td><td className={`${TD} text-right`}>{vnd(kq.tongSl)}</td><td className={`${TD} text-right`}>{vnd(kq.tongSl)}</td></tr>
+              <tr><td className={TD}>Tổng phải thanh toán tiền hàng (bước 1, đã gồm phí mua hàng)</td><td className={`${TD} text-right`}>{vnd(kq.tong.vnd)}</td><td className={`${TD} text-right`}>{vnd(kq.tong.vnd)}</td></tr>
+              <tr><td className={TD}>Chi phí vận chuyển + thuế (bước 2 và 3)</td><td className={`${TD} text-right`}>{vnd(kq.ve.kg.vc)}</td><td className={`${TD} text-right`}>{vnd(kq.ve.m3.vc)}</td></tr>
+              <tr className="bg-slate-100 font-bold"><td className={TD}>TỔNG TIỀN HÀNG VỀ TAY</td><td className={`${TD} text-right`}>{vnd(kq.ve.kg.tongVe)}</td><td className={`${TD} text-right`}>{vnd(kq.ve.m3.tongVe)}</td></tr>
+              <tr className="bg-orange-100 font-bold"><td className={TD}>GIÁ VỀ TAY 1 SẢN PHẨM</td><td className={`${TD} text-right text-base`}>{vnd(kq.ve.kg.motSp)}</td><td className={`${TD} text-right text-base`}>{vnd(kq.ve.m3.motSp)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        {st.sp.length > 1 && (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead><tr>{['Sản phẩm', 'SL', 'Giá về tay 1 SP theo KG', 'Giá về tay 1 SP theo M3'].map((h) => <th key={h} className={TH}>{h}</th>)}</tr></thead>
+              <tbody>
+                {st.sp.map((x, i) => (
+                  <tr key={i}>
+                    <td className={TD}>{x.ten || `Sản phẩm ${i + 1}`}</td>
+                    <td className={`${TD} text-right`}>{vnd(so(x.sl))}</td>
+                    <td className={`${TD} text-right font-semibold`}>{vnd(kq.ve.kg.dong[i]?.mot)}</td>
+                    <td className={`${TD} text-right font-semibold`}>{vnd(kq.ve.m3.dong[i]?.mot)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-2 text-xs text-ink-400">Chi phí vận chuyển chia theo tỷ lệ giá trị hàng; thuế tính đúng theo từng sản phẩm.</p>
+          </div>
+        )}
+      </Buoc>
+    </div>
+  )
+}
 
 // Chọn khách hàng để gắn báo giá (tìm theo tên, mã hoặc số điện thoại)
 function ChonKhach({ khach, onChon }) {
@@ -244,9 +447,9 @@ function ChonKhach({ khach, onChon }) {
 
 // Phần tính báo giá. khachCo: khách cố định (khi mở từ hồ sơ khách). baoGiaMo: báo giá đã lưu cần mở lại.
 export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, onSaved, onClose, duoi = null }) {
-  const [tab, setTab] = useState(baoGiaMo?.loai || 'mua_ban')
+  const [tab, setTab] = useState(baoGiaMo?.loai || 'order')
   const [data, setData] = useState(() => {
-    const d = { mua_ban: MUA_BAN_MAC_DINH(), van_chuyen: VAN_CHUYEN_MAC_DINH(), uy_thac: UY_THAC_MAC_DINH() }
+    const d = { order: ORDER_MAC_DINH(), mua_ban: MUA_BAN_MAC_DINH(), van_chuyen: VAN_CHUYEN_MAC_DINH(), uy_thac: UY_THAC_MAC_DINH() }
     if (baoGiaMo) d[baoGiaMo.loai] = { ...d[baoGiaMo.loai], ...baoGiaMo.du_lieu }
     return d
   })
@@ -266,10 +469,11 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
   async function luu() {
     if (!khach) { alert('Chọn khách hàng để lưu báo giá vào hồ sơ khách.'); return }
     setDangLuu(true)
-    const kq = tinhXNK(st, tab)
+    const tong = tab === 'order' ? tinhOrder(st).ve : null
+    const kq = tab === 'order' ? null : tinhXNK(st, tab)
     const row = {
       customer_id: khach.id, loai: tab, ten: (st.ma || '').trim() || `Báo giá ${TEN_DV[tab].toLowerCase()}`,
-      du_lieu: st, tong_kg: kq.kg.phaiTra, tong_m3: kq.m3.phaiTra, updated_at: new Date().toISOString(),
+      du_lieu: st, tong_kg: tong ? tong.kg.tongVe : kq.kg.phaiTra, tong_m3: tong ? tong.m3.tongVe : kq.m3.phaiTra, updated_at: new Date().toISOString(),
     }
     const { data: r, error } = idLuu
       ? await supabase.from('bao_gia').update(row).eq('id', idLuu).select('id').single()
@@ -296,21 +500,34 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
       </header>
 
       <div className="space-y-5 p-8">
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
+        {tab !== 'order' && <div className="rounded-2xl bg-white p-4 shadow-sm">
           <p className="mb-1.5 text-sm font-medium text-navy-900">Khách hàng của báo giá {!khach && <span className="font-normal text-rose-500">(chọn để lưu vào hồ sơ)</span>}</p>
           <ChonKhach khach={khach} onChon={khachCo ? null : chonKhach} />
-        </div>
+        </div>}
 
         <div className="flex gap-2">
           {TABS.map((t) => (
             <button key={t.key} type="button" onClick={() => doiTab(t.key)}
               className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${tab === t.key ? 'bg-navy-900 text-white shadow-sm' : 'bg-white text-ink-600 hover:bg-slate-100'}`}>
-              Dịch vụ {t.ten}
+              {t.key === 'order' ? t.ten : `Dịch vụ ${t.ten}`}
             </button>
           ))}
         </div>
 
-        <ThongTinChung st={st} up={up} />
+        {tab !== 'order' && <ThongTinChung st={st} up={up} />}
+        {tab === 'order' && (
+          <div className="flex flex-wrap items-end gap-4 rounded-2xl bg-white p-4 shadow-sm">
+            <div className="min-w-[300px] flex-1">
+              <p className="mb-1.5 text-sm font-medium text-navy-900">Khách hàng của báo giá {!khach && <span className="font-normal text-rose-500">(chọn để lưu vào hồ sơ)</span>}</p>
+              <ChonKhach khach={khach} onChon={khachCo ? null : chonKhach} />
+            </div>
+            <label className="flex w-56 flex-col gap-1 text-sm"><span className="font-medium text-navy-900">Tên in trên báo giá</span>
+              <Chu v={st.khach} set={(v) => up({ khach: v })} ph="VD: Anh Minh - Shop ABC" /></label>
+            <label className="flex w-44 flex-col gap-1 text-sm"><span className="font-medium text-navy-900">Mã báo giá</span>
+              <Chu v={st.ma} set={(v) => up({ ma: v })} ph="VD: CTS38001" /></label>
+          </div>
+        )}
+        {tab === 'order' && <OrderFlow st={st} up={up} />}
         {tab === 'uy_thac' && (
           <div className="flex flex-wrap items-end gap-4 rounded-2xl bg-white p-4 shadow-sm">
             <label className="flex min-w-[320px] flex-col gap-1 text-sm"><span className="font-medium text-navy-900">Hình thức uỷ thác</span>
@@ -322,8 +539,8 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
             <p className="pb-2 text-xs text-ink-400">Chọn hình thức sẽ tự điền phí tách tờ khai (3.000.000 hoặc 5.000.000), vẫn sửa tay được.</p>
           </div>
         )}
-        <BangThue st={st} up={up} />
-        <BangXNK st={st} up={up} loai={tab} />
+        {tab !== 'order' && <BangThue st={st} up={up} />}
+        {tab !== 'order' && <BangXNK st={st} up={up} loai={tab} />}
         {duoi}
       </div>
     </div>

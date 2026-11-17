@@ -50,12 +50,13 @@ export function tinhThue(st) {
   return { dong, tong: t }
 }
 
-export function tinhXNK(st, loai) {
+export function tinhXNK(st, loai, order = false) {
   const th = tinhThue(st)
   const thue = th.tong
   const tienHang = th.dong.reduce((a, d) => a + d.W, 0)
-  const muaBan = loai === 'mua_ban'
-  const coPhiMua = muaBan || loai === 'uy_thac'
+  // order = true: tiền hàng và phí mua hàng đã tính ở bước giá xưởng nên không tính lại ở phần vận chuyển
+  const muaBan = loai === 'mua_ban' && !order
+  const coPhiMua = !order && (loai === 'mua_ban' || loai === 'uy_thac')
   const phiMua = coPhiMua ? lam(tienHang * so(st.phiMuaPct) / 100) : 0
 
   const phiTach = lam(so(st.phiTach))
@@ -92,9 +93,9 @@ export function tinhXNK(st, loai) {
 
 // Khung bảng báo giá (dùng chung cho màn hình và file Excel).
 // sl / dg: số (hiện chữ), hoặc {k, tp} = ô nhập gắn với st[k] (tp = cho phép số lẻ), hoặc {fix:số}.
-export function khungXNK(st, kq, loai) {
-  const muaBan = loai === 'mua_ban'
-  const coPhiMua = muaBan || loai === 'uy_thac'
+export function khungXNK(st, kq, loai, order = false) {
+  const muaBan = loai === 'mua_ban' && !order
+  const coPhiMua = !order && (loai === 'mua_ban' || loai === 'uy_thac')
   const o = coPhiMua ? 1 : 0
   const n = (x) => String(x + o)
   const tuyen = st.tuyen || 'BT-HN'
@@ -133,7 +134,7 @@ export function khungXNK(st, kq, loai) {
   return R
 }
 
-export const TEN_DV = { mua_ban: 'MUA BÁN', van_chuyen: 'VẬN CHUYỂN', uy_thac: 'UỶ THÁC XUẤT NHẬP KHẨU' }
+export const TEN_DV = { order: 'ORDER', mua_ban: 'MUA BÁN', van_chuyen: 'VẬN CHUYỂN', uy_thac: 'UỶ THÁC XUẤT NHẬP KHẨU' }
 
 // Khung báo giá Mua bán (cùng kiểu bảng STT / Nội dung / ĐVT / Số lượng / Đơn giá / Thành tiền với 2 dịch vụ kia).
 // sl / dg: số, hoặc {sp: số thứ tự sản phẩm, k: tên trường, tp: cho số lẻ}
@@ -156,4 +157,57 @@ export function khungMuaBan(st, kq) {
     ]
     return { ten: p.ten || `Sản phẩm ${i + 1}`, rows }
   })
+}
+
+// ============ BÁO GIÁ ORDER: giá xưởng → khai thuế → vận chuyển → giá về tay ============
+export const SP_ORDER = () => ({
+  ten: '', link: '', can: '', khoi: '', sl: '', dg: '', ship: '',
+  dgUsd: '', nk: '', gtgt: '8', cbpg: '', ttdb: '', bvmt: '',
+})
+export const ORDER_MAC_DINH = () => ({
+  ...XNK_CHUNG(), hinhThuc: 'ut', dichVu: 'van_chuyen', phiDVPct: '2', tamUngPct: '80', sp: [SP_ORDER()],
+})
+
+export function tinhOrder(st) {
+  const ty = so(st.tyGiaTe), pct = so(st.phiDVPct), tamUng = so(st.tamUngPct)
+  const sps = st.sp || []
+  const tri = sps.map((p) => so(p.sl) * so(p.dg))                       // giá trị đơn hàng từng sản phẩm (tệ)
+  const ship = sps.map((p) => so(p.ship))                               // ship nội địa TQ từng sản phẩm (tệ)
+  const gt1 = tri.reduce((a, b) => a + b, 0)
+  const shipTong = ship.reduce((a, b) => a + b, 0)
+  const gt3 = gt1 + shipTong
+  const phi = gt3 * pct / 100
+  const tong = gt3 + phi
+  const r = {
+    gt1: { te: gt1, vnd: lam(gt1 * ty) },
+    ship: { te: shipTong, vnd: lam(shipTong * ty) },
+    gt3: { te: gt3, vnd: lam(gt3 * ty) },
+    phi: { te: phi, vnd: lam(phi * ty) },
+  }
+  r.tong = { te: tong, vnd: r.gt3.vnd + r.phi.vnd }
+  r.tamUng = { te: tong * tamUng / 100, vnd: lam(tong * tamUng / 100 * ty) }
+
+  // phần vận chuyển + thuế theo dịch vụ đã chọn (bỏ tiền hàng và phí mua hàng vì đã tính ở trên)
+  const xnk = tinhXNK(st, st.dichVu || 'van_chuyen', true)
+  const thue = tinhThue(st)
+  const tongSl = sps.reduce((a, p) => a + so(p.sl), 0)
+
+  const ve = (k) => {
+    const vc = xnk[k].phaiTra
+    const tongVe = r.tong.vnd + vc
+    // chia chi phí vận chuyển cho từng sản phẩm theo tỷ lệ giá trị hàng, thuế tính đúng theo sản phẩm
+    const phanChia = vc - xnk.thue.tong
+    const dong = sps.map((p, i) => {
+      const w = gt3 > 0 ? (tri[i] + ship[i]) / gt3 : 0
+      const hang = lam((tri[i] + ship[i]) * ty * (1 + pct / 100))
+      const tong1 = hang + (thue.dong[i]?.tong || 0) + lam(phanChia * w)
+      return { tong: tong1, mot: so(p.sl) ? lam(tong1 / so(p.sl)) : 0 }
+    })
+    return { vc, tongVe, motSp: tongSl ? lam(tongVe / tongSl) : 0, dong }
+  }
+  r.xnk = xnk
+  r.tongSl = tongSl
+  r.ve = { kg: ve('kg'), m3: ve('m3') }
+  r.tri = tri
+  return r
 }

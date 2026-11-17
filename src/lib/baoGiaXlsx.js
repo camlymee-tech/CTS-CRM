@@ -39,22 +39,25 @@ const pt = (v) => (so(v) ? `${so(v).toFixed(2).replace('.', ',')}%` : '')
 export async function xuatBaoGia({ loai, st }) {
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
-  const ten = `Báo giá dịch vụ ${TEN_DV[loai]}`
-  const ws = wb.addWorksheet('Báo giá', { views: [{ showGridLines: false }], pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } })
+  const order = loai === 'order'
+  const dv = order ? (st.dichVu || 'van_chuyen') : loai
+  const ten = order ? 'Báo giá order' : `Báo giá dịch vụ ${TEN_DV[loai]}`
+  if (order) sheetOrder(wb, st)
+  const ws = wb.addWorksheet(order ? 'Vận chuyển' : 'Báo giá', { views: [{ showGridLines: false }], pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } })
 
   {
-    const kq = tinhXNK(st, loai)
+    const kq = tinhXNK(st, dv, order)
     const heads = ['STT', 'Nội dung', 'ĐVT', 'Số lượng', 'Đơn giá', 'Thành tiền theo KG', 'Thành tiền theo M3']
     ws.columns = [7, 52, 8, 14, 15, 20, 20].map((width) => ({ width }))
-    tieuDe(ws, heads.length, `BÁO GIÁ DỊCH VỤ ${TEN_DV[loai]}`, st.khach, st.ma)
+    tieuDe(ws, heads.length, order ? `BÁO GIÁ VẬN CHUYỂN - ${TEN_DV[dv]}` : `BÁO GIÁ DỊCH VỤ ${TEN_DV[loai]}`, st.khach, st.ma)
     let r = 4
-    if (loai === 'uy_thac') {
+    if (dv === 'uy_thac') {
       ws.mergeCells(r, 1, r, 7); const c = ws.getCell(r, 1); c.value = `Hình thức: ${HINH_THUC_UT[st.hinhThuc]?.ten || ''}`; c.font = { size: 10, bold: true }; r++
     }
     r++
     dongDau(ws, r, heads); r++
     const giaTri = (x) => (x && typeof x === 'object' ? (x.fix ?? so(st[x.k])) : x)
-    khungXNK(st, kq, loai).forEach((row) => {
+    khungXNK(st, kq, dv, order).forEach((row) => {
       const dam = row.loai !== 'dong' || row.dam
       const nen = row.loai === 'tong' ? (row.lon ? CAM : XAM) : row.loai === 'nhom' ? XAM : undefined
       o(ws, r, 1, row.stt, { canh: 'center', dam, nen })
@@ -100,4 +103,50 @@ export async function xuatBaoGia({ loai, st }) {
   const a = document.createElement('a')
   a.href = url; a.download = `${ten}${st.khach ? ' - ' + st.khach : ''}.xlsx`; a.click()
   URL.revokeObjectURL(url)
+}
+
+// Sheet đầu của báo giá order: giá xưởng + bảng tổng hợp + giá về tay
+function sheetOrder(wb, st) {
+  const ws = wb.addWorksheet('Giá xưởng & giá về tay', { views: [{ showGridLines: false }], pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } })
+  const kq = tinhOrder(st)
+  const heads = ['STT', 'Sản phẩm', 'Link SP', 'Cân (KG)', 'Khối (M3)', 'Số lượng', 'Giá web (¥)', 'Ship nội địa (¥)', 'Giá trị đơn hàng (¥)', 'Giá về tay 1 SP theo KG', 'Giá về tay 1 SP theo M3']
+  ws.columns = [6, 28, 26, 11, 11, 11, 13, 15, 18, 20, 20].map((width) => ({ width }))
+  tieuDe(ws, heads.length, 'BÁO GIÁ ORDER', st.khach, st.ma)
+  ws.mergeCells(4, 1, 4, heads.length)
+  const gc = ws.getCell(4, 1)
+  gc.value = `Tỷ giá tệ: ${so(st.tyGiaTe).toLocaleString('vi-VN')}   ·   Tỷ lệ phí dịch vụ: ${pt(st.phiDVPct)}   ·   Dịch vụ vận chuyển: ${TEN_DV[st.dichVu] || ''}`
+  gc.font = { size: 10, bold: true }
+  dongDau(ws, 6, heads)
+  st.sp.forEach((p, i) => {
+    const r = 7 + i
+    ;[i + 1, p.ten || `Sản phẩm ${i + 1}`, p.link || '', so(p.can), so(p.khoi), so(p.sl), so(p.dg), so(p.ship), kq.tri[i], kq.ve.kg.dong[i]?.mot ?? 0, kq.ve.m3.dong[i]?.mot ?? 0]
+      .forEach((v, ci) => o(ws, r, ci + 1, v, { canh: ci === 0 ? 'center' : undefined, fmt: ci >= 3 && ci <= 8 ? '#,##0.00' : undefined, dam: ci >= 9 }))
+  })
+  let r = 7 + st.sp.length + 1
+  const khoi = (tieu, heads2, rows) => {
+    ws.mergeCells(r, 1, r, 4); const c = ws.getCell(r, 1); c.value = tieu; c.font = { bold: true, size: 12, color: { argb: NAVY } }; r++
+    heads2.forEach((h, i) => { const c2 = ws.getCell(r, i + 1); c2.value = h; c2.border = vien; c2.font = { bold: true, color: { argb: TRANG } }; fill(c2, NAVY); c2.alignment = { horizontal: 'center', vertical: 'middle' } })
+    r++
+    rows.forEach(({ v, dam, nen }) => {
+      v.forEach((val, ci) => o(ws, r, ci + 1, val, { dam, nen, canh: ci === 0 ? 'center' : undefined, fmt: typeof val === 'number' && heads2[ci].includes('¥') ? '#,##0.00' : undefined }))
+      r++
+    })
+    r++
+  }
+  const t = (s, v) => [s, v.te, v.vnd]
+  khoi('1. GIÁ XƯỞNG', ['STT', 'Nội dung', 'Số tiền (¥ - RMB)', 'Quy đổi VND'], [
+    { v: ['1', 'Giá trị đơn hàng', kq.gt1.te, kq.gt1.vnd] },
+    { v: ['2', 'Tổng tiền ship nội địa', kq.ship.te, kq.ship.vnd] },
+    { v: ['3', 'Giá trị đơn hàng + ship nội địa TQ', kq.gt3.te, kq.gt3.vnd] },
+    { v: ['4', `Phí dịch vụ mua hàng (${pt(st.phiDVPct)})`, kq.phi.te, kq.phi.vnd] },
+    { v: ['5', 'TỔNG PHẢI THANH TOÁN', kq.tong.te, kq.tong.vnd], dam: true, nen: CAM },
+    { v: ['6', `${pt(st.tamUngPct)} tiền tạm ứng`, kq.tamUng.te, kq.tamUng.vnd] },
+  ].map((x) => x))
+  khoi('2. GIÁ VỀ TAY', ['STT', 'Nội dung', 'Theo KG', 'Theo M3'], [
+    { v: ['1', 'Tổng số lượng sản phẩm', kq.tongSl, kq.tongSl] },
+    { v: ['2', 'Tổng phải thanh toán tiền hàng (đã gồm phí mua hàng)', kq.tong.vnd, kq.tong.vnd] },
+    { v: ['3', 'Chi phí vận chuyển + thuế (sheet Khai báo thuế và Vận chuyển)', kq.ve.kg.vc, kq.ve.m3.vc] },
+    { v: ['4', 'TỔNG TIỀN HÀNG VỀ TAY', kq.ve.kg.tongVe, kq.ve.m3.tongVe], dam: true, nen: XAM },
+    { v: ['5', 'GIÁ VỀ TAY 1 SẢN PHẨM', kq.ve.kg.motSp, kq.ve.m3.motSp], dam: true, nen: CAM },
+  ])
 }
