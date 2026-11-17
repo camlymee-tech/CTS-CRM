@@ -40,14 +40,12 @@ export default function CustomerList({ currentProfile }) {
     { key: 'sdt', label: 'Điện thoại', sapXep: 'sdt' },
     { key: 'sale', label: 'Người phụ trách', sapXep: 'sale' },
     { key: 'trao_doi', label: 'Trao đổi gần nhất', sapXep: 'trao_doi' },
-    { key: 'cham_soc', label: 'Chăm sóc' },
+    { key: 'cham_soc', label: 'Trạng thái' },
     { key: 'van_de', label: 'Vấn đề KH', sapXep: 'van_de' },
-    { key: 'nguon', label: 'Nguồn khách hàng', sapXep: 'nguon' },
-    { key: 'doanh_thu', label: 'Tổng doanh thu', sapXep: 'doanh_thu' },
+    { key: 'khu_vuc', label: 'Khu vực', macDinh: false },
     { key: 'nen_tang', label: 'Nền tảng', macDinh: false },
     { key: 'dich_vu', label: 'Dịch vụ', macDinh: false },
     { key: 'loai', label: 'Loại', macDinh: false },
-    { key: 'trang_thai', label: 'Trạng thái', macDinh: false },
     { key: 'ngay_tao', label: 'Ngày tạo data', macDinh: false },
     { key: 'lien_he', label: 'Liên hệ gần nhất', macDinh: false },
     { key: 'giai_phap', label: 'Giải pháp', macDinh: false },
@@ -268,6 +266,22 @@ export default function CustomerList({ currentProfile }) {
     XLSX.writeFile(wb, `KhachHang_${ngayLocal(new Date())}.xlsx`)
   }
 
+  // Xoá nhiều khách cùng lúc: chỉ quản trị viên
+  async function xoaNhieu() {
+    if (!isAdmin || daChon.size === 0) return
+    const ids = [...daChon]
+    const ok = window.confirm(
+      `Xoá ${ids.length} khách đã chọn?\n\nToàn bộ ĐƠN DỊCH VỤ, HỢP ĐỒNG, lịch sử chăm sóc và nhật ký của các khách này cũng bị xoá vĩnh viễn. Doanh số từ các khách này sẽ không còn trong báo cáo. Không khôi phục được.`
+    )
+    if (!ok) return
+    for (let i = 0; i < ids.length; i += 100) {
+      const { error } = await supabase.from('customers').delete().in('id', ids.slice(i, i + 100))
+      if (error) { alert('Không xoá được: ' + error.message); loadCustomers(); return }
+    }
+    setDaChon(new Set())
+    loadCustomers()
+  }
+
   // Chọn nhiều khách (ô tích đầu dòng)
   const chonTatCaTrang = phanTrang.length > 0 && phanTrang.every((c) => daChon.has(c.id))
   function toggleChon(id) {
@@ -384,6 +398,12 @@ export default function CustomerList({ currentProfile }) {
           )}
         </p>
         <div className="flex items-center gap-2">
+          {isAdmin && daChon.size > 0 && (
+            <button type="button" onClick={xoaNhieu}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50">
+              <Trash2 size={15} /> Xoá {daChon.size} khách
+            </button>
+          )}
           <button type="button" onClick={taiExcel}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-ink-600 hover:border-coral-500 hover:text-coral-500">
             <Download size={15} /> {daChon.size > 0 ? `Tải Excel (${daChon.size} khách)` : 'Tải Excel'}
@@ -536,10 +556,7 @@ export default function CustomerList({ currentProfile }) {
                       <p className="line-clamp-3 whitespace-pre-wrap">{c.van_de || <span className="text-ink-400">—</span>}</p>
                     </td>
                   )}
-                  {hien('nguon') && <td className="border border-slate-200 px-4 py-3 text-navy-900">{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '—'}</td>}
-                  {hien('doanh_thu') && (
-                    <td className="border border-slate-200 px-4 py-3 font-bold text-orange-500">{formatVnd(doanhThu[c.id] || 0)}</td>
-                  )}
+                  {hien('khu_vuc') && <td className="border border-slate-200 px-4 py-3 text-navy-900">{c.khu_vuc || '—'}</td>}
                   {hien('nen_tang') && (
                   <td className="border border-slate-200 px-4 py-3">
                     <div className="flex flex-wrap gap-1">
@@ -560,12 +577,6 @@ export default function CustomerList({ currentProfile }) {
                   <td className="border border-slate-200 px-4 py-3">
                     <Badge className={c.loai_khach === 'moi' ? 'bg-coral-50 text-coral-600' : 'bg-slate-100 text-slate-600'}>
                       {labelOf(LOAI_KHACH_OPTIONS, c.loai_khach)}
-                    </Badge>
-                  </td>)}
-                  {hien('trang_thai') && (
-                  <td className="border border-slate-200 px-4 py-3">
-                    <Badge className={classTrangThai(c.trang_thai_cham_soc)}>
-                      {tenTrangThai(c.trang_thai_cham_soc)}
                     </Badge>
                   </td>)}
                   {hien('ngay_tao') && <td className="border border-slate-200 px-4 py-3 text-ink-600">{ngayLocal(c.created_at) || '—'}</td>}

@@ -9,6 +9,7 @@ import {
   LOAI_KHACH_OPTIONS,
   NGUON_KHACH_OPTIONS,
   labelOf,
+  TINH_THANH,
 } from '../lib/constants'
 
 export default function CustomerForm({ customer, profiles, currentProfile, onClose, onSaved }) {
@@ -17,6 +18,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
   const trangThaiCu = customer?.trang_thai_cham_soc || null
   const [form, setForm] = useState({
     ten_khach: customer?.ten_khach || '',
+    khu_vuc: customer?.khu_vuc || '',
     link_fb: customer?.link_fb || '',
     link_shop: customer?.link_shop || '',
     dia_chi: customer?.dia_chi || '',
@@ -32,7 +34,6 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
     nguon_khach: customer?.nguon_khach || 'tu_tim',
     trang_thai_cham_soc: customer?.trang_thai_cham_soc || 'chua_lien_he',
     sale_id: customer?.sale_id || currentProfile?.id || '',
-    ngay_lien_he_gan_nhat: customer?.ngay_lien_he_gan_nhat || '',
     ngay_cham_soc_tiep_theo: customer?.ngay_cham_soc_tiep_theo || '',
     ghi_chu: customer?.ghi_chu || '',
     van_de: customer?.van_de || '',
@@ -82,7 +83,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
     setError('')
     const payload = {
       ...form,
-      ngay_lien_he_gan_nhat: form.ngay_lien_he_gan_nhat || null,
+      khu_vuc: form.khu_vuc || null,
       ngay_cham_soc_tiep_theo: form.ngay_cham_soc_tiep_theo || null,
       van_de: form.van_de || null,
       giai_phap: form.giai_phap || null,
@@ -128,31 +129,17 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
         <Input label="Ngành hàng" value={form.nganh_hang}
           onChange={(e) => setForm({ ...form, nganh_hang: e.target.value })}
           placeholder="Thời trang, mỹ phẩm..." />
+        <Select label="Khu vực khách ở (tỉnh / thành)" value={form.khu_vuc}
+          onChange={(e) => setForm({ ...form, khu_vuc: e.target.value })}>
+          <option value="">-- Chọn tỉnh / thành --</option>
+          {TINH_THANH.map((t) => <option key={t} value={t}>{t}</option>)}
+        </Select>
         <Input label="Link Facebook cá nhân" value={form.link_fb}
           onChange={(e) => setForm({ ...form, link_fb: e.target.value })}
           placeholder="https://facebook.com/..." />
         <Input label="Link shop" value={form.link_shop}
           onChange={(e) => setForm({ ...form, link_shop: e.target.value })}
           placeholder="https://shopee.vn/... hoặc TikTok Shop" />
-
-        <div className="col-span-2 flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-navy-900">Thông tin pháp lý (dùng khi lên hợp đồng)</span>
-          <p className="text-xs text-ink-400">
-            Khai 1 lần ở đây, dùng chung cho mọi hợp đồng của khách này — không cần nhập lại mỗi lần xuất hợp đồng.
-          </p>
-        </div>
-        <Input label="Người đại diện (Bên A)" value={form.nguoi_dai_dien}
-          onChange={(e) => setForm({ ...form, nguoi_dai_dien: e.target.value })} />
-        <Input label="Chức vụ" value={form.chuc_vu}
-          onChange={(e) => setForm({ ...form, chuc_vu: e.target.value })} />
-        <Input label="Mã số thuế" value={form.mst}
-          onChange={(e) => setForm({ ...form, mst: e.target.value })} />
-        <Input label="Email" value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        <div className="col-span-2">
-          <Input label="Địa chỉ" value={form.dia_chi}
-            onChange={(e) => setForm({ ...form, dia_chi: e.target.value })} />
-        </div>
 
         {khachTrung && (
           <div className="col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-4">
@@ -172,7 +159,6 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
               </div>
               <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink-600">
                 <span>Sale phụ trách: <b className="text-navy-900">{saleList[khachTrung.sale_id] || 'Chưa gán'}</b></span>
-                <span>Nguồn: <b className="text-navy-900">{labelOf(NGUON_KHACH_OPTIONS, khachTrung.nguon_khach)}</b></span>
                 <span>Ngành hàng: <b className="text-navy-900">{khachTrung.nganh_hang || '—'}</b></span>
                 <span>Liên hệ gần nhất: <b className="text-navy-900">{khachTrung.ngay_lien_he_gan_nhat || '—'}</b></span>
               </div>
@@ -182,43 +168,6 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
             </p>
           </div>
         )}
-
-        <div className="col-span-2 flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-navy-900">Nền tảng</span>
-          <div className="flex gap-2">
-            {NEN_TANG_OPTIONS.map((opt) => (
-              <button type="button" key={opt.value} onClick={() => toggleArray('nen_tang', opt.value)}
-                className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-                  form.nen_tang.includes(opt.value) ? opt.className : 'border-slate-200 text-ink-600'
-                }`}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="col-span-2 flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-navy-900">Dịch vụ quan tâm</span>
-          <div className="flex gap-2">
-            {DICH_VU_OPTIONS.map((opt) => (
-              <button type="button" key={opt.value} onClick={() => toggleArray('dich_vu', opt.value)}
-                className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-                  form.dich_vu.includes(opt.value) ? opt.className : 'border-slate-200 text-ink-600'
-                }`}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <Select label="Loại khách" value={form.loai_khach}
-          onChange={(e) => setForm({ ...form, loai_khach: e.target.value })}>
-          {LOAI_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </Select>
-        <Select label="Nguồn khách hàng" value={form.nguon_khach}
-          onChange={(e) => setForm({ ...form, nguon_khach: e.target.value })}>
-          {NGUON_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </Select>
 
         <Select label="Trạng thái chăm sóc" value={form.trang_thai_cham_soc}
           onChange={(e) => setForm({ ...form, trang_thai_cham_soc: e.target.value })}>
@@ -230,28 +179,8 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
           {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name || p.id}</option>)}
         </Select>
 
-        <Input label="Ngày liên hệ gần nhất" type="date" value={form.ngay_lien_he_gan_nhat || ''}
-          onChange={(e) => setForm({ ...form, ngay_lien_he_gan_nhat: e.target.value })} />
         <Input label="Ngày chăm sóc tiếp theo" type="date" value={form.ngay_cham_soc_tiep_theo || ''}
           onChange={(e) => setForm({ ...form, ngay_cham_soc_tiep_theo: e.target.value })} />
-
-        <div className="col-span-2">
-          <Textarea label="Vấn đề" rows={3} value={form.van_de}
-            onChange={(e) => setForm({ ...form, van_de: e.target.value })}
-            placeholder="Vấn đề khách đang gặp..." />
-        </div>
-        <div className="col-span-2">
-          <Textarea label="Giải pháp" rows={4} value={form.giai_phap}
-            onChange={(e) => setForm({ ...form, giai_phap: e.target.value })}
-            placeholder="Giải pháp tư vấn cho khách..." />
-        </div>
-        <div className="col-span-2">
-          <Textarea label="Gói tư vấn phù hợp" rows={2} value={form.goi_tu_van}
-            onChange={(e) => setForm({ ...form, goi_tu_van: e.target.value })}
-            placeholder="VD: Gói Chạy quảng cáo Pro 3 tháng + Xây shop VIP 1..." />
-        </div>
-
-        
 
         {chotDon && (
           <p className="col-span-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">

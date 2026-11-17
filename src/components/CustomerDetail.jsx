@@ -18,7 +18,7 @@ import BaoCaoAdsModal from './BaoCaoAdsModal'
 import {
   LOAI_TUONG_TAC_OPTIONS, NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, LOAI_KHACH_OPTIONS,
-  TRANG_THAI_HD_OPTIONS,
+  TRANG_THAI_HD_OPTIONS, TINH_THANH,
   classOf, labelOf, formatVnd,
 } from '../lib/constants'
 
@@ -149,10 +149,10 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     nen_tang: customer.nen_tang || [],
     dich_vu: customer.dich_vu || [],
     nganh_hang: customer.nganh_hang || '',
+    khu_vuc: customer.khu_vuc || '',
     nguon_khach: customer.nguon_khach || '',
     loai_khach: customer.loai_khach || '',
     sale_id: customer.sale_id || '',
-    ngay_lien_he_gan_nhat: customer.ngay_lien_he_gan_nhat || '',
     ngay_cham_soc_tiep_theo: customer.ngay_cham_soc_tiep_theo || '',
     ten_tieu_de_bena: customer.ten_tieu_de_bena || '',
     nguoi_dai_dien: customer.nguoi_dai_dien || '',
@@ -270,7 +270,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
           </div>
 
           <div className="mt-3 space-y-2 text-sm">
-            <Field label="Nguồn khách" value={labelOf(NGUON_KHACH_OPTIONS, customer.nguon_khach)} />
             <Field label="Ngày tạo" value={(customer.created_at || '').slice(0, 10)} />
           </div>
 
@@ -313,25 +312,18 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                         onChange={(e) => setFormTT({ ...formTT, link_fb: e.target.value })} />
                       <Input label="Link shop" value={formTT.link_shop}
                         onChange={(e) => setFormTT({ ...formTT, link_shop: e.target.value })} />
+                      <Select label="Khu vực khách ở" value={formTT.khu_vuc}
+                        onChange={(e) => setFormTT({ ...formTT, khu_vuc: e.target.value })}>
+                        <option value="">-- Chọn tỉnh / thành --</option>
+                        {TINH_THANH.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </Select>
                       <Input label="Ngành hàng" value={formTT.nganh_hang}
                         onChange={(e) => setFormTT({ ...formTT, nganh_hang: e.target.value })} />
-                      <Select label="Loại khách" value={formTT.loai_khach}
-                        onChange={(e) => setFormTT({ ...formTT, loai_khach: e.target.value })}>
-                        <option value="">—</option>
-                        {LOAI_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </Select>
-                      <Select label="Nguồn khách" value={formTT.nguon_khach}
-                        onChange={(e) => setFormTT({ ...formTT, nguon_khach: e.target.value })}>
-                        <option value="">—</option>
-                        {NGUON_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </Select>
                       <Select label="Sale phụ trách" value={formTT.sale_id}
                         onChange={(e) => setFormTT({ ...formTT, sale_id: e.target.value })}>
                         <option value="">-- Chưa gán --</option>
                         {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                       </Select>
-                      <Input label="Liên hệ gần nhất" type="date" value={formTT.ngay_lien_he_gan_nhat}
-                        onChange={(e) => setFormTT({ ...formTT, ngay_lien_he_gan_nhat: e.target.value })} />
                       <Input label="Chăm sóc tiếp theo" type="date" value={formTT.ngay_cham_soc_tiep_theo}
                         onChange={(e) => setFormTT({ ...formTT, ngay_cham_soc_tiep_theo: e.target.value })} />
                     </div>
@@ -404,7 +396,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                   <div className="space-y-5">
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                       <Field label="Ngành hàng" value={customer.nganh_hang} />
-                      <Field label="Loại khách" value={labelOf(LOAI_KHACH_OPTIONS, customer.loai_khach)} />
+                      <Field label="Khu vực khách ở" value={customer.khu_vuc} />
                       <Field label="Chăm sóc tiếp theo" value={customer.ngay_cham_soc_tiep_theo} />
                     </div>
                     <div>

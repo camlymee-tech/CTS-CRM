@@ -9,6 +9,15 @@ export const DICH_VU_OPTIONS = [
   { value: 'van_chuyen', label: 'Vận chuyển', className: 'bg-amber-100 text-amber-700 border border-amber-300' },
 ]
 
+// 34 tỉnh, thành phố hiện hành (sau sắp xếp đơn vị hành chính 2025)
+export const TINH_THANH = [
+  'Hà Nội', 'TP Hồ Chí Minh', 'Hải Phòng', 'Đà Nẵng', 'Cần Thơ', 'Huế',
+  'An Giang', 'Bắc Ninh', 'Cà Mau', 'Cao Bằng', 'Đắk Lắk', 'Điện Biên', 'Đồng Nai', 'Đồng Tháp',
+  'Gia Lai', 'Hà Tĩnh', 'Hưng Yên', 'Khánh Hoà', 'Lai Châu', 'Lâm Đồng', 'Lạng Sơn', 'Lào Cai',
+  'Nghệ An', 'Ninh Bình', 'Phú Thọ', 'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị', 'Sơn La',
+  'Tây Ninh', 'Thái Nguyên', 'Thanh Hoá', 'Tuyên Quang', 'Vĩnh Long',
+]
+
 export const LOAI_KHACH_OPTIONS = [
   { value: 'moi', label: 'Khách mới' },
   { value: 'cu', label: 'Khách cũ' },
