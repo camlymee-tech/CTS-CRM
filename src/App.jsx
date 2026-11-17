@@ -21,7 +21,7 @@ export default function App() {
   const [recovering, setRecovering] = useState(false)
   useDanhMuc(!!session)  // nạp Nguồn / Dịch vụ tuỳ chỉnh
   const [unread, setUnread] = useState(0)
-  const [viecCan, setViecCan] = useState({ tong: 0, taiKy: 0, baoCaoAds: 0 })   // việc nhắc: tái ký + báo cáo ADS
+  const [viecCan, setViecCan] = useState({ tong: 0, followUp: 0, canGoiLai: 0, baoCaoAds: 0 })   // việc nhắc: follow-up, khách cần gọi lại, báo cáo ADS
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))

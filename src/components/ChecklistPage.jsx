@@ -5,15 +5,15 @@ import { Select, Badge } from './ui'
 import CustomerDetail from './CustomerDetail'
 import OrderForm from './OrderForm'
 import BaoCaoAdsModal from './BaoCaoAdsModal'
-import ChecklistTasks from './ChecklistTasks'
+import MucTieuNgay from './MucTieuNgay'
 import { DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, classOf, labelOf } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
 import { homNayLocal, dinhDangNgay, moTaConLai, SO_NGAY_NHAC } from '../lib/taiKy'
 import { moTaHanBaoCao, CHU_KY_BAO_CAO } from '../lib/baoCaoAds'
-import { tinhNhacViec } from '../lib/nhacViec'
+import { tinhNhacViec, tinhCanGoiLai, tinhFollowUpHomNay, SO_NGAY_GOI_LAI } from '../lib/nhacViec'
 
 export default function ChecklistPage({ currentProfile, onDoiViec }) {
-  const { tenTrangThai, classTrangThai, maDaChot } = useTrangThai()
+  const { tenTrangThai, classTrangThai, maDaChot, statuses } = useTrangThai()
   const [customers, setCustomers] = useState([])
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -23,48 +23,52 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   const [don, setDon] = useState([])
   const [itemsDon, setItemsDon] = useState([])
   const [baoCao, setBaoCao] = useState([])
+  const [logsDoiTT, setLogsDoiTT] = useState([])
   const [ghiBaoCao, setGhiBaoCao] = useState(null)   // dòng nhắc báo cáo ADS đang mở cửa sổ ghi nhận
   const [taiKy, setTaiKy] = useState(null)   // { khach, muc } đang mở form tái ký
   const [dangDong, setDangDong] = useState('')
 
   const isAdmin = currentProfile?.role === 'admin'
-  const homNay = new Date().toISOString().slice(0, 10)
+  const homNay = homNayLocal()
 
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
-    const [{ data: c }, { data: p }, { data: hd }, { data: dn }, { data: it }, { data: bc }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: hd }, { data: dn }, { data: it }, { data: bc }, { data: lg }] = await Promise.all([
       supabase.from('customers').select('*').order('ngay_cham_soc_tiep_theo'),
       supabase.from('profiles').select('id, full_name').order('full_name'),
       supabase.from('contracts').select('*').eq('trang_thai', 'hieu_luc'),
       supabase.from('orders').select('*').neq('trang_thai', 'huy'),
       supabase.from('order_items').select('order_id, ten_dich_vu'),
       supabase.from('ads_bao_cao').select('*'),   // chưa chạy SQL thì rỗng
+      supabase.from('customer_logs').select('customer_id, hanh_dong, created_at').eq('hanh_dong', 'Đổi trạng thái').order('created_at', { ascending: false }).limit(5000),
     ])
     setCustomers(c || []); setProfiles(p || [])
-    setHopDong(hd || []); setDon(dn || []); setItemsDon(it || []); setBaoCao(bc || [])
+    setHopDong(hd || []); setDon(dn || []); setItemsDon(it || []); setBaoCao(bc || []); setLogsDoiTT(lg || [])
     setLoading(false)
     onDoiViec?.()   // báo App cập nhật huy hiệu số việc cần nhắc
   }
 
   const tenSale = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
-  // Khách đến hạn chăm sóc, bỏ qua khách đã chốt/đang triển khai/hoàn thành
-  const canLam = useMemo(() => customers.filter((c) => {
-    if (!c.ngay_cham_soc_tiep_theo) return false
-    if (c.ngay_cham_soc_tiep_theo > homNay) return false
-    if (maDaChot.includes(c.trang_thai_cham_soc)) return false
-    if (!isAdmin && c.sale_id !== currentProfile?.id) return false
-    if (filterSale && c.sale_id !== filterSale) return false
-    return true
-  }), [customers, homNay, isAdmin, currentProfile?.id, filterSale, maDaChot])
+  // Follow-up đến hạn: ngày dự kiến liên hệ lại là hôm nay, bỏ qua khách đã chốt/đang triển khai/hoàn thành
+  const dungHomNay = useMemo(() => tinhFollowUpHomNay({
+    khach: customers, maDaChot, isAdmin, userId: currentProfile?.id, homNay,
+  }).filter((c) => !filterSale || c.sale_id === filterSale),
+  [customers, homNay, isAdmin, currentProfile?.id, filterSale, maDaChot])
+
+  // Khách cần gọi lại: trạng thái đã gửi báo giá / hẹn đi đơn mà 7 ngày chưa liên hệ lại, chưa đổi trạng thái
+  const canGoiLai = useMemo(() => tinhCanGoiLai({
+    khach: customers, logs: logsDoiTT, statuses, isAdmin, userId: currentProfile?.id, homNay,
+  }).filter((r) => !filterSale || r.saleId === filterSale),
+  [customers, logsDoiTT, statuses, isAdmin, currentProfile?.id, filterSale, homNay])
 
   // Việc cần nhắc: tái ký hợp đồng ADS + báo cáo chỉ số ADS (sale chỉ thấy của mình, admin thấy cả team)
-  const { nhacTaiKy, nhacBaoCao } = useMemo(() => {
+  const { nhacBaoCao } = useMemo(() => {
     const r = tinhNhacViec({ khach: customers, hopDong, don, items: itemsDon, baoCao, isAdmin, userId: currentProfile?.id })
     const loc = (ds) => ds.filter((x) => !filterSale || x.saleId === filterSale)
-    return { nhacTaiKy: loc(r.taiKy), nhacBaoCao: loc(r.baoCaoAds) }
+    return { nhacBaoCao: loc(r.baoCaoAds) }
   }, [customers, hopDong, don, itemsDon, baoCao, isAdmin, currentProfile?.id, filterSale])
 
   async function khongTaiKy(r) {
@@ -75,9 +79,6 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
     if (error) { window.alert('Không cập nhật được: ' + error.message); return }
     load()
   }
-
-  const quaHan = canLam.filter((c) => c.ngay_cham_soc_tiep_theo < homNay)
-  const dungHomNay = canLam.filter((c) => c.ngay_cham_soc_tiep_theo === homNay)
 
   // Khách sắp tới hạn trong 3 ngày, để chuẩn bị trước
   const sapToi = useMemo(() => {
@@ -115,46 +116,31 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
         <p className="py-16 text-center text-ink-400">Đang tải...</p>
       ) : (
         <div className="space-y-4 p-8">
-          <ChecklistTasks currentProfile={currentProfile} />
-
-          {nhacTaiKy.length > 0 && (
-            <NhacTaiKy ds={nhacTaiKy} tenSale={tenSale} onMoKhach={setXemKhach}
-              onTaiKy={(r) => setTaiKy(r)} onKhongTaiKy={khongTaiKy} dangDong={dangDong} />
-          )}
+          <MucTieuNgay currentProfile={currentProfile} customers={customers} onMoKhach={setXemKhach} />
 
           {nhacBaoCao.length > 0 && (
             <NhacBaoCaoAds ds={nhacBaoCao} tenSale={tenSale} onMoKhach={setXemKhach} onGhi={(r) => setGhiBaoCao(r)} />
           )}
 
-          {canLam.length === 0 ? (
-            <div className="rounded-2xl bg-white p-10 text-center shadow-sm">
-              <CircleCheck size={40} className="mx-auto text-emerald-500" />
-              <p className="mt-3 font-display text-lg font-semibold text-navy-900">Không có khách đến hạn</p>
-              <p className="mt-1 text-sm text-ink-600">
-                Nhớ đặt lịch hẹn khi ghi lịch sử chăm sóc để không bỏ sót khách.
-              </p>
-            </div>
+          {dungHomNay.length > 0 ? (
+            <Nhom
+              icon={CalendarCheck} mau="coral"
+              tieuDe={`Follow-up đến hạn (${dungHomNay.length})`}
+              moTa="Đến ngày dự kiến liên hệ lại"
+              ds={dungHomNay} homNay={homNay} tenSale={tenSale} onOpen={setXemKhach}
+              tenTrangThai={tenTrangThai} classTrangThai={classTrangThai}
+            />
           ) : (
-            <>
-              {quaHan.length > 0 && (
-                <Nhom
-                  icon={CircleAlert} mau="rose"
-                  tieuDe={`Quá hạn (${quaHan.length})`}
-                  moTa="Đã trễ so với lịch hẹn — nên gọi trước"
-                  ds={quaHan} homNay={homNay} tenSale={tenSale} onOpen={setXemKhach}
-                  tenTrangThai={tenTrangThai} classTrangThai={classTrangThai}
-                />
-              )}
-              {dungHomNay.length > 0 && (
-                <Nhom
-                  icon={CalendarCheck} mau="coral"
-                  tieuDe={`Hôm nay (${dungHomNay.length})`}
-                  moTa="Đúng lịch hẹn hôm nay"
-                  ds={dungHomNay} homNay={homNay} tenSale={tenSale} onOpen={setXemKhach}
-                  tenTrangThai={tenTrangThai} classTrangThai={classTrangThai}
-                />
-              )}
-            </>
+            <div className="rounded-2xl bg-white p-6 text-center shadow-sm">
+              <CircleCheck size={32} className="mx-auto text-emerald-500" />
+              <p className="mt-2 font-display font-semibold text-navy-900">Không có khách đến hạn follow-up hôm nay</p>
+              <p className="mt-1 text-sm text-ink-600">Nhớ đặt ngày chăm sóc tiếp theo khi ghi trao đổi để không bỏ sót khách.</p>
+            </div>
+          )}
+
+          {canGoiLai.length > 0 && (
+            <KhachCanGoiLai ds={canGoiLai} tenSale={tenSale} onOpen={setXemKhach}
+              tenTrangThai={tenTrangThai} classTrangThai={classTrangThai} />
           )}
 
           {sapToi.length > 0 && (
@@ -205,65 +191,56 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   )
 }
 
-// Nhắc tái ký hợp đồng ADS: quá hạn / hôm nay / sắp hết hạn
-function NhacTaiKy({ ds, tenSale, onMoKhach, onTaiKy, onKhongTaiKy, dangDong }) {
-  const quaHan = ds.filter((r) => r.muc === 'qua_han').length
-  const mau = {
-    qua_han: 'bg-rose-100 text-rose-600',
-    hom_nay: 'bg-coral-50 text-coral-600',
-    sap_het: 'bg-amber-100 text-amber-700',
-  }
+// Khách cần gọi lại: trạng thái báo giá / hẹn đi đơn, đã nhiều ngày chưa liên hệ lại
+function KhachCanGoiLai({ ds, tenSale, onOpen, tenTrangThai, classTrangThai }) {
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <RefreshCw size={18} className={quaHan > 0 ? 'text-rose-500' : 'text-amber-600'} />
-        <h2 className="font-display font-semibold text-navy-900">Nhắc tái ký hợp đồng ADS ({ds.length})</h2>
-        <span className="text-xs text-ink-400">· hết hạn trong {SO_NGAY_NHAC} ngày tới hoặc đã hết hạn mà chưa tái ký</span>
+        <Phone size={18} className="text-rose-500" />
+        <h2 className="font-display font-semibold text-navy-900">Khách cần gọi lại ({ds.length})</h2>
+        <span className="text-xs text-ink-400">· đang ở trạng thái đã gửi báo giá / hẹn đi đơn mà {SO_NGAY_GOI_LAI} ngày chưa liên hệ lại hoặc đổi trạng thái</span>
       </div>
-
-      <div className="space-y-2">
-        {ds.map((r) => (
-          <div key={r.hd.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 px-4 py-3">
-            <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onMoKhach(r.khach)}>
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium text-navy-900">{r.khach.ten_khach}</p>
-                <span className="text-xs text-ink-400">{r.khach.ma_khach}</span>
-                <Badge className={mau[r.muc]}>{moTaConLai(r.conLai)}</Badge>
-                {r.soLanTaiKy > 0 && <Badge className="bg-teal-50 text-teal-600">Đã tái ký {r.soLanTaiKy} lần</Badge>}
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-600">
-                <span>{r.hd.so_hop_dong}</span>
-                {r.hd.ten_goi && <><span className="text-ink-400">·</span><span>{r.hd.ten_goi}</span></>}
-                <span className="text-ink-400">·</span>
-                <span>Hết hạn <b className="text-navy-900">{dinhDangNgay(r.han)}</b></span>
-                <span className="text-ink-400">·</span>
-                <span>{tenSale(r.saleId)}</span>
-              </div>
-            </div>
-
-            <div className="flex flex-none items-center gap-2">
-              <a href={r.khach.sdt ? `tel:${r.khach.sdt}` : undefined}
-                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
-                  r.khach.sdt ? 'bg-teal-50 text-teal-600 hover:bg-teal-100' : 'text-ink-400'
-                }`}>
-                <Phone size={13} /> Gọi
-              </a>
-              <button type="button" onClick={() => onTaiKy(r)}
-                className="inline-flex items-center gap-1 rounded-lg bg-coral-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-coral-600">
-                <RefreshCw size={13} /> Tạo đơn tái ký
-              </button>
-              <button type="button" disabled={dangDong === r.hd.id} onClick={() => onKhongTaiKy(r)}
-                className="rounded-lg px-2.5 py-1.5 text-xs text-ink-400 hover:bg-slate-100 hover:text-rose-500 disabled:opacity-50">
-                Không tái ký
-              </button>
-            </div>
-          </div>
-        ))}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-slate-100 text-left text-sm font-semibold text-navy-900">
+              <th className="border border-slate-200 px-4 py-2.5">Khách hàng</th>
+              <th className="border border-slate-200 px-4 py-2.5">Điện thoại</th>
+              <th className="border border-slate-200 px-4 py-2.5">Trạng thái</th>
+              <th className="border border-slate-200 px-4 py-2.5">Chưa liên hệ</th>
+              <th className="border border-slate-200 px-4 py-2.5">Sale</th>
+              <th className="border border-slate-200 px-4 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {ds.map((r) => (
+              <tr key={r.khach.id} className="cursor-pointer hover:bg-slate-50" onClick={() => onOpen(r.khach)}>
+                <td className="border border-slate-200 px-4 py-2.5">
+                  <p className="font-medium text-navy-900">{r.khach.ten_khach}</p>
+                  <p className="text-xs text-ink-400">{r.khach.ma_khach}</p>
+                </td>
+                <td className="border border-slate-200 px-4 py-2.5 text-ink-600">{r.khach.sdt || '—'}</td>
+                <td className="border border-slate-200 px-4 py-2.5">
+                  <Badge className={classTrangThai(r.khach.trang_thai_cham_soc)}>{tenTrangThai(r.khach.trang_thai_cham_soc)}</Badge>
+                </td>
+                <td className="border border-slate-200 px-4 py-2.5">
+                  <Badge className="bg-rose-100 text-rose-600">{r.soNgay} ngày</Badge>
+                  <p className="mt-0.5 text-xs text-ink-400">từ {dinhDangNgay(r.moc)}</p>
+                </td>
+                <td className="border border-slate-200 px-4 py-2.5 text-ink-600">{tenSale(r.saleId)}</td>
+                <td className="whitespace-nowrap border border-slate-200 px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                  <a href={r.khach.sdt ? `tel:${r.khach.sdt}` : undefined}
+                    className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
+                      r.khach.sdt ? 'bg-teal-50 text-teal-600 hover:bg-teal-100' : 'text-ink-400'}`}>
+                    <Phone size={13} /> Gọi
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      <p className="mt-3 text-xs text-ink-400">
-        Bấm "Tạo đơn tái ký" để lên đơn mới cho hợp đồng này (điền sẵn dịch vụ theo đơn trước) — nhắc sẽ tự biến mất, và hiện lại khi đến kỳ hết hạn kế tiếp.
-        "Không tái ký" = khách dừng dịch vụ, hợp đồng chuyển sang Hết hạn.
-      </p>
+      <p className="mt-3 text-xs text-ink-400">Khách sẽ biến mất khỏi danh sách khi bạn ghi trao đổi mới hoặc đổi trạng thái.</p>
     </div>
   )
 }
@@ -360,16 +337,8 @@ function Nhom({ icon: Icon, mau, tieuDe, moTa, ds, homNay, tenSale, onOpen, tenT
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-600">
                   <span>{c.sdt || 'Chưa có SĐT'}</span>
                   <span className="text-ink-400">·</span>
-                  <span>{labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach)}</span>
-                  <span className="text-ink-400">·</span>
                   <span>{tenSale(c.sale_id)}</span>
                 </div>
-              </div>
-
-              <div className="hidden flex-none gap-1 md:flex">
-                {(c.dich_vu || []).map((dv) => (
-                  <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
-                ))}
               </div>
 
               <Badge className={classTrangThai(c.trang_thai_cham_soc)}>

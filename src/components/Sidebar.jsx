@@ -11,7 +11,7 @@ const NAV = [
   { key: 'team', label: 'Nhân sự', icon: UserCog, ready: true, adminOnly: true },
 ]
 
-export default function Sidebar({ current, onNavigate, profile, onChangePassword, unreadCount = 0, viecCan = { tong: 0, taiKy: 0, baoCaoAds: 0 } }) {
+export default function Sidebar({ current, onNavigate, profile, onChangePassword, unreadCount = 0, viecCan = { tong: 0, followUp: 0, canGoiLai: 0, baoCaoAds: 0 } }) {
   return (
     <aside className="flex h-screen w-60 flex-col bg-navy-950 text-white">
       <div className="flex items-center gap-2.5 px-5 py-6">
@@ -46,7 +46,7 @@ export default function Sidebar({ current, onNavigate, profile, onChangePassword
               )}
               {showViecCan && (
                 <span
-                  title={`Cần xử lý: ${viecCan.taiKy} nhắc tái ký ADS, ${viecCan.baoCaoAds} nhắc báo cáo chỉ số ADS`}
+                  title={`Cần xử lý: ${viecCan.followUp} follow-up đến hạn, ${viecCan.canGoiLai} khách cần gọi lại, ${viecCan.baoCaoAds} nhắc báo cáo chỉ số ADS`}
                   className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-semibold text-white">
                   {viecCan.tong > 99 ? '99+' : viecCan.tong}
                 </span>

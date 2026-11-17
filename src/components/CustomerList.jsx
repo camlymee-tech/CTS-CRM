@@ -44,7 +44,6 @@ export default function CustomerList({ currentProfile }) {
     { key: 'van_de', label: 'Vấn đề KH', sapXep: 'van_de' },
     { key: 'khu_vuc', label: 'Khu vực', macDinh: false },
     { key: 'nen_tang', label: 'Nền tảng', macDinh: false },
-    { key: 'dich_vu', label: 'Dịch vụ', macDinh: false },
     { key: 'loai', label: 'Loại', macDinh: false },
     { key: 'ngay_tao', label: 'Ngày tạo data', macDinh: false },
     { key: 'lien_he', label: 'Liên hệ gần nhất', macDinh: false },
@@ -562,14 +561,6 @@ export default function CustomerList({ currentProfile }) {
                     <div className="flex flex-wrap gap-1">
                       {(c.nen_tang || []).map((nt) => (
                         <Badge key={nt} className={classOf(NEN_TANG_OPTIONS, nt)}>{labelOf(NEN_TANG_OPTIONS, nt)}</Badge>
-                      ))}
-                    </div>
-                  </td>)}
-                  {hien('dich_vu') && (
-                  <td className="border border-slate-200 px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {(c.dich_vu || []).map((dv) => (
-                        <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
                       ))}
                     </div>
                   </td>)}

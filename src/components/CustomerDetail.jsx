@@ -249,15 +249,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
             )}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {(customer.nen_tang || []).map((nt) => (
-              <Badge key={nt} className={classOf(NEN_TANG_OPTIONS, nt)}>{labelOf(NEN_TANG_OPTIONS, nt)}</Badge>
-            ))}
-            {(customer.dich_vu || []).map((dv) => (
-              <Badge key={dv} className={classOf(DICH_VU_OPTIONS, dv)}>{labelOf(DICH_VU_OPTIONS, dv)}</Badge>
-            ))}
-          </div>
-
           <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
             <p className="text-xs text-ink-400">Sale phụ trách</p>
             <p className="text-sm font-medium text-navy-900">{tenNguoi(customer.sale_id)}</p>
@@ -317,6 +308,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                         <option value="">-- Chọn tỉnh / thành --</option>
                         {TINH_THANH.map((t) => <option key={t} value={t}>{t}</option>)}
                       </Select>
+                      <Input label="Số điện thoại" value={formTT.sdt}
+                        onChange={(e) => setFormTT({ ...formTT, sdt: e.target.value })} />
                       <Input label="Ngành hàng" value={formTT.nganh_hang}
                         onChange={(e) => setFormTT({ ...formTT, nganh_hang: e.target.value })} />
                       <Select label="Sale phụ trách" value={formTT.sale_id}
@@ -326,63 +319,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                       </Select>
                       <Input label="Chăm sóc tiếp theo" type="date" value={formTT.ngay_cham_soc_tiep_theo}
                         onChange={(e) => setFormTT({ ...formTT, ngay_cham_soc_tiep_theo: e.target.value })} />
-                    </div>
-
-                    <div className="flex flex-col gap-1.5 text-sm">
-                      <span className="font-medium text-navy-900">Nền tảng</span>
-                      <div className="flex flex-wrap gap-2">
-                        {NEN_TANG_OPTIONS.map((opt) => (
-                          <button type="button" key={opt.value} onClick={() => toggleArrTT('nen_tang', opt.value)}
-                            className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-                              formTT.nen_tang.includes(opt.value) ? opt.className : 'border-slate-200 text-ink-600'
-                            }`}>
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5 text-sm">
-                      <span className="font-medium text-navy-900">Dịch vụ quan tâm</span>
-                      <div className="flex flex-wrap gap-2">
-                        {DICH_VU_OPTIONS.map((opt) => (
-                          <button type="button" key={opt.value} onClick={() => toggleArrTT('dich_vu', opt.value)}
-                            className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-                              formTT.dich_vu.includes(opt.value) ? opt.className : 'border-slate-200 text-ink-600'
-                            }`}>
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-400">
-                        Thông tin Bên A (dùng khi lên hợp đồng)
-                      </p>
-                      <p className="mb-2 text-xs text-ink-400">Ô nào để trống thì hợp đồng sẽ không hiện dòng đó.</p>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                        <div className="col-span-2">
-                          <Input label="Bên sử dụng dịch vụ (tên công ty / hộ kinh doanh)" value={formTT.ten_tieu_de_bena}
-                            onChange={(e) => setFormTT({ ...formTT, ten_tieu_de_bena: e.target.value })} />
-                        </div>
-                        <Input label="Đại diện" value={formTT.nguoi_dai_dien}
-                          onChange={(e) => setFormTT({ ...formTT, nguoi_dai_dien: e.target.value })} />
-                        <Input label="Chức vụ" value={formTT.chuc_vu}
-                          onChange={(e) => setFormTT({ ...formTT, chuc_vu: e.target.value })} />
-                        <div className="col-span-2">
-                          <Input label="Địa chỉ" value={formTT.dia_chi}
-                            onChange={(e) => setFormTT({ ...formTT, dia_chi: e.target.value })} />
-                        </div>
-                        <Input label="MST" value={formTT.mst}
-                          onChange={(e) => setFormTT({ ...formTT, mst: e.target.value })} />
-                        <Input label="SĐT" value={formTT.sdt}
-                          onChange={(e) => setFormTT({ ...formTT, sdt: e.target.value })} />
-                        <div className="col-span-2">
-                          <Input label="Số tài khoản" value={formTT.so_tai_khoan}
-                            onChange={(e) => setFormTT({ ...formTT, so_tai_khoan: e.target.value })} />
-                        </div>
-                      </div>
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -395,34 +331,13 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                 ) : (
                   <div className="space-y-5">
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                      <Field label="Số điện thoại" value={customer.sdt} />
                       <Field label="Ngành hàng" value={customer.nganh_hang} />
                       <Field label="Khu vực khách ở" value={customer.khu_vuc} />
                       <Field label="Chăm sóc tiếp theo" value={customer.ngay_cham_soc_tiep_theo} />
                     </div>
-                    <div>
-                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">
-                        Thông tin Bên A (dùng khi lên hợp đồng)
-                      </p>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                        <div className="col-span-2"><Field label="Bên sử dụng dịch vụ" value={customer.ten_tieu_de_bena} /></div>
-                        <Field label="Đại diện" value={customer.nguoi_dai_dien} />
-                        <Field label="Chức vụ" value={customer.chuc_vu} />
-                        <div className="col-span-2"><Field label="Địa chỉ" value={customer.dia_chi} /></div>
-                        <Field label="MST" value={customer.mst} />
-                        <Field label="SĐT" value={customer.sdt} />
-                        <div className="col-span-2"><Field label="Số tài khoản" value={customer.so_tai_khoan} /></div>
-                      </div>
-                    </div>
                   </div>
                 )
-              )}
-
-              {tab === 'thong_tin' && (
-                <div className="mt-5 space-y-5">
-
-                <VanDeGiaiPhap customer={customer} suaDuoc={suaDuoc}
-                  onSaved={(patch) => setCustomer({ ...customer, ...patch })} />
-                </div>
               )}
 
               {tab === 'don_hang' && (
