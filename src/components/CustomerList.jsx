@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, ListPlus, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download } from 'lucide-react'
+import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, ListPlus, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download, Upload } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Phantrang } from './ui'
 import CustomerForm from './CustomerForm'
@@ -7,6 +7,7 @@ import CustomerDetail from './CustomerDetail'
 import OrderForm from './OrderForm'
 import StatusesModal from './StatusesModal'
 import DanhMucModal from './DanhMucModal'
+import TaiKhachLenModal from './TaiKhachLenModal'
 import { useTrangThai } from '../lib/StatusContext'
 import { ngayLocal, gioNgay, traoDoiGanNhat, demLuotChamSoc, tongDoanhThu, sapXepKhach } from '../lib/danhSachKhach'
 import {
@@ -94,6 +95,7 @@ export default function CustomerList({ currentProfile }) {
   const [tuNgay, setTuNgay] = useState('')
   const [denNgay, setDenNgay] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [taiLen, setTaiLen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
   const [viewingCustomer, setViewingCustomer] = useState(null)
 
@@ -313,6 +315,9 @@ export default function CustomerList({ currentProfile }) {
               <ListPlus size={16} /> Nguồn & dịch vụ
             </Button>
           )}
+          <Button variant="secondary" onClick={() => setTaiLen(true)}>
+            <Upload size={16} /> Tải khách lên
+          </Button>
           <Button onClick={() => { setEditingCustomer(null); setShowForm(true) }}>
             <Plus size={16} /> Thêm khách hàng
           </Button>
@@ -603,6 +608,11 @@ export default function CustomerList({ currentProfile }) {
 
       {quanLyTT && <StatusesModal onClose={() => setQuanLyTT(false)} />}
       {quanLyDM && <DanhMucModal onClose={() => setQuanLyDM(false)} />}
+
+      {taiLen && (
+        <TaiKhachLenModal customers={customers} profiles={profiles} currentProfile={currentProfile}
+          onClose={() => setTaiLen(false)} onDone={loadCustomers} />
+      )}
 
       {showForm && (
         <CustomerForm
