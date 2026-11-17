@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, ListPlus, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download, Upload } from 'lucide-react'
+import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, ListPlus, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download, Upload, UserCog, UserRoundCheck } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Phantrang } from './ui'
 import CustomerForm from './CustomerForm'
@@ -8,6 +8,7 @@ import OrderForm from './OrderForm'
 import StatusesModal from './StatusesModal'
 import DanhMucModal from './DanhMucModal'
 import TaiKhachLenModal from './TaiKhachLenModal'
+import ChiaKhachModal from './ChiaKhachModal'
 import { laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
 import { useTrangThai } from '../lib/StatusContext'
 import { ngayLocal, gioNgay, traoDoiGanNhat, demLuotChamSoc, tongDoanhThu, sapXepKhach } from '../lib/danhSachKhach'
@@ -40,7 +41,7 @@ export default function CustomerList({ currentProfile }) {
   const COT = [
     { key: 'stt', label: '#' },
     { key: 'sdt', label: 'Điện thoại', sapXep: 'sdt' },
-    { key: 'sale', label: 'Người phụ trách', sapXep: 'sale' },
+    { key: 'sale', label: 'Tên sale', sapXep: 'sale' },
     { key: 'trao_doi', label: 'Trao đổi gần nhất', sapXep: 'trao_doi' },
     { key: 'cham_soc', label: 'Trạng thái' },
     { key: 'van_de', label: 'Vấn đề KH', sapXep: 'van_de' },
@@ -52,7 +53,7 @@ export default function CustomerList({ currentProfile }) {
     { key: 'giai_phap', label: 'Giải pháp', macDinh: false },
     { key: 'nhat_ky', label: 'Cập nhật gần nhất', macDinh: false },
   ]
-  const KHOA_LUU_COT = 'tuki_cot_khach_v2'   // đổi khoá để áp bộ cột mặc định mới 1 lần
+  const KHOA_LUU_COT = 'tuki_cot_khach_v3'   // đổi khoá để áp bộ cột mặc định mới 1 lần
   const [cotHien, setCotHien] = useState(() => {
     try {
       const luu = JSON.parse(localStorage.getItem(KHOA_LUU_COT) || 'null')
@@ -61,6 +62,7 @@ export default function CustomerList({ currentProfile }) {
     return Object.fromEntries(COT.map((c) => [c.key, c.macDinh !== false]))
   })
   const [moChonCot, setMoChonCot] = useState(false)
+  const [chiaMode, setChiaMode] = useState(null)   // 'chon' | 'nghi'
   const [nhatKyGanNhat, setNhatKyGanNhat] = useState({})
   const [interactions, setInteractions] = useState([])
   const [donHang, setDonHang] = useState([])
@@ -254,7 +256,7 @@ export default function CustomerList({ currentProfile }) {
         'Mã KH': c.ma_khach,
         'Tên khách hàng': c.ten_khach,
         'Điện thoại': c.sdt || '',
-        'Người phụ trách': profileName(c.sale_id),
+        'Tên sale': profileName(c.sale_id),
         'Trạng thái': tenTrangThai(c.trang_thai_cham_soc),
         'Hẹn chăm sóc tiếp': c.ngay_cham_soc_tiep_theo || '',
         'Số lượt chăm sóc': luotCS[c.id] || 0,
@@ -317,6 +319,11 @@ export default function CustomerList({ currentProfile }) {
           {isAdmin && (
             <Button variant="secondary" onClick={() => setQuanLyDM(true)}>
               <ListPlus size={16} /> Nguồn & dịch vụ
+            </Button>
+          )}
+          {laQuanLy(currentProfile) && (
+            <Button variant="secondary" onClick={() => setChiaMode('nghi')}>
+              <UserCog size={16} /> Chuyển data sale nghỉ
             </Button>
           )}
           <Button variant="secondary" onClick={() => setTaiLen(true)}>
@@ -398,6 +405,12 @@ export default function CustomerList({ currentProfile }) {
           )}
         </p>
         <div className="flex items-center gap-2">
+          {laQuanLy(currentProfile) && daChon.size > 0 && (
+            <button type="button" onClick={() => setChiaMode('chon')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-coral-500 bg-coral-500 px-3 py-1.5 text-sm text-white hover:bg-coral-600">
+              <UserRoundCheck size={15} /> Chia {daChon.size} khách cho sale
+            </button>
+          )}
           {isAdmin && daChon.size > 0 && (
             <button type="button" onClick={xoaNhieu}
               className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50">
@@ -612,6 +625,12 @@ export default function CustomerList({ currentProfile }) {
 
       {quanLyTT && <StatusesModal onClose={() => setQuanLyTT(false)} />}
       {quanLyDM && <DanhMucModal onClose={() => setQuanLyDM(false)} />}
+
+      {chiaMode && (
+        <ChiaKhachModal mode={chiaMode} customers={customers} daChon={daChon} profiles={dsSale}
+          onClose={() => setChiaMode(null)}
+          onDone={() => { setDaChon(new Set()); loadCustomers() }} />
+      )}
 
       {taiLen && (
         <TaiKhachLenModal customers={customers} profiles={dsSale} currentProfile={currentProfile}
