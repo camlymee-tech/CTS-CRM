@@ -1,6 +1,7 @@
 import { Users, LogOut, UserCog, KeyRound, BookOpen, Bell, PieChart, ListChecks, Calculator } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { laQuanLy, tenVaiTro } from '../lib/quyen'
+import logoCts from '../assets/cts-logo-trang.png'
 
 const NAV = [
   { key: 'checklist', label: 'Checklist hôm nay', icon: ListChecks, ready: true },
@@ -15,12 +16,9 @@ const NAV = [
 export default function Sidebar({ current, onNavigate, profile, onChangePassword, unreadCount = 0, viecCan = { tong: 0, followUp: 0, canGoiLai: 0, baoCaoAds: 0 } }) {
   return (
     <aside className="flex h-screen w-60 flex-col bg-navy-950 text-white">
-      <div className="flex items-center gap-2.5 px-5 py-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-coral-500 font-display text-sm font-bold">C</div>
-        <div>
-          <p className="font-display text-sm font-bold leading-tight">CTS CRM</p>
-          <p className="text-xs text-white/50">Quản lý khách hàng</p>
-        </div>
+      <div className="px-5 pb-4 pt-6">
+        <img src={logoCts} alt="CTS Group" className="h-auto w-full" />
+        <p className="mt-3 border-t border-white/10 pt-3 text-xs text-white/50">CRM · Quản lý khách hàng</p>
       </div>
 
       <nav className="flex-1 space-y-1 px-3">

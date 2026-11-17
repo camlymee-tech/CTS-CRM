@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Button, Input } from './ui'
+import logoCts from '../assets/cts-logo.png'
 
 export default function Login() {
   const [mode, setMode] = useState('signin')
@@ -37,7 +38,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-navy-950 px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-coral-500 font-display text-lg font-bold text-white">C</div>
+          <img src={logoCts} alt="CTS Group" className="mx-auto mb-3 h-14 w-auto" />
           <h1 className="font-display text-xl font-bold text-navy-900">CTS CRM</h1>
           <p className="text-sm text-ink-600">
             {mode === 'forgot' ? 'Nhập email để nhận link đặt lại mật khẩu' : 'Quản lý khách hàng & dịch vụ'}

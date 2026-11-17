@@ -1,5 +1,8 @@
 // Xuất báo giá dịch vụ CTS ra Excel: bảng kẻ ô, đúng thứ tự các dòng như file báo giá mẫu
-import { so, tinhThue, tinhXNK, khungXNK, khungMuaBan, TEN_DV } from './baoGia'
+import { so, tinhThue, tinhXNK, tinhOrder, khungXNK, TEN_DV } from './baoGia'
+import logoUrl from '../assets/cts-logo.png'
+
+let LOGO = null   // dữ liệu ảnh logo CTS, nạp 1 lần khi xuất file
 
 const NAVY = 'FF0A2463', CAM = 'FFFFEDD5', XAM = 'FFF1F5F9', TRANG = 'FFFFFFFF'
 const mau = { argb: 'FFCBD5E1' }
@@ -9,7 +12,13 @@ const fill = (c, argb) => { c.fill = { type: 'pattern', pattern: 'solid', fgColo
 
 function tieuDe(ws, n, tieu, khach, ma) {
   ws.mergeCells(1, 1, 1, n)
-  const a = ws.getCell(1, 1); a.value = 'CTS LOGISTICS'; a.font = { bold: true, size: 12, color: { argb: 'FFEA580C' } }
+  ws.getRow(1).height = 46
+  if (LOGO) {
+    const id = ws.workbook.addImage({ buffer: LOGO, extension: 'png' })
+    ws.addImage(id, { tl: { col: 0.1, row: 0.1 }, ext: { width: 150, height: 44 } })
+  } else {
+    const a = ws.getCell(1, 1); a.value = 'CTS GROUP'; a.font = { bold: true, size: 12, color: { argb: 'FF2A62AF' } }
+  }
   ws.mergeCells(2, 1, 2, n)
   const b = ws.getCell(2, 1); b.value = tieu; b.font = { bold: true, size: 16, color: { argb: NAVY } }; ws.getRow(2).height = 26
   ws.mergeCells(3, 1, 3, n)
@@ -39,6 +48,7 @@ const pt = (v) => (so(v) ? `${so(v).toFixed(2).replace('.', ',')}%` : '')
 export async function xuatBaoGia({ loai, st }) {
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
+  if (!LOGO) { try { LOGO = await (await fetch(logoUrl)).arrayBuffer() } catch { LOGO = null } }
   const order = loai === 'order'
   const dv = order ? (st.dichVu || 'van_chuyen') : loai
   const ten = order ? 'Báo giá order' : `Báo giá dịch vụ ${TEN_DV[loai]}`
