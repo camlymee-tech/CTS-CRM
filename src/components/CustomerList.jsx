@@ -347,10 +347,6 @@ export default function CustomerList({ currentProfile }) {
             <Input placeholder="Tìm theo tên, mã KH, SĐT, ngành hàng..." value={search}
               onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
-          <Select value={filterLoai} onChange={(e) => setFilterLoai(e.target.value)} className="w-40">
-            <option value="">Tất cả loại khách</option>
-            {LOAI_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
           <Select value={filterTrangThai} onChange={(e) => setFilterTrangThai(e.target.value)} className="w-48">
             <option value="">Tất cả trạng thái</option>
             {TRANG_THAI.map((o) => <option key={o.ma} value={o.ma}>{o.ten}</option>)}
@@ -360,10 +356,6 @@ export default function CustomerList({ currentProfile }) {
           <Select value={filterDichVu} onChange={(e) => setFilterDichVu(e.target.value)} className="w-48">
             <option value="">Tất cả dịch vụ</option>
             {DICH_VU_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-          <Select value={filterNguon} onChange={(e) => setFilterNguon(e.target.value)} className="w-44">
-            <option value="">Tất cả nguồn</option>
-            {NGUON_KHACH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </Select>
           <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
             <option value="">Tất cả sale</option>

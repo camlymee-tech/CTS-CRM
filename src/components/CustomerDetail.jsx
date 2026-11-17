@@ -193,8 +193,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const TABS = [
     { key: 'thong_tin', label: 'Thông tin' },
     { key: 'cham_soc', label: `Chăm sóc (${interactions.length})` },
-    { key: 'don_hang', label: `Đơn hàng (${donHang.length})` },
-    { key: 'hop_dong', label: `Hợp đồng (${hopDong.length})` },
     { key: 'nhat_ky', label: 'Nhật ký' },
   ]
 
