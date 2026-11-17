@@ -11,7 +11,7 @@ function taoMa(ten) {
 }
 
 export default function DanhMucModal({ onClose }) {
-  const [loai, setLoai] = useState('nguon_khach')
+  const [loai, setLoai] = useState('dich_vu')
   const [moi, setMoi] = useState('')
   const [sua, setSua] = useState(null)       // { value, label }
   const [msg, setMsg] = useState('')
@@ -80,9 +80,9 @@ export default function DanhMucModal({ onClose }) {
   }
 
   return (
-    <Modal title="Nguồn khách & Dịch vụ" onClose={onClose} wide>
+    <Modal title="Dịch vụ" onClose={onClose} wide>
       <div className="mb-4 flex gap-2">
-        {Object.entries(DANH_MUC).map(([k, v]) => (
+        {Object.entries(DANH_MUC).filter(([k]) => k === 'dich_vu').map(([k, v]) => (
           <button key={k} onClick={() => { setLoai(k); setMsg(''); setSua(null) }}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
               loai === k ? 'bg-navy-900 text-white' : 'bg-slate-100 text-ink-600 hover:bg-slate-200'}`}>
