@@ -321,14 +321,6 @@ export default function CustomerList({ currentProfile }) {
               <ListPlus size={16} /> Nguồn & dịch vụ
             </Button>
           )}
-          {laQuanLy(currentProfile) && (
-            <Button variant="secondary" onClick={() => setChiaMode('nghi')}>
-              <UserCog size={16} /> Chuyển data sale nghỉ
-            </Button>
-          )}
-          <Button variant="secondary" onClick={() => setTaiLen(true)}>
-            <Upload size={16} /> Tải khách lên
-          </Button>
           <Button onClick={() => { setEditingCustomer(null); setShowForm(true) }}>
             <Plus size={16} /> Thêm khách hàng
           </Button>
@@ -642,6 +634,7 @@ export default function CustomerList({ currentProfile }) {
           customer={editingCustomer}
           profiles={laQuanLy(currentProfile) ? dsSale : profiles}
           currentProfile={currentProfile}
+          onTaiFile={() => { setShowForm(false); setTaiLen(true) }}
           onClose={() => setShowForm(false)}
           onSaved={(khachVuaChot) => {
             setShowForm(false)

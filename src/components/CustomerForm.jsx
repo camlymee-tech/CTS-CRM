@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { TriangleAlert, Upload } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Modal, Input, Select, Textarea, Button, Badge } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
@@ -12,7 +12,7 @@ import {
   TINH_THANH,
 } from '../lib/constants'
 
-export default function CustomerForm({ customer, profiles, currentProfile, onClose, onSaved }) {
+export default function CustomerForm({ customer, profiles, currentProfile, onClose, onSaved, onTaiFile }) {
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, maTaoDon } = useTrangThai()
   const isEdit = !!customer
   const trangThaiCu = customer?.trang_thai_cham_soc || null
@@ -196,6 +196,18 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
             {saving ? 'Đang lưu...' : khachTrung ? 'Số điện thoại bị trùng' : 'Lưu khách hàng'}
           </Button>
         </div>
+
+        {!isEdit && onTaiFile && (
+          <div className="col-span-2 mt-1 flex items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-navy-900">Có nhiều khách?</p>
+              <p className="text-xs text-ink-600">Thêm nhiều khách cùng lúc từ file Excel hoặc CSV</p>
+            </div>
+            <Button type="button" variant="secondary" onClick={onTaiFile}>
+              <Upload size={16} /> Tải file lên
+            </Button>
+          </div>
+        )}
       </form>
     </Modal>
   )
