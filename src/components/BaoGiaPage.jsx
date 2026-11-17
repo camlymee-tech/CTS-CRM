@@ -53,15 +53,19 @@ function ThongTinChung({ st, up }) {
 function BangThue({ st, up }) {
   const th = useMemo(() => tinhThue(st), [st])
   const setSp = (i, p) => up({ sp: st.sp.map((x, j) => (j === i ? { ...x, ...p } : x)) })
-  const heads = ['STT', 'Sản phẩm', 'Số lượng', 'Đơn giá khách báo (tệ)', 'Giá trị (tệ)', 'Giá trị (VND)', 'TS thuế NK (%)', 'TS GTGT (%)', 'CBPG (%)', 'TTDB (%)', 'BVMT (VND)', 'Thuế NK', 'CBPG', 'TTDB', 'Thuế GTGT', 'Tổng thuế', '']
+  const heads = ['STT', 'Sản phẩm', 'Số lượng', 'Đơn giá khách báo (tệ)', 'Giá trị (tệ)', 'Tiền hàng (VND)', 'Đơn giá khai (USD)', 'Giá trị khai (USD)', 'Giá trị khai (VND)', 'TS thuế NK (%)', 'TS GTGT (%)', 'CBPG (%)', 'TTDB (%)', 'BVMT (VND)', 'Thuế NK', 'CBPG', 'TTDB', 'Thuế GTGT', 'Tổng thuế', '']
   return (
     <div className="overflow-x-auto rounded-2xl bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <p className="font-display font-semibold text-navy-900">1. Khai báo thuế theo sản phẩm</p>
-        <label className="flex items-center gap-2 text-sm"><span className="font-medium text-navy-900">Tỷ giá tệ (VND)</span>
-          <span className="w-28"><O v={st.tyGiaTe} set={(v) => up({ tyGiaTe: v })} /></span></label>
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="flex items-center gap-2 text-sm"><span className="font-medium text-navy-900">Tỷ giá tệ (VND)</span>
+            <span className="w-28"><O v={st.tyGiaTe} set={(v) => up({ tyGiaTe: v })} /></span></label>
+          <label className="flex items-center gap-2 text-sm"><span className="font-medium text-navy-900">Tỷ giá USD (VND)</span>
+            <span className="w-28"><O v={st.tyGiaUsd} set={(v) => up({ tyGiaUsd: v })} /></span></label>
+        </div>
       </div>
-      <table className="w-full min-w-[1700px] border-collapse">
+      <table className="w-full min-w-[2000px] border-collapse">
         <thead><tr>{heads.map((h, i) => <th key={i} className={TH}>{h}</th>)}</tr></thead>
         <tbody>
           {st.sp.map((p, i) => {
@@ -74,6 +78,9 @@ function BangThue({ st, up }) {
                 <td className={`${TD} w-28`}><O v={p.dg} set={(v) => setSp(i, { dg: v })} tp /></td>
                 <td className={`${TD} text-right`}>{vnd(d.tri)}</td>
                 <td className={`${TD} text-right`}>{vnd(d.W)}</td>
+                <td className={`${TD} w-28`}><O v={p.dgUsd} set={(v) => setSp(i, { dgUsd: v })} tp /></td>
+                <td className={`${TD} text-right`}>{vnd(d.usd)}</td>
+                <td className={`${TD} text-right`}>{vnd(d.WU)}</td>
                 {['nk', 'gtgt', 'cbpg', 'ttdb'].map((k) => <td key={k} className={`${TD} w-20`}><O v={p[k]} set={(v) => setSp(i, { [k]: v })} tp /></td>)}
                 <td className={`${TD} w-28`}><O v={p.bvmt} set={(v) => setSp(i, { bvmt: v })} /></td>
                 <td className={`${TD} text-right`}>{vnd(d.nk)}</td>
@@ -91,6 +98,9 @@ function BangThue({ st, up }) {
             <td className={TD} /><td className={TD}>TỔNG CỘNG</td>
             <td className={TD} /><td className={TD} /><td className={TD} />
             <td className={`${TD} text-right`}>{vnd(th.dong.reduce((a, d) => a + d.W, 0))}</td>
+            <td className={TD} />
+            <td className={`${TD} text-right`}>{vnd(th.dong.reduce((a, d) => a + d.usd, 0))}</td>
+            <td className={`${TD} text-right`}>{vnd(th.dong.reduce((a, d) => a + d.WU, 0))}</td>
             <td className={TD} /><td className={TD} /><td className={TD} /><td className={TD} /><td className={TD} />
             <td className={`${TD} text-right`}>{vnd(th.tong.nk)}</td>
             <td className={`${TD} text-right`}>{vnd(th.dong.reduce((a, d) => a + d.cbpg, 0))}</td>
@@ -102,8 +112,8 @@ function BangThue({ st, up }) {
         </tbody>
       </table>
       <div className="mt-3 flex items-center justify-between">
-        <Button variant="secondary" onClick={() => up({ sp: [...st.sp, SP_THUE()] })}><Plus size={16} />Thêm sản phẩm</Button>
-        <p className="text-xs text-ink-400">Thuế NK = giá trị × TS NK · TTDB = (giá trị + thuế NK) × TS TTDB · GTGT = (giá trị + NK + CBPG + TTDB + BVMT) × TS GTGT</p>
+        <Button variant="secondary" className="shrink-0 whitespace-nowrap" onClick={() => up({ sp: [...st.sp, SP_THUE()] })}><Plus size={16} />Thêm sản phẩm</Button>
+        <p className="ml-4 text-xs text-ink-400">Có đơn giá khai USD thì tính thuế trên giá trị khai (VND), không có thì tính trên tiền hàng theo tệ · Thuế NK = giá trị × TS NK · TTDB = (giá trị + thuế NK) × TS TTDB · GTGT = (giá trị + NK + CBPG + TTDB + BVMT) × TS GTGT</p>
       </div>
     </div>
   )

@@ -13,7 +13,7 @@ export const HINH_THUC_UT = {
   cts: { ten: 'Khách đứng & CTS đứng tờ khai', phiTach: '3000000' },
   nsx: { ten: 'Khách và nhà sản xuất đứng tờ khai', phiTach: '5000000' },
 }
-export const SP_THUE = () => ({ ten: '', sl: '', dg: '', nk: '', gtgt: '8', cbpg: '', ttdb: '', bvmt: '' })
+export const SP_THUE = () => ({ ten: '', sl: '', dg: '', dgUsd: '', nk: '', gtgt: '8', cbpg: '', ttdb: '', bvmt: '' })
 
 const XNK_CHUNG = () => ({
   khach: '', ma: '', tuyen: 'BT-HN',
@@ -23,7 +23,7 @@ const XNK_CHUNG = () => ({
   shipKho: '', tauSl: '', tauDg: '', pallet: '', hoanGt: '', hoanPct: '0,6', khacVN: '',
   tq1Sl: '', tq1Dg: '3965', tq2Sl: '', tq2Dg: '3965', tq3Sl: '', tq3Dg: '3965',
   vatDV: '8', chotKg: '', chotM3: '', phiMuaPct: '2',
-  tyGiaTe: '3965', sp: [SP_THUE()],
+  tyGiaTe: '3965', tyGiaUsd: '26800', sp: [SP_THUE()],
 })
 export const MUA_BAN_MAC_DINH = () => ({ ...XNK_CHUNG(), phiTach: '' })
 export const VAN_CHUYEN_MAC_DINH = () => XNK_CHUNG()
@@ -31,16 +31,19 @@ export const UY_THAC_MAC_DINH = () => ({ ...XNK_CHUNG(), hinhThuc: 'ut', phiTach
 
 // Thuế theo từng sản phẩm (tab Uỷ thác)
 export function tinhThue(st) {
-  const ty = so(st.tyGiaTe)
+  const ty = so(st.tyGiaTe), tyUsd = so(st.tyGiaUsd)
   const dong = (st.sp || []).map((p) => {
     const tri = so(p.sl) * so(p.dg)                     // giá trị (tệ)
-    const W = lam(tri * ty)                             // giá trị tính thuế (VND)
-    const nk = lam(W * so(p.nk) / 100)
-    const cbpg = lam(W * so(p.cbpg) / 100)
-    const ttdb = lam((W + nk) * so(p.ttdb) / 100)
+    const W = lam(tri * ty)                             // tiền hàng theo tệ (VND)
+    const usd = so(p.sl) * so(p.dgUsd)                  // giá trị khai (USD)
+    const WU = lam(usd * tyUsd)                         // giá trị khai (VND)
+    const T = so(p.dgUsd) > 0 ? WU : W                  // giá trị tính thuế: ưu tiên giá khai USD, không có thì dùng tệ
+    const nk = lam(T * so(p.nk) / 100)
+    const cbpg = lam(T * so(p.cbpg) / 100)
+    const ttdb = lam((T + nk) * so(p.ttdb) / 100)
     const bvmt = lam(so(p.bvmt))
-    const gtgt = lam((W + nk + cbpg + ttdb + bvmt) * so(p.gtgt) / 100)
-    return { tri, W, nk, cbpg, ttdb, bvmt, gtgt, tong: nk + cbpg + ttdb + bvmt + gtgt }
+    const gtgt = lam((T + nk + cbpg + ttdb + bvmt) * so(p.gtgt) / 100)
+    return { tri, W, usd, WU, T, nk, cbpg, ttdb, bvmt, gtgt, tong: nk + cbpg + ttdb + bvmt + gtgt }
   })
   const t = { nk: 0, vat: 0, khac: 0, tong: 0 }
   dong.forEach((d) => { t.nk += d.nk; t.vat += d.gtgt; t.khac += d.cbpg + d.ttdb + d.bvmt; t.tong += d.tong })

@@ -79,18 +79,18 @@ export async function xuatBaoGia({ loai, st }) {
 
     {
       const w2 = wb.addWorksheet('Khai báo thuế', { views: [{ showGridLines: false }] })
-      const h2 = ['STT', 'Sản phẩm', 'Số lượng', 'Đơn giá (tệ)', 'Giá trị (tệ)', 'Tỷ giá tệ', 'Giá trị (VND)', 'TS thuế NK', 'TS GTGT', 'CBPG', 'TTDB', 'BVMT', 'Thuế NK', 'CBPG', 'TTDB', 'Thuế GTGT', 'Tổng thuế']
-      w2.columns = [6, 26, 10, 12, 14, 10, 16, 11, 11, 10, 10, 12, 15, 14, 14, 16, 16].map((width) => ({ width }))
+      const h2 = ['STT', 'Sản phẩm', 'Số lượng', 'Đơn giá (tệ)', 'Giá trị (tệ)', 'Tỷ giá tệ', 'Tiền hàng (VND)', 'Đơn giá khai (USD)', 'Giá trị khai (USD)', 'Tỷ giá USD', 'Giá trị khai (VND)', 'TS thuế NK', 'TS GTGT', 'CBPG', 'TTDB', 'BVMT', 'Thuế NK', 'CBPG', 'TTDB', 'Thuế GTGT', 'Tổng thuế']
+      w2.columns = [6, 26, 10, 12, 14, 10, 16, 14, 14, 10, 16, 11, 11, 10, 10, 12, 15, 14, 14, 16, 16].map((width) => ({ width }))
       tieuDe(w2, h2.length, 'KHAI BÁO THUẾ', st.khach, st.ma)
       dongDau(w2, 5, h2)
       const th = tinhThue(st)
       st.sp.forEach((p, i) => {
         const d = th.dong[i]
-        ;[i + 1, p.ten || `Sản phẩm ${i + 1}`, so(p.sl), so(p.dg), d.tri, so(st.tyGiaTe), d.W, pt(p.nk), pt(p.gtgt), pt(p.cbpg), pt(p.ttdb), so(p.bvmt), d.nk, d.cbpg, d.ttdb, d.gtgt, d.tong]
-          .forEach((v, ci) => o(w2, 6 + i, ci + 1, v, { canh: ci === 0 ? 'center' : ci >= 7 && ci <= 10 ? 'center' : undefined, fmt: '#,##0.##', dam: ci === 16 }))
+        ;[i + 1, p.ten || `Sản phẩm ${i + 1}`, so(p.sl), so(p.dg), d.tri, so(st.tyGiaTe), d.W, so(p.dgUsd), d.usd, so(st.tyGiaUsd), d.WU, pt(p.nk), pt(p.gtgt), pt(p.cbpg), pt(p.ttdb), so(p.bvmt), d.nk, d.cbpg, d.ttdb, d.gtgt, d.tong]
+          .forEach((v, ci) => o(w2, 6 + i, ci + 1, v, { canh: ci === 0 ? 'center' : ci >= 11 && ci <= 14 ? 'center' : undefined, fmt: '#,##0.##', dam: ci === 20 }))
       })
       const rr = 6 + st.sp.length
-      ;['', 'TỔNG CỘNG', '', '', '', '', th.dong.reduce((a, d) => a + d.W, 0), '', '', '', '', '', th.dong.reduce((a, d) => a + d.nk, 0), th.dong.reduce((a, d) => a + d.cbpg, 0), th.dong.reduce((a, d) => a + d.ttdb, 0), th.dong.reduce((a, d) => a + d.gtgt, 0), th.tong.tong]
+      ;['', 'TỔNG CỘNG', '', '', '', '', th.dong.reduce((a, d) => a + d.W, 0), '', th.dong.reduce((a, d) => a + d.usd, 0), '', th.dong.reduce((a, d) => a + d.WU, 0), '', '', '', '', '', th.dong.reduce((a, d) => a + d.nk, 0), th.dong.reduce((a, d) => a + d.cbpg, 0), th.dong.reduce((a, d) => a + d.ttdb, 0), th.dong.reduce((a, d) => a + d.gtgt, 0), th.tong.tong]
         .forEach((v, ci) => o(w2, rr, ci + 1, v, { dam: true, nen: XAM }))
     }
   }
