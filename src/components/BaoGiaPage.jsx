@@ -174,7 +174,6 @@ function BangXNK({ st, up, loai, order = false, phang = false, tieuDe }) {
         </table>
       </div>
 
-      {!order && (
       <div className={KHUNG}>
         <p className="mb-3 font-display font-semibold text-navy-900">Tổng hợp so sánh: theo KG và theo M3</p>
         <table className="w-full min-w-[640px] border-collapse">
@@ -196,7 +195,6 @@ function BangXNK({ st, up, loai, order = false, phang = false, tieuDe }) {
           </tbody>
         </table>
       </div>
-      )}
     </div>
   )
 }
@@ -228,15 +226,15 @@ const DICH_VU = [
 
 function Buoc({ n, id, ten, mota, children }) {
   return (
-    <section id={id} className="flex min-h-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-      <div className="flex items-start gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
-        <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-coral-500 font-display text-sm font-bold text-white shadow-sm shadow-coral-500/30">{n}</span>
-        <div className="min-w-0">
-          <h2 className="font-display text-base font-bold text-navy-900">{ten}</h2>
-          <p className="text-xs text-ink-600">{mota}</p>
+    <section id={id} className="scroll-mt-4 rounded-2xl bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-coral-500 font-display text-base font-bold text-white shadow-sm shadow-coral-500/30">{n}</span>
+        <div>
+          <h2 className="font-display text-lg font-bold text-navy-900">{ten}</h2>
+          <p className="text-sm text-ink-600">{mota}</p>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-4">{children}</div>
+      {children}
     </section>
   )
 }
@@ -258,20 +256,34 @@ function OrderFlow({ st, up }) {
   const tongCan = st.sp.reduce((a, x) => a + so(x.can), 0)
   const tongKhoi = st.sp.reduce((a, x) => a + so(x.khoi), 0)
   const reHon = kq.ve.kg.motSp && kq.ve.m3.motSp ? (kq.ve.kg.motSp <= kq.ve.m3.motSp ? 'kg' : 'm3') : null
-  const heads1 = ['STT', 'Sản phẩm', 'Link SP', 'Cân (KG)', 'Khối (M3)', 'Số lượng', 'Giá web (¥)', 'Ship nội địa (¥)', 'Giá trị đơn hàng (¥)', '']
+  const heads1 = ['STT', 'Sản phẩm', 'Link SP', 'Cân (KG)', 'Khối (M3)', 'Số lượng', 'Giá web (¥)', 'Ship nội địa (¥)', 'Giá trị đơn hàng (¥)', 'Giá về tay 1 SP theo KG', 'Giá về tay 1 SP theo M3', '']
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2" style={{ gridAutoRows: 'minmax(430px, calc((100vh - 270px) / 2))' }}>
+    <div className="space-y-5">
+      {/* Thanh tiến trình 4 bước */}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-3 shadow-sm">
+        {BUOC.map((b, i) => (
+          <div key={b.n} className="flex items-center gap-2">
+            <button type="button" onClick={() => nhay(b.id)}
+              className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-navy-900 transition hover:bg-orange-50">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-coral-500 text-xs font-bold text-white">{b.n}</span>
+              {b.ten}
+            </button>
+            {i < BUOC.length - 1 && <span className="text-ink-400">→</span>}
+          </div>
+        ))}
+      </div>
+
       {/* BƯỚC 1 */}
-      <Buoc n={1} id="order-b1" ten="Giá xưởng" mota="Sản phẩm khách order: số lượng, giá web (tệ), ship nội địa TQ, cân và khối">
-        <div className="mb-3 flex flex-wrap items-end gap-3">
+      <Buoc n={1} id="order-b1" ten="Giá xưởng" mota="Nhập sản phẩm khách muốn order: số lượng, giá web (tệ), ship nội địa Trung Quốc, cân nặng và khối.">
+        <div className="mb-4 flex flex-wrap items-end gap-4">
           {[['tyGiaTe', 'Tỷ giá tệ (VND)', false], ['phiDVPct', 'Tỷ lệ phí dịch vụ mua hàng (%)', true], ['tamUngPct', 'Tiền tạm ứng (%)', true]].map(([k, nhan, tp]) => (
-            <label key={k} className="flex w-44 flex-col gap-1 text-xs"><span className="font-medium text-navy-900">{nhan}</span>
+            <label key={k} className="flex w-52 flex-col gap-1 text-sm"><span className="font-medium text-navy-900">{nhan}</span>
               <O v={st[k]} set={(v) => up({ [k]: v })} tp={tp} /></label>
           ))}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] border-collapse">
+          <table className="w-full min-w-[1300px] border-collapse">
             <thead><tr>{heads1.map((h, i) => <th key={i} className={TH}>{h}</th>)}</tr></thead>
             <tbody>
               {st.sp.map((p, i) => (
@@ -285,6 +297,8 @@ function OrderFlow({ st, up }) {
                   <td className={`${TD} w-28`}><O v={p.dg} set={(v) => setSp(i, { dg: v })} tp /></td>
                   <td className={`${TD} w-28`}><O v={p.ship} set={(v) => setSp(i, { ship: v })} tp /></td>
                   <td className={`${TD} bg-amber-50 text-right font-semibold`}>{te2(kq.tri[i])}</td>
+                  <td className={`${TD} text-right font-semibold ${reHon === 'kg' ? 'bg-emerald-50 text-emerald-700' : ''}`}>{vnd(kq.ve.kg.dong[i]?.mot)}</td>
+                  <td className={`${TD} text-right font-semibold ${reHon === 'm3' ? 'bg-emerald-50 text-emerald-700' : ''}`}>{vnd(kq.ve.m3.dong[i]?.mot)}</td>
                   <td className={`${TD} w-10 text-center`}>
                     {st.sp.length > 1 && <button type="button" onClick={() => { const sp = st.sp.filter((_, j) => j !== i); up({ sp }) }} className="text-ink-400 hover:text-rose-500"><Trash2 size={15} /></button>}
                   </td>
@@ -297,7 +311,7 @@ function OrderFlow({ st, up }) {
           <Button variant="secondary" className="whitespace-nowrap" onClick={() => up({ sp: [...st.sp, SP_ORDER()] })}><Plus size={16} />Thêm sản phẩm</Button>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-5 max-w-2xl overflow-x-auto">
           <table className="w-full border-collapse">
             <thead><tr>{['STT', 'Nội dung', 'Số tiền (¥ - RMB)', 'Quy đổi VND'].map((h) => <th key={h} className={TH}>{h}</th>)}</tr></thead>
             <tbody>
@@ -320,19 +334,19 @@ function OrderFlow({ st, up }) {
       </Buoc>
 
       {/* BƯỚC 2 */}
-      <Buoc n={2} id="order-b2" ten="Khai thuế" mota="Số lượng và giá lấy từ bước 1. Nhập giá khai USD (nếu có) và thuế suất">
+      <Buoc n={2} id="order-b2" ten="Khai thuế" mota="Sản phẩm, số lượng và giá lấy từ bước 1. Nhập thêm giá khai USD (nếu khai riêng) và thuế suất từng sản phẩm.">
         <BangThue st={st} up={up} khoa phang tieuDe={null} />
       </Buoc>
 
       {/* BƯỚC 3 */}
-      <Buoc n={3} id="order-b3" ten="Vận chuyển" mota="Chọn 1 trong 3 dịch vụ. Tiền hàng và phí mua hàng đã tính ở bước 1">
-        <div className="mb-3 grid gap-2 sm:grid-cols-3">
+      <Buoc n={3} id="order-b3" ten="Vận chuyển" mota="Chọn 1 trong 3 dịch vụ để tính cước, phí và thuế nộp hộ. Tiền hàng và phí mua hàng đã tính ở bước 1 nên không tính lại ở đây.">
+        <div className="mb-4 grid gap-3 md:grid-cols-3">
           {DICH_VU.map((d) => (
             <button key={d.k} type="button"
               onClick={() => up({ dichVu: d.k, ...(d.k === 'uy_thac' ? { phiTach: HINH_THUC_UT[st.hinhThuc]?.phiTach || st.phiTach } : {}) })}
-              className={`rounded-xl border-2 px-3 py-2 text-left transition ${st.dichVu === d.k ? 'border-coral-500 bg-orange-50' : 'border-slate-200 hover:border-slate-300'}`}>
+              className={`rounded-xl border-2 p-3 text-left transition ${st.dichVu === d.k ? 'border-coral-500 bg-orange-50' : 'border-slate-200 hover:border-slate-300'}`}>
               <p className="font-semibold text-navy-900">{d.ten}</p>
-              <p className="hidden text-xs text-ink-600 2xl:block">{d.mota}</p>
+              <p className="text-xs text-ink-600">{d.mota}</p>
             </button>
           ))}
         </div>
@@ -350,15 +364,15 @@ function OrderFlow({ st, up }) {
       </Buoc>
 
       {/* BƯỚC 4 */}
-      <Buoc n={4} id="order-b4" ten="Giá về tay" mota="Tiền hàng bước 1 + vận chuyển và thuế bước 2, 3, chia cho số lượng">
-        <div className="mb-3 grid gap-3 sm:grid-cols-2">
+      <Buoc n={4} id="order-b4" ten="Giá về tay" mota="Tổng tiền hàng ở bước 1 cộng chi phí vận chuyển và thuế ở bước 3, chia cho số lượng sản phẩm.">
+        <div className="mb-4 grid gap-4 md:grid-cols-2">
           {[['kg', 'Vận chuyển theo KG'], ['m3', 'Vận chuyển theo M3']].map(([k, nhan]) => (
-            <div key={k} className={`rounded-2xl border-2 p-4 ${reHon === k ? 'border-emerald-400 bg-emerald-50/60' : 'border-slate-200 bg-slate-50'}`}>
+            <div key={k} className={`rounded-2xl border-2 p-5 ${reHon === k ? 'border-emerald-400 bg-emerald-50/60' : 'border-slate-200 bg-slate-50'}`}>
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-ink-600">{nhan}</p>
                 {reHon === k && <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-xs font-semibold text-white">Rẻ hơn</span>}
               </div>
-              <p className="mt-1 font-display text-2xl font-bold text-navy-900">{vnd(kq.ve[k].motSp)} <span className="text-base font-medium text-ink-600">đ / sản phẩm</span></p>
+              <p className="mt-2 font-display text-3xl font-bold text-navy-900">{vnd(kq.ve[k].motSp)} <span className="text-base font-medium text-ink-600">đ / sản phẩm</span></p>
               <p className="mt-1 text-sm text-ink-600">Tổng tiền hàng về tay: <b className="text-navy-900">{vnd(kq.ve[k].tongVe)}</b></p>
             </div>
           ))}
@@ -500,10 +514,10 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
       </header>
 
       <div className="space-y-5 p-8">
-        {tab !== 'order' && <div className="rounded-2xl bg-white p-4 shadow-sm">
+        <div className="rounded-2xl bg-white p-4 shadow-sm">
           <p className="mb-1.5 text-sm font-medium text-navy-900">Khách hàng của báo giá {!khach && <span className="font-normal text-rose-500">(chọn để lưu vào hồ sơ)</span>}</p>
           <ChonKhach khach={khach} onChon={khachCo ? null : chonKhach} />
-        </div>}
+        </div>
 
         <div className="flex gap-2">
           {TABS.map((t) => (
@@ -514,19 +528,7 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
           ))}
         </div>
 
-        {tab !== 'order' && <ThongTinChung st={st} up={up} />}
-        {tab === 'order' && (
-          <div className="flex flex-wrap items-end gap-4 rounded-2xl bg-white p-4 shadow-sm">
-            <div className="min-w-[300px] flex-1">
-              <p className="mb-1.5 text-sm font-medium text-navy-900">Khách hàng của báo giá {!khach && <span className="font-normal text-rose-500">(chọn để lưu vào hồ sơ)</span>}</p>
-              <ChonKhach khach={khach} onChon={khachCo ? null : chonKhach} />
-            </div>
-            <label className="flex w-56 flex-col gap-1 text-sm"><span className="font-medium text-navy-900">Tên in trên báo giá</span>
-              <Chu v={st.khach} set={(v) => up({ khach: v })} ph="VD: Anh Minh - Shop ABC" /></label>
-            <label className="flex w-44 flex-col gap-1 text-sm"><span className="font-medium text-navy-900">Mã báo giá</span>
-              <Chu v={st.ma} set={(v) => up({ ma: v })} ph="VD: CTS38001" /></label>
-          </div>
-        )}
+        <ThongTinChung st={st} up={up} />
         {tab === 'order' && <OrderFlow st={st} up={up} />}
         {tab === 'uy_thac' && (
           <div className="flex flex-wrap items-end gap-4 rounded-2xl bg-white p-4 shadow-sm">
