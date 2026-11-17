@@ -109,8 +109,8 @@ export async function xuatBaoGia({ loai, st }) {
 function sheetOrder(wb, st) {
   const ws = wb.addWorksheet('Giá xưởng & giá về tay', { views: [{ showGridLines: false }], pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } })
   const kq = tinhOrder(st)
-  const heads = ['STT', 'Sản phẩm', 'Link SP', 'Cân (KG)', 'Khối (M3)', 'Số lượng', 'Giá web (¥)', 'Ship nội địa (¥)', 'Giá trị đơn hàng (¥)', 'Giá về tay 1 SP theo KG', 'Giá về tay 1 SP theo M3']
-  ws.columns = [6, 28, 26, 11, 11, 11, 13, 15, 18, 20, 20].map((width) => ({ width }))
+  const heads = ['STT', 'Sản phẩm', 'Link SP', 'Số lượng', 'Giá web (¥)', 'Ship nội địa (¥)', 'Giá trị đơn hàng (¥)']
+  ws.columns = [6, 28, 26, 11, 13, 15, 18].map((width) => ({ width }))
   tieuDe(ws, heads.length, 'BÁO GIÁ ORDER', st.khach, st.ma)
   ws.mergeCells(4, 1, 4, heads.length)
   const gc = ws.getCell(4, 1)
@@ -119,8 +119,8 @@ function sheetOrder(wb, st) {
   dongDau(ws, 6, heads)
   st.sp.forEach((p, i) => {
     const r = 7 + i
-    ;[i + 1, p.ten || `Sản phẩm ${i + 1}`, p.link || '', so(p.can), so(p.khoi), so(p.sl), so(p.dg), so(p.ship), kq.tri[i], kq.ve.kg.dong[i]?.mot ?? 0, kq.ve.m3.dong[i]?.mot ?? 0]
-      .forEach((v, ci) => o(ws, r, ci + 1, v, { canh: ci === 0 ? 'center' : undefined, fmt: ci >= 3 && ci <= 8 ? '#,##0.00' : undefined, dam: ci >= 9 }))
+    ;[i + 1, p.ten || `Sản phẩm ${i + 1}`, p.link || '', so(p.sl), so(p.dg), so(p.ship), kq.tri[i]]
+      .forEach((v, ci) => o(ws, r, ci + 1, v, { canh: ci === 0 ? 'center' : undefined, fmt: ci >= 4 ? '#,##0.00' : undefined, dam: ci === 6 }))
   })
   let r = 7 + st.sp.length + 1
   const khoi = (tieu, heads2, rows) => {

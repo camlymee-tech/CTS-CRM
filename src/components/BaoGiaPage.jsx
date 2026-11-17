@@ -243,24 +243,15 @@ function OrderFlow({ st, up }) {
   const kq = useMemo(() => tinhOrder(st), [st])
   const setSp = (i, p) => {
     const sp = st.sp.map((x, j) => (j === i ? { ...x, ...p } : x))
-    const extra = {}
-    if ('can' in p || 'khoi' in p) {
-      // cân và khối tổng tự chuyển sang bước vận chuyển
-      const tong = (k) => sp.reduce((a, x) => a + so(x[k]), 0)
-      const chuoi = (n) => (n > 0 ? String(Math.round(n * 1000) / 1000).replace('.', ',') : '')
-      extra.kg = chuoi(tong('can')); extra.m3 = chuoi(tong('khoi'))
-    }
-    up({ sp, ...extra })
+    up({ sp })
   }
-  const tongCan = st.sp.reduce((a, x) => a + so(x.can), 0)
-  const tongKhoi = st.sp.reduce((a, x) => a + so(x.khoi), 0)
   const reHon = kq.ve.kg.motSp && kq.ve.m3.motSp ? (kq.ve.kg.motSp <= kq.ve.m3.motSp ? 'kg' : 'm3') : null
-  const heads1 = ['STT', 'Sản phẩm', 'Link SP', 'Cân (KG)', 'Khối (M3)', 'Số lượng', 'Giá web (¥)', 'Ship nội địa (¥)', 'Giá trị đơn hàng (¥)', 'Giá về tay 1 SP theo KG', 'Giá về tay 1 SP theo M3', '']
+  const heads1 = ['STT', 'Sản phẩm', 'Link SP', 'Số lượng', 'Giá web (¥)', 'Ship nội địa (¥)', 'Giá trị đơn hàng (¥)', '']
 
   return (
     <div className="space-y-5">
       {/* BƯỚC 1 */}
-      <Buoc n={1} id="order-b1" ten="Giá xưởng" mota="Nhập sản phẩm khách muốn order: số lượng, giá web (tệ), ship nội địa Trung Quốc, cân nặng và khối.">
+      <Buoc n={1} id="order-b1" ten="Giá xưởng" mota="Nhập sản phẩm khách muốn order: số lượng, giá web (tệ) và ship nội địa Trung Quốc.">
         <div className="mb-4 flex flex-wrap items-end gap-4">
           {[['tyGiaTe', 'Tỷ giá tệ (VND)', false], ['phiDVPct', 'Tỷ lệ phí dịch vụ mua hàng (%)', true], ['tamUngPct', 'Tiền tạm ứng (%)', true]].map(([k, nhan, tp]) => (
             <label key={k} className="flex w-52 flex-col gap-1 text-sm"><span className="font-medium text-navy-900">{nhan}</span>
@@ -268,7 +259,7 @@ function OrderFlow({ st, up }) {
           ))}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1300px] border-collapse">
+          <table className="w-full min-w-[900px] border-collapse">
             <thead><tr>{heads1.map((h, i) => <th key={i} className={TH}>{h}</th>)}</tr></thead>
             <tbody>
               {st.sp.map((p, i) => (
@@ -276,14 +267,10 @@ function OrderFlow({ st, up }) {
                   <td className={`${TD} text-center`}>{i + 1}</td>
                   <td className={`${TD} min-w-[170px]`}><Chu v={p.ten} set={(v) => setSp(i, { ten: v })} ph={`Sản phẩm ${i + 1}`} /></td>
                   <td className={`${TD} min-w-[140px]`}><Chu v={p.link} set={(v) => setSp(i, { link: v })} ph="Dán link" /></td>
-                  <td className={`${TD} w-24`}><O v={p.can} set={(v) => setSp(i, { can: v })} tp /></td>
-                  <td className={`${TD} w-24`}><O v={p.khoi} set={(v) => setSp(i, { khoi: v })} tp /></td>
                   <td className={`${TD} w-24`}><O v={p.sl} set={(v) => setSp(i, { sl: v })} /></td>
                   <td className={`${TD} w-28`}><O v={p.dg} set={(v) => setSp(i, { dg: v })} tp /></td>
                   <td className={`${TD} w-28`}><O v={p.ship} set={(v) => setSp(i, { ship: v })} tp /></td>
                   <td className={`${TD} bg-amber-50 text-right font-semibold`}>{te2(kq.tri[i])}</td>
-                  <td className={`${TD} text-right font-semibold ${reHon === 'kg' ? 'bg-emerald-50 text-emerald-700' : ''}`}>{vnd(kq.ve.kg.dong[i]?.mot)}</td>
-                  <td className={`${TD} text-right font-semibold ${reHon === 'm3' ? 'bg-emerald-50 text-emerald-700' : ''}`}>{vnd(kq.ve.m3.dong[i]?.mot)}</td>
                   <td className={`${TD} w-10 text-center`}>
                     {st.sp.length > 1 && <button type="button" onClick={() => { const sp = st.sp.filter((_, j) => j !== i); up({ sp }) }} className="text-ink-400 hover:text-rose-500"><Trash2 size={15} /></button>}
                   </td>
@@ -343,7 +330,7 @@ function OrderFlow({ st, up }) {
             </select></label>
         )}
         <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-ink-600">
-          Cân và khối lấy từ bước 1: <b className="text-navy-900">{tongCan.toLocaleString('vi-VN')} KG</b> và <b className="text-navy-900">{tongKhoi.toLocaleString('vi-VN')} M3</b>. Cần chỉnh thì sửa trực tiếp ở dòng cước bên dưới.
+          Nhập số <b className="text-navy-900">KG</b> và <b className="text-navy-900">M3</b> cùng đơn giá ở hai dòng cước vận chuyển bên dưới.
         </p>
         <BangXNK st={st} up={up} loai={st.dichVu} order phang tieuDe="Báo giá vận chuyển" />
       </Buoc>
