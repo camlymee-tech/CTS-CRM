@@ -37,15 +37,15 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-navy-950 px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-coral-500 font-display text-lg font-bold text-white">T</div>
-          <h1 className="font-display text-xl font-bold text-navy-900">TUKI CRM</h1>
+          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-coral-500 font-display text-lg font-bold text-white">C</div>
+          <h1 className="font-display text-xl font-bold text-navy-900">CTS CRM</h1>
           <p className="text-sm text-ink-600">
             {mode === 'forgot' ? 'Nhập email để nhận link đặt lại mật khẩu' : 'Quản lý khách hàng & dịch vụ'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="ban@tuki.vn" />
+          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="ban@email.com" />
           {mode === 'signin' && (
             <Input label="Mật khẩu" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
           )}

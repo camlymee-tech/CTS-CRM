@@ -4,14 +4,14 @@
   --font-display: "Sora", "Inter", sans-serif;
   --font-body: "Inter", sans-serif;
 
-  --color-navy-950: #0b1a2b;
-  --color-navy-900: #0f2438;
-  --color-navy-800: #163350;
-  --color-navy-700: #1d4267;
+  --color-navy-950: #0a2463;
+  --color-navy-900: #0d2f80;
+  --color-navy-800: #1240a6;
+  --color-navy-700: #1d56d1;
 
-  --color-coral-500: #ff6b45;
-  --color-coral-600: #ef5a34;
-  --color-coral-50: #fff1ec;
+  --color-coral-500: #ff7a00;
+  --color-coral-600: #e86a00;
+  --color-coral-50: #fff4e6;
 
   --color-teal-500: #14b8a6;
   --color-teal-50: #e9fbf8;
@@ -20,7 +20,7 @@
   --color-ink-600: #5b6b7f;
   --color-ink-400: #94a3b3;
 
-  --color-bg: #f5f6f8;
+  --color-bg: #f3f6fc;
 }
 
 body {

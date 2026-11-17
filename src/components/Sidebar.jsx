@@ -15,10 +15,10 @@ export default function Sidebar({ current, onNavigate, profile, onChangePassword
   return (
     <aside className="flex h-screen w-60 flex-col bg-navy-950 text-white">
       <div className="flex items-center gap-2.5 px-5 py-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-coral-500 font-display text-sm font-bold">T</div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-coral-500 font-display text-sm font-bold">C</div>
         <div>
-          <p className="font-display text-sm font-bold leading-tight">TUKI CRM</p>
-          <p className="text-xs text-white/50">TUKI Agency</p>
+          <p className="font-display text-sm font-bold leading-tight">CTS CRM</p>
+          <p className="text-xs text-white/50">Quản lý khách hàng</p>
         </div>
       </div>
 

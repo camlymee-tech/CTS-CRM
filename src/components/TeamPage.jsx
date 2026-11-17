@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, Lock, Unlock, Pencil, Link2 } from 'lucide-react'
+import { UserPlus, Lock, Unlock, Pencil, Link2, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { supabaseSignUp } from '../lib/signupClient'
 import { Button, Input, Select, Badge, Modal } from './ui'
 
 const EMPTY = {
@@ -48,6 +47,18 @@ export default function TeamPage({ currentProfile }) {
     updateProfile(p.id, { role: newRole })
   }
 
+  async function deleteAccount(p) {
+    const ok = window.confirm(
+      `Xoá hẳn tài khoản "${p.full_name || p.email}"?\n\nNgười này sẽ không đăng nhập được nữa và không thể khôi phục.\nNếu chỉ muốn tạm ngưng thì nên dùng nút Khoá.`
+    )
+    if (!ok) return
+    const { data, error } = await supabase.functions.invoke('quan-ly-tai-khoan', { body: { action: 'delete', id: p.id } })
+    const msg = data?.error || error?.message
+    if (msg) { setMessage(msg); return }
+    setMessage('')
+    load()
+  }
+
   if (currentProfile?.role !== 'admin') {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -71,25 +82,25 @@ export default function TeamPage({ currentProfile }) {
       {message && <p className="mx-8 mt-4 rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-600">{message}</p>}
 
       <div className="mx-8 my-6 overflow-x-auto rounded-2xl bg-white shadow-sm">
-        <table className="border-collapse w-full min-w-[900px] text-sm">
+        <table className="w-full min-w-[900px] border-collapse text-sm">
           <thead>
-            <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-600">
-              <th className="border border-slate-200 px-5 py-3">Nhân sự</th>
-              <th className="border border-slate-200 px-5 py-3">Mã sale</th>
-              <th className="border border-slate-200 px-5 py-3">Liên hệ</th>
-              <th className="border border-slate-200 px-5 py-3">Ngày vào công ty</th>
-              <th className="border border-slate-200 px-5 py-3">Vai trò</th>
-              <th className="border border-slate-200 px-5 py-3">Trạng thái</th>
-              <th className="border border-slate-200 px-5 py-3 text-right">Thao tác</th>
+            <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
+              <th className="border border-slate-200 bg-slate-50 px-5 py-3">Nhân sự</th>
+              <th className="border border-slate-200 bg-slate-50 px-5 py-3">Mã sale</th>
+              <th className="border border-slate-200 bg-slate-50 px-5 py-3">Liên hệ</th>
+              <th className="border border-slate-200 bg-slate-50 px-5 py-3">Ngày vào công ty</th>
+              <th className="border border-slate-200 bg-slate-50 px-5 py-3">Vai trò</th>
+              <th className="border border-slate-200 bg-slate-50 px-5 py-3">Trạng thái</th>
+              <th className="border border-slate-200 bg-slate-50 px-5 py-3 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="border border-slate-200 px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
+              <tr><td colSpan={7} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
             ) : profiles.map((p) => {
               const isMe = p.id === currentProfile.id
               return (
-                <tr key={p.id} className="border-b border-slate-50 last:border-0">
+                <tr key={p.id}>
                   <td className="border border-slate-200 px-5 py-3">
                     <p className="font-medium text-navy-900">
                       {p.full_name || '—'}
@@ -128,6 +139,12 @@ export default function TeamPage({ currentProfile }) {
                       <button onClick={() => updateProfile(p.id, { active: p.active === false })}
                         className="inline-flex items-center gap-1 text-xs text-ink-600 hover:text-coral-500">
                         {p.active === false ? <><Unlock size={13} /> Mở khoá</> : <><Lock size={13} /> Khoá</>}
+                      </button>
+                    )}
+                    {!isMe && (
+                      <button onClick={() => deleteAccount(p)}
+                        className="ml-3 inline-flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700">
+                        <Trash2 size={13} /> Xoá
                       </button>
                     )}
                   </td>
@@ -178,33 +195,11 @@ function CreateAccountForm({ onClose, onCreated }) {
     setSaving(true)
     setError('')
 
-    const { data, error: signUpError } = await supabaseSignUp.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: { data: { full_name: form.full_name } },
+    const { data, error: fnError } = await supabase.functions.invoke('quan-ly-tai-khoan', {
+      body: { action: 'create', profile: form },
     })
-
-    if (signUpError) {
-      setSaving(false)
-      setError(signUpError.message.includes('already registered')
-        ? 'Email này đã có tài khoản rồi' : signUpError.message)
-      return
-    }
-
-    const newId = data.user?.id
-    if (newId) {
-      await new Promise((r) => setTimeout(r, 900))
-      await supabase.from('profiles').update({
-        full_name: form.full_name,
-        ma_sale: form.ma_sale || null,
-        role: form.role,
-        sdt: form.sdt || null,
-        sdt_lam_viec: form.sdt_lam_viec || null,
-        ngay_sinh: form.ngay_sinh || null,
-        ngay_vao_cty: form.ngay_vao_cty || null,
-        link_fb: form.link_fb || null,
-      }).eq('id', newId)
-    }
+    const msg = data?.error || fnError?.message
+    if (msg) { setSaving(false); setError(msg); return }
 
     setSaving(false)
     onCreated()
@@ -218,7 +213,7 @@ function CreateAccountForm({ onClose, onCreated }) {
         <Input label="Mã sale" value={form.ma_sale}
           onChange={(e) => setForm({ ...form, ma_sale: e.target.value })} placeholder="VD: S01" />
         <Input label="Email đăng nhập *" type="email" required value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="a.nguyen@tuki.vn" />
+          onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="a.nguyen@email.com" />
         <Input label="Mật khẩu *" required minLength={6} value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Ít nhất 6 ký tự" />
 
