@@ -11,6 +11,8 @@ import { useTrangThai } from '../lib/StatusContext'
 import { XuatHopDongForm, hdTuHopDongDaLuu } from './ContractsPage'
 import ContractPreview from './ContractPreview'
 import OrderForm from './OrderForm'
+import DanhSachBaoGia from './DanhSachBaoGia'
+import { BaoGiaEditor } from './BaoGiaPage'
 import BenBModal from './BenBModal'
 import { useBenB } from '../lib/benB'
 import { nhacChoHopDong, hanDichVu, dinhDangNgay, moTaConLai } from '../lib/taiKy'
@@ -31,6 +33,12 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung, maTaoDon } = useTrangThai()
   const [customer, setCustomer] = useState(khachBanDau)
   const [tab, setTab] = useState('thong_tin')
+  const [baoGiaMo, setBaoGiaMo] = useState(null)   // null = đóng · {} = báo giá mới · {…} = mở báo giá đã lưu
+  const [lamMoiBG, setLamMoiBG] = useState(0)
+  const [demBG, setDemBG] = useState(0)
+  useEffect(() => {
+    supabase.from('bao_gia').select('id', { count: 'exact', head: true }).eq('customer_id', khachBanDau.id).then(({ count }) => setDemBG(count || 0))
+  }, [khachBanDau.id, lamMoiBG])
   const [interactions, setInteractions] = useState([])
   const [logs, setLogs] = useState([])
   const [donHang, setDonHang] = useState([])
@@ -197,6 +205,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const TABS = [
     { key: 'thong_tin', label: 'Thông tin' },
     { key: 'cham_soc', label: `Chăm sóc (${interactions.length})` },
+    { key: 'bao_gia', label: `Báo giá (${demBG})` },
     { key: 'nhat_ky', label: 'Nhật ký' },
   ]
 
@@ -340,6 +349,19 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                     </div>
                   </div>
                 )
+              )}
+
+              {tab === 'bao_gia' && (
+                <div className="space-y-3">
+                  {suaDuoc && (
+                    <button type="button" onClick={() => setBaoGiaMo({})}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-coral-300 px-3 py-2 text-sm font-medium text-coral-600 hover:bg-coral-50">
+                      <Plus size={15} /> Tạo báo giá mới
+                    </button>
+                  )}
+                  <DanhSachBaoGia customerId={customer.id} currentProfile={currentProfile} lamMoi={lamMoiBG}
+                    onDem={setDemBG} onMo={(b) => setBaoGiaMo(b)} />
+                </div>
               )}
 
               {tab === 'don_hang' && (
@@ -589,6 +611,15 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
         )}
         </div>
       </div>
+
+      {baoGiaMo && (
+        <div className="fixed inset-0 z-50 flex bg-navy-950/40 p-4 backdrop-blur-sm">
+          <div className="flex w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <BaoGiaEditor khachCo={customer} baoGiaMo={baoGiaMo.id ? baoGiaMo : null} currentProfile={currentProfile}
+              onSaved={() => setLamMoiBG((n) => n + 1)} onClose={() => setBaoGiaMo(null)} />
+          </div>
+        </div>
+      )}
 
       {ghiBaoCao && (
         <BaoCaoAdsModal

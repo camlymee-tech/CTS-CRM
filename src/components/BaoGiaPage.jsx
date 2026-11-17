@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react'
-import { FileDown, Plus, Trash2, RotateCcw } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { FileDown, Plus, Trash2, RotateCcw, Save, X, Search } from 'lucide-react'
+import { supabase } from '../supabaseClient'
+import DanhSachBaoGia from './DanhSachBaoGia'
 import { Button } from './ui'
 import {
-  so, tinhThue, tinhXNK, khungXNK, khungMuaBan,
+  so, tinhThue, tinhXNK, TEN_DV, khungXNK,
   MUA_BAN_MAC_DINH, VAN_CHUYEN_MAC_DINH, UY_THAC_MAC_DINH, SP_THUE, HINH_THUC_UT,
 } from '../lib/baoGia'
 import { xuatBaoGia } from '../lib/baoGiaXlsx'
@@ -183,56 +185,156 @@ const TABS = [
 ]
 const MAC_DINH = { mua_ban: MUA_BAN_MAC_DINH, van_chuyen: VAN_CHUYEN_MAC_DINH, uy_thac: UY_THAC_MAC_DINH }
 
-export default function BaoGiaPage() {
-  const [tab, setTab] = useState('mua_ban')
-  const [data, setData] = useState({ mua_ban: MUA_BAN_MAC_DINH(), van_chuyen: VAN_CHUYEN_MAC_DINH(), uy_thac: UY_THAC_MAC_DINH() })
+
+// Chọn khách hàng để gắn báo giá (tìm theo tên, mã hoặc số điện thoại)
+function ChonKhach({ khach, onChon }) {
+  const [tim, setTim] = useState('')
+  const [kq, setKq] = useState([])
+  const [mo, setMo] = useState(false)
+  useEffect(() => {
+    if (tim.trim().length < 2) { setKq([]); return }
+    const t = setTimeout(async () => {
+      const s = tim.trim().replace(/[,()%]/g, ' ')
+      const { data } = await supabase.from('customers').select('id, ma_khach, ten_khach, sdt')
+        .or(`ten_khach.ilike.%${s}%,ma_khach.ilike.%${s}%,sdt.ilike.%${s}%`).limit(10)
+      setKq(data || [])
+    }, 250)
+    return () => clearTimeout(t)
+  }, [tim])
+  if (khach) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg bg-orange-50 px-3 py-2 text-sm">
+        <span className="font-medium text-navy-900">{khach.ten_khach}</span>
+        <span className="text-xs text-ink-400">{khach.ma_khach}{khach.sdt ? ` · ${khach.sdt}` : ''}</span>
+        {onChon && <button type="button" onClick={() => onChon(null)} className="ml-auto text-ink-400 hover:text-rose-500"><X size={15} /></button>}
+      </div>
+    )
+  }
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+        <Search size={15} className="text-ink-400" />
+        <input value={tim} onChange={(e) => { setTim(e.target.value); setMo(true) }} placeholder="Gõ tên, mã hoặc số điện thoại khách để chọn..."
+          className="w-full text-sm outline-none" />
+      </div>
+      {mo && kq.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+          {kq.map((c) => (
+            <button key={c.id} type="button" onClick={() => { onChon(c); setMo(false); setTim('') }}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50">
+              <span className="font-medium text-navy-900">{c.ten_khach}</span>
+              <span className="text-xs text-ink-400">{c.ma_khach}{c.sdt ? ` · ${c.sdt}` : ''}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Phần tính báo giá. khachCo: khách cố định (khi mở từ hồ sơ khách). baoGiaMo: báo giá đã lưu cần mở lại.
+export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, onSaved, onClose, duoi = null }) {
+  const [tab, setTab] = useState(baoGiaMo?.loai || 'mua_ban')
+  const [data, setData] = useState(() => {
+    const d = { mua_ban: MUA_BAN_MAC_DINH(), van_chuyen: VAN_CHUYEN_MAC_DINH(), uy_thac: UY_THAC_MAC_DINH() }
+    if (baoGiaMo) d[baoGiaMo.loai] = { ...d[baoGiaMo.loai], ...baoGiaMo.du_lieu }
+    return d
+  })
+  const [khach, setKhach] = useState(khachCo || (baoGiaMo?.khach ? { id: baoGiaMo.customer_id, ...baoGiaMo.khach } : null))
+  const [idLuu, setIdLuu] = useState(baoGiaMo?.id || null)
+  const [daLuu, setDaLuu] = useState(false)
+  const [dangLuu, setDangLuu] = useState(false)
   const st = data[tab]
-  const up = (p) => setData((d) => ({ ...d, [tab]: { ...d[tab], ...p } }))
+  const up = (p) => { setDaLuu(false); setData((d) => ({ ...d, [tab]: { ...d[tab], ...p } })) }
   const [dang, setDang] = useState(false)
   const xuat = async () => { setDang(true); try { await xuatBaoGia({ loai: tab, st }) } finally { setDang(false) } }
+
+  const chonKhach = (c) => { setKhach(c); setDaLuu(false); if (c) setData((d) => ({ ...d, [tab]: { ...d[tab], khach: c.ten_khach } })) }
+  // Đổi tab khi đã lưu: lần lưu tiếp theo sẽ tạo báo giá mới cho dịch vụ khác
+  const doiTab = (k) => { if (k !== tab) { setTab(k); setIdLuu(k === baoGiaMo?.loai ? baoGiaMo.id : null); setDaLuu(false) } }
+
+  async function luu() {
+    if (!khach) { alert('Chọn khách hàng để lưu báo giá vào hồ sơ khách.'); return }
+    setDangLuu(true)
+    const kq = tinhXNK(st, tab)
+    const row = {
+      customer_id: khach.id, loai: tab, ten: (st.ma || '').trim() || `Báo giá ${TEN_DV[tab].toLowerCase()}`,
+      du_lieu: st, tong_kg: kq.kg.phaiTra, tong_m3: kq.m3.phaiTra, updated_at: new Date().toISOString(),
+    }
+    const { data: r, error } = idLuu
+      ? await supabase.from('bao_gia').update(row).eq('id', idLuu).select('id').single()
+      : await supabase.from('bao_gia').insert({ ...row, created_by: currentProfile?.id }).select('id').single()
+    setDangLuu(false)
+    if (error) { alert('Không lưu được báo giá: ' + error.message); return }
+    setIdLuu(r.id); setDaLuu(true); onSaved?.()
+  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-8 py-5">
         <div>
-          <h1 className="font-display text-xl font-bold text-navy-900">Tính giá bán</h1>
+          <h1 className="font-display text-xl font-bold text-navy-900">{khachCo ? `Báo giá cho ${khachCo.ten_khach}` : 'Tính giá bán'}</h1>
           <p className="text-sm text-ink-600">Báo giá dịch vụ Mua bán, Vận chuyển, Uỷ thác. Ô nền cam là ô sale tự nhập</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setData((d) => ({ ...d, [tab]: MAC_DINH[tab]() }))}><RotateCcw size={16} />Làm lại</Button>
-          <Button onClick={xuat} disabled={dang}><FileDown size={16} />{dang ? 'Đang xuất...' : 'Xuất Excel báo giá'}</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {daLuu && <span className="text-sm font-medium text-emerald-600">✓ Đã lưu vào hồ sơ khách</span>}
+          <Button variant="secondary" onClick={() => { setDaLuu(false); setIdLuu(null); setData((d) => ({ ...d, [tab]: MAC_DINH[tab]() })) }}><RotateCcw size={16} />Làm lại</Button>
+          <Button variant="secondary" onClick={xuat} disabled={dang}><FileDown size={16} />{dang ? 'Đang xuất...' : 'Xuất Excel'}</Button>
+          <Button onClick={luu} disabled={dangLuu}><Save size={16} />{dangLuu ? 'Đang lưu...' : idLuu ? 'Cập nhật báo giá' : 'Lưu báo giá'}</Button>
+          {onClose && <Button variant="ghost" onClick={onClose}><X size={16} />Đóng</Button>}
         </div>
       </header>
 
       <div className="space-y-5 p-8">
+        <div className="rounded-2xl bg-white p-4 shadow-sm">
+          <p className="mb-1.5 text-sm font-medium text-navy-900">Khách hàng của báo giá {!khach && <span className="font-normal text-rose-500">(chọn để lưu vào hồ sơ)</span>}</p>
+          <ChonKhach khach={khach} onChon={khachCo ? null : chonKhach} />
+        </div>
+
         <div className="flex gap-2">
           {TABS.map((t) => (
-            <button key={t.key} type="button" onClick={() => setTab(t.key)}
+            <button key={t.key} type="button" onClick={() => doiTab(t.key)}
               className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${tab === t.key ? 'bg-navy-900 text-white shadow-sm' : 'bg-white text-ink-600 hover:bg-slate-100'}`}>
               Dịch vụ {t.ten}
             </button>
           ))}
         </div>
 
-        {(
-          <>
-            <ThongTinChung st={st} up={up} />
-            {tab === 'uy_thac' && (
-              <div className="flex flex-wrap items-end gap-4 rounded-2xl bg-white p-4 shadow-sm">
-                <label className="flex min-w-[320px] flex-col gap-1 text-sm"><span className="font-medium text-navy-900">Hình thức uỷ thác</span>
-                  <select value={st.hinhThuc}
-                    onChange={(e) => up({ hinhThuc: e.target.value, phiTach: HINH_THUC_UT[e.target.value].phiTach })}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500">
-                    {Object.entries(HINH_THUC_UT).map(([k, v]) => <option key={k} value={k}>{v.ten}</option>)}
-                  </select></label>
-                <p className="pb-2 text-xs text-ink-400">Chọn hình thức sẽ tự điền phí tách tờ khai (3.000.000 hoặc 5.000.000), vẫn sửa tay được.</p>
-              </div>
-            )}
-            <BangThue st={st} up={up} />
-            <BangXNK st={st} up={up} loai={tab} />
-          </>
+        <ThongTinChung st={st} up={up} />
+        {tab === 'uy_thac' && (
+          <div className="flex flex-wrap items-end gap-4 rounded-2xl bg-white p-4 shadow-sm">
+            <label className="flex min-w-[320px] flex-col gap-1 text-sm"><span className="font-medium text-navy-900">Hình thức uỷ thác</span>
+              <select value={st.hinhThuc}
+                onChange={(e) => up({ hinhThuc: e.target.value, phiTach: HINH_THUC_UT[e.target.value].phiTach })}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500">
+                {Object.entries(HINH_THUC_UT).map(([k, v]) => <option key={k} value={k}>{v.ten}</option>)}
+              </select></label>
+            <p className="pb-2 text-xs text-ink-400">Chọn hình thức sẽ tự điền phí tách tờ khai (3.000.000 hoặc 5.000.000), vẫn sửa tay được.</p>
+          </div>
         )}
+        <BangThue st={st} up={up} />
+        <BangXNK st={st} up={up} loai={tab} />
+        {duoi}
       </div>
+    </div>
+  )
+}
+
+// Trang Tính giá bán: bảng tính ở trên, danh sách báo giá đã lưu ngay bên dưới
+export default function BaoGiaPage({ currentProfile }) {
+  const [mo, setMo] = useState(null)         // báo giá đang mở lại
+  const [khoa, setKhoa] = useState(0)        // đổi để dựng lại editor
+  const [lamMoi, setLamMoi] = useState(0)
+  const duoi = (
+    <div id="bao-gia-da-luu" className="rounded-2xl bg-white p-4 shadow-sm">
+      <p className="mb-3 font-display font-semibold text-navy-900">Báo giá đã lưu</p>
+      <DanhSachBaoGia currentProfile={currentProfile} lamMoi={lamMoi}
+        onMo={(b) => { setMo(b); setKhoa((n) => n + 1) }} />
+    </div>
+  )
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <BaoGiaEditor key={khoa} baoGiaMo={mo} currentProfile={currentProfile} onSaved={() => setLamMoi((n) => n + 1)} duoi={duoi} />
     </div>
   )
 }

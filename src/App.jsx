@@ -111,7 +111,7 @@ export default function App() {
       {page === 'customers' && <CustomerList currentProfile={profile} />}
       {page === 'baocao' && <BaoCaoPage currentProfile={profile} />}
       {page === 'team' && <TeamPage currentProfile={profile} />}
-      {page === 'pricing' && <BaoGiaPage />}
+      {page === 'pricing' && <BaoGiaPage currentProfile={profile} />}
       {page === 'documents' && <DocumentsPage currentProfile={profile} />}
       {page === 'notifications' && profile && (
         <NotificationsPage currentProfile={profile} onRead={loadUnread} />
