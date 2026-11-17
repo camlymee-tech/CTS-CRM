@@ -12,7 +12,7 @@ import BaoCaoPage from './components/BaoCaoPage'
 import ChecklistPage from './components/ChecklistPage'
 import { demNhacViec } from './lib/nhacViec'
 import { useDanhMuc } from './lib/danhMuc'
-import PricingPage from './components/PricingPage'
+import BaoGiaPage from './components/BaoGiaPage'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -111,7 +111,7 @@ export default function App() {
       {page === 'customers' && <CustomerList currentProfile={profile} />}
       {page === 'baocao' && <BaoCaoPage currentProfile={profile} />}
       {page === 'team' && <TeamPage currentProfile={profile} />}
-      {page === 'pricing' && <PricingPage currentProfile={profile} />}
+      {page === 'pricing' && <BaoGiaPage />}
       {page === 'documents' && <DocumentsPage currentProfile={profile} />}
       {page === 'notifications' && profile && (
         <NotificationsPage currentProfile={profile} onRead={loadUnread} />
