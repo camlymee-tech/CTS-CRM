@@ -252,7 +252,6 @@ function OrderFlow({ st, up }) {
     }
     up({ sp, ...extra })
   }
-  const nhay = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   const tongCan = st.sp.reduce((a, x) => a + so(x.can), 0)
   const tongKhoi = st.sp.reduce((a, x) => a + so(x.khoi), 0)
   const reHon = kq.ve.kg.motSp && kq.ve.m3.motSp ? (kq.ve.kg.motSp <= kq.ve.m3.motSp ? 'kg' : 'm3') : null
@@ -260,20 +259,6 @@ function OrderFlow({ st, up }) {
 
   return (
     <div className="space-y-5">
-      {/* Thanh tiến trình 4 bước */}
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-3 shadow-sm">
-        {BUOC.map((b, i) => (
-          <div key={b.n} className="flex items-center gap-2">
-            <button type="button" onClick={() => nhay(b.id)}
-              className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-navy-900 transition hover:bg-orange-50">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-coral-500 text-xs font-bold text-white">{b.n}</span>
-              {b.ten}
-            </button>
-            {i < BUOC.length - 1 && <span className="text-ink-400">→</span>}
-          </div>
-        ))}
-      </div>
-
       {/* BƯỚC 1 */}
       <Buoc n={1} id="order-b1" ten="Giá xưởng" mota="Nhập sản phẩm khách muốn order: số lượng, giá web (tệ), ship nội địa Trung Quốc, cân nặng và khối.">
         <div className="mb-4 flex flex-wrap items-end gap-4">
