@@ -52,7 +52,8 @@ export function tinhXNK(st, loai) {
   const thue = th.tong
   const tienHang = th.dong.reduce((a, d) => a + d.W, 0)
   const muaBan = loai === 'mua_ban'
-  const phiMua = muaBan ? lam(tienHang * so(st.phiMuaPct) / 100) : 0
+  const coPhiMua = muaBan || loai === 'uy_thac'
+  const phiMua = coPhiMua ? lam(tienHang * so(st.phiMuaPct) / 100) : 0
 
   const phiTach = lam(so(st.phiTach))
   const vnDong = [lam(so(st.shipKho)), lam(so(st.tauSl) * so(st.tauDg)), lam(so(st.pallet)), lam(so(st.hoanGt) * so(st.hoanPct) / 100), lam(so(st.khacVN))]
@@ -90,7 +91,8 @@ export function tinhXNK(st, loai) {
 // sl / dg: số (hiện chữ), hoặc {k, tp} = ô nhập gắn với st[k] (tp = cho phép số lẻ), hoặc {fix:số}.
 export function khungXNK(st, kq, loai) {
   const muaBan = loai === 'mua_ban'
-  const o = muaBan ? 1 : 0
+  const coPhiMua = muaBan || loai === 'uy_thac'
+  const o = coPhiMua ? 1 : 0
   const n = (x) => String(x + o)
   const tuyen = st.tuyen || 'BT-HN'
   const dongTien = (k) => ({ k })
@@ -103,7 +105,7 @@ export function khungXNK(st, kq, loai) {
   dong({ stt: '', nd: `Cước vận chuyển ${tuyen} theo M3`, dvt: 'M3', sl: { k: 'm3', tp: 1 }, dg: dongTien('dgM3'), t: { kg: null, m3: kq.m3.cuoc }, dam: 1 })
   nhom('II', 'Các khoản chi phí', null, null)
   dong({ stt: '1', nd: 'Phí tách tờ khai', dvt: 'TK', sl: 1, dg: dongTien('phiTach'), t: chung(kq.phiTach) })
-  if (muaBan) dong({ stt: '2', nd: 'Phí mua hàng (% × tiền hàng)', pct: { k: 'phiMuaPct' }, dvt: 'Lô', sl: 1, dg: kq.phiMua, t: chung(kq.phiMua) })
+  if (coPhiMua) dong({ stt: '2', nd: muaBan ? 'Phí mua hàng (% × tiền hàng)' : 'Phí mua hàng uỷ thác (% × tiền hàng)', pct: { k: 'phiMuaPct' }, dvt: 'Lô', sl: 1, dg: kq.phiMua, t: chung(kq.phiMua) })
   nhom(n(2), 'Các khoản tiền thuế', kq.thue.tong, kq.thue.tong)
   dong({ stt: n(2) + '.1', nd: 'Thuế nhập khẩu', dvt: 'Lô', sl: 1, dg: kq.thue.nk, t: chung(kq.thue.nk), sub: 1 })
   dong({ stt: n(2) + '.2', nd: 'Thuế VAT', dvt: 'Lô', sl: 1, dg: kq.thue.vat, t: chung(kq.thue.vat), sub: 1 })
