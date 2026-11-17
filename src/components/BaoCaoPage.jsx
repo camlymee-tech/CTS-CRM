@@ -8,6 +8,7 @@ import { ngayLocal } from '../lib/danhSachKhach'
 import { maChuaLienHe, maKhNgheMay, tinhCanGoiLai, SO_NGAY_GOI_LAI } from '../lib/nhacViec'
 import { hienPt2 } from '../lib/dashboardXlsx'
 import { xuatBangXlsx } from '../lib/baoCaoXlsx'
+import { laQuanLy, locNhanSu } from '../lib/quyen'
 
 const TABS = [
   { key: 'tong_quan', label: 'Tổng quan' },
@@ -45,7 +46,7 @@ function cacNgay(tu, den) {
 }
 
 export default function BaoCaoPage({ currentProfile }) {
-  const laAdmin = currentProfile?.role === 'admin'
+  const laAdmin = laQuanLy(currentProfile)   // admin hoặc leader: có ô lọc Sale (leader chỉ thấy team mình)
   const { options: TRANG_THAI, statuses } = useTrangThai()
   const [tab, setTab] = useState('tong_quan')
   const [ky, setKy] = useState('thang_nay')
@@ -66,7 +67,7 @@ export default function BaoCaoPage({ currentProfile }) {
     setLoading(true)
     const [a, b, c, d, e, f] = await Promise.all([
       supabase.from('customers').select('id, ten_khach, sale_id, trang_thai_cham_soc, khu_vuc, created_at, ngay_lien_he_gan_nhat'),
-      supabase.from('profiles').select('id, full_name, role').order('full_name'),
+      supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
       supabase.from('customer_interactions').select('customer_id, sale_id, ngay_thuc_hien, created_at').limit(20000),
       supabase.from('customer_logs').select('customer_id, user_id, hanh_dong, chi_tiet, created_at')
         .eq('hanh_dong', 'Đổi trạng thái').order('created_at', { ascending: false }).limit(10000),
@@ -84,9 +85,9 @@ export default function BaoCaoPage({ currentProfile }) {
   // Sale chỉ xem số của mình
   const saleDangXem = laAdmin ? locSale : currentProfile?.id
   const dsSale = useMemo(() => {
-    const sales = profiles.filter((p) => p.role === 'sale')
+    const sales = locNhanSu(currentProfile, profiles).filter((p) => p.role !== 'admin')
     return saleDangXem ? sales.filter((p) => p.id === saleDangXem) : sales
-  }, [profiles, saleDangXem])
+  }, [profiles, saleDangXem, currentProfile])
   const idSale = useMemo(() => new Set(dsSale.map((s) => s.id)), [dsSale])
 
   const maChua = maChuaLienHe(statuses)
@@ -173,7 +174,7 @@ export default function BaoCaoPage({ currentProfile }) {
   }, [khach])
 
   const tenKy = ky === 'hom_nay' ? `Hôm nay (${dmy(tuNgay)})` : `${dmy(tuNgay)} – ${dmy(denNgay)}`
-  const tenSaleXem = laAdmin ? (locSale ? dsSale[0]?.full_name : 'Tất cả sale') : currentProfile?.full_name
+  const tenSaleXem = laAdmin ? (locSale ? dsSale[0]?.full_name : (currentProfile?.role === 'leader' ? `Team ${currentProfile.phong_ban || ''}` : 'Tất cả sale')) : currentProfile?.full_name
   const phuDe = `Kỳ: ${tenKy} · ${tenSaleXem || ''}`
 
   // ===== Excel =====
@@ -252,7 +253,7 @@ export default function BaoCaoPage({ currentProfile }) {
           {laAdmin && (
             <Select label="Sale" value={locSale} onChange={(e) => setLocSale(e.target.value)} className="w-52">
               <option value="">Tất cả sale</option>
-              {profiles.filter((p) => p.role === 'sale').map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+              {locNhanSu(currentProfile, profiles).filter((p) => p.role !== 'admin').map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
             </Select>
           )}
           <button type="button" onClick={taiExcel} disabled={loading}
@@ -395,7 +396,7 @@ export default function BaoCaoPage({ currentProfile }) {
             {tab === 'khu_vuc' && (
               <section className="rounded-2xl bg-white p-5 shadow-sm">
                 <h2 className="mb-1 font-display text-base font-semibold text-navy-900">Khách theo khu vực và trạng thái</h2>
-                <p className="mb-3 text-xs text-ink-400">Tính trên toàn bộ khách hiện có của {laAdmin ? (locSale ? 'sale đang chọn' : 'cả team') : 'bạn'}.</p>
+                <p className="mb-3 text-xs text-ink-400">Tính trên toàn bộ khách hiện có của {laAdmin ? (locSale ? 'sale đang chọn' : (currentProfile?.role === 'leader' ? 'team của bạn' : 'cả team')) : 'bạn'}.</p>
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-sm">
                     <thead>

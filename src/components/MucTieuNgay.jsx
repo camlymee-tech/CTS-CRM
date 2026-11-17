@@ -5,12 +5,13 @@ import { Button, Select, Input, Badge } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
 import { homNayLocal } from '../lib/taiKy'
 import { maChuaLienHe, maKhNgheMay } from '../lib/nhacViec'
+import { laQuanLy, locNhanSu } from '../lib/quyen'
 
 // Mục tiêu ngày: (1) số khách chuyển từ "Chưa liên hệ" sang "KH nghe máy" hôm nay,
 // (2) danh sách khách cần liên hệ lại do sale tự chọn — tự báo "Đã hoàn thành" khi đổi trạng thái hoặc có trao đổi mới.
 export default function MucTieuNgay({ currentProfile, customers, onMoKhach }) {
-  // Quản trị chỉ xem báo cáo mục tiêu của các sale; sale mới là người nhập và làm
-  if (currentProfile?.role === 'admin') return <KhuQuanLy currentProfile={currentProfile} customers={customers} onMoKhach={onMoKhach} />
+  // Quản trị / leader xem báo cáo mục tiêu của sale (leader: chỉ team mình); sale mới là người nhập và làm
+  if (laQuanLy(currentProfile)) return <KhuQuanLy currentProfile={currentProfile} customers={customers} onMoKhach={onMoKhach} />
   return <MucTieuCuaToi nguoiDung={currentProfile} customers={customers} onMoKhach={onMoKhach} />
 }
 
@@ -27,13 +28,13 @@ function KhuQuanLy({ currentProfile, customers, onMoKhach }) {
   const [sales, setSales] = useState([])
   const [saleId, setSaleId] = useState('')
   useEffect(() => {
-    supabase.from('profiles').select('id, full_name, role').order('full_name')
-      .then(({ data }) => setSales((data || []).filter((x) => x.role === 'sale')))
+    supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name')
+      .then(({ data }) => setSales(locNhanSu(currentProfile, data || []).filter((x) => x.role !== 'admin')))
   }, [])
   const sale = sales.find((x) => x.id === saleId)
   return (
     <>
-      <BaoCaoMucTieu customers={customers} />
+      <BaoCaoMucTieu customers={customers} currentProfile={currentProfile} />
       <div className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <h2 className="font-display text-lg font-semibold text-navy-900">Đặt / chỉnh mục tiêu cho sale</h2>
@@ -301,7 +302,7 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
 
 
 // ---- Báo cáo mục tiêu ngày của từng sale (chỉ xem) — dành cho quản trị ----
-function BaoCaoMucTieu({ customers }) {
+function BaoCaoMucTieu({ customers, currentProfile }) {
   const { statuses } = useTrangThai()
   const [ngay, setNgay] = useState(homNayLocal())
   const [sales, setSales] = useState([])
@@ -316,13 +317,13 @@ function BaoCaoMucTieu({ customers }) {
     setLoading(true)
     const dau = new Date(`${ngay}T00:00:00`); const cuoi = new Date(dau); cuoi.setDate(cuoi.getDate() + 1)
     const [{ data: p }, { data: a }, { data: b }, { data: c }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, role').order('full_name'),
+      supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
       supabase.from('muc_tieu_so').select('user_id, loai, muc_tieu').eq('ngay', ngay),
       supabase.from('muc_tieu_ngay').select('user_id, customer_id').eq('ngay', ngay),
       supabase.from('customer_logs').select('customer_id, user_id, hanh_dong, chi_tiet, created_at')
         .eq('hanh_dong', 'Đổi trạng thái').gte('created_at', dau.toISOString()).lt('created_at', cuoi.toISOString()),
     ])
-    setSales((p || []).filter((x) => x.role === 'sale'))
+    setSales(locNhanSu(currentProfile, p || []).filter((x) => x.role !== 'admin'))
     setSo(a || []); setChon(b || []); setLogs(c || [])
     setLoading(false)
   }

@@ -58,9 +58,9 @@ export default function App() {
   const loadViecCan = useCallback(async () => {
     if (!profile?.id) return
     try {
-      setViecCan(await demNhacViec(supabase, { isAdmin: profile.role === 'admin', userId: profile.id }))
+      setViecCan(await demNhacViec(supabase, { isAdmin: profile.role === 'admin', userId: profile.id, me: profile }))
     } catch { /* bo qua, khong anh huong cac man khac */ }
-  }, [profile?.id, profile?.role])
+  }, [profile?.id, profile?.role, profile?.phong_ban])
 
   useEffect(() => { loadViecCan() }, [loadViecCan, page])
 

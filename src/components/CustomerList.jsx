@@ -8,6 +8,7 @@ import OrderForm from './OrderForm'
 import StatusesModal from './StatusesModal'
 import DanhMucModal from './DanhMucModal'
 import TaiKhachLenModal from './TaiKhachLenModal'
+import { laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
 import { useTrangThai } from '../lib/StatusContext'
 import { ngayLocal, gioNgay, traoDoiGanNhat, demLuotChamSoc, tongDoanhThu, sapXepKhach } from '../lib/danhSachKhach'
 import {
@@ -163,6 +164,9 @@ export default function CustomerList({ currentProfile }) {
   }
 
   const isAdmin = currentProfile?.role === 'admin'
+  const uids = useMemo(() => nhanSuXemDuoc(currentProfile, profiles), [currentProfile, profiles])   // null = xem tất cả
+  const dsSale = useMemo(() => locNhanSu(currentProfile, profiles), [currentProfile, profiles])   // admin: tất cả · leader: team · sale: chính mình
+  const xemDuoc = (id) => uids === null || (!!id && uids.has(id))
 
   // Gộp kết quả tra cứu SĐT vào danh sách, không trùng lặp
   const nguon = useMemo(() => {
@@ -191,7 +195,7 @@ export default function CustomerList({ currentProfile }) {
   // Danh sách áp dụng mọi bộ lọc TRỪ bộ lọc trạng thái,
   // để mỗi thẻ trạng thái vẫn hiện đúng số khi đang chọn một trạng thái
   const nenDem = useMemo(() => nguon.filter((c) => {
-    if (!isAdmin && c.sale_id !== currentProfile?.id) return false
+    if (!xemDuoc(c.sale_id)) return false
     if (search && !`${c.ten_khach} ${c.ma_khach} ${c.sdt || ''} ${c.nganh_hang || ''}`.toLowerCase().includes(search.toLowerCase())) {
       if (!c._tuTraCuu) return false
     }
@@ -203,7 +207,7 @@ export default function CustomerList({ currentProfile }) {
     if (tuNgay && (!ngayTao || ngayTao < tuNgay)) return false
     if (denNgay && (!ngayTao || ngayTao > denNgay)) return false
     return true
-  }), [nguon, isAdmin, currentProfile?.id, search, filterLoai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay])
+  }), [nguon, uids, currentProfile?.id, search, filterLoai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay])
 
   const demTheoTrangThai = useMemo(() => {
     const m = {}
@@ -364,7 +368,7 @@ export default function CustomerList({ currentProfile }) {
           </Select>
           <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
             <option value="">Tất cả sale</option>
-            {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+            {(laQuanLy(currentProfile) ? dsSale : profiles).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </Select>
           <div className="flex items-center gap-2 text-sm text-ink-600">
             <span className="font-medium text-navy-900">Ngày tạo</span>
@@ -457,7 +461,7 @@ export default function CustomerList({ currentProfile }) {
             ) : phanTrang.map((c, idxTrang) => {
               const idx = (trang - 1) * 20 + idxTrang
               const chung = laKhachChung(c)
-              const cuaMinh = c.sale_id === currentProfile?.id
+              const cuaMinh = c.sale_id === currentProfile?.id || (!isAdmin && !!c.sale_id && !!uids?.has(c.sale_id))
               const dongChon = daChon.has(c.id)
               const mauTT = TRANG_THAI.find((o) => o.ma === c.trang_thai_cham_soc)?.mau
               const td = traoDoi[c.id]
@@ -610,14 +614,14 @@ export default function CustomerList({ currentProfile }) {
       {quanLyDM && <DanhMucModal onClose={() => setQuanLyDM(false)} />}
 
       {taiLen && (
-        <TaiKhachLenModal customers={customers} profiles={profiles} currentProfile={currentProfile}
+        <TaiKhachLenModal customers={customers} profiles={dsSale} currentProfile={currentProfile}
           onClose={() => setTaiLen(false)} onDone={loadCustomers} />
       )}
 
       {showForm && (
         <CustomerForm
           customer={editingCustomer}
-          profiles={profiles}
+          profiles={laQuanLy(currentProfile) ? dsSale : profiles}
           currentProfile={currentProfile}
           onClose={() => setShowForm(false)}
           onSaved={(khachVuaChot) => {

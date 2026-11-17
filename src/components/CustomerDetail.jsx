@@ -5,6 +5,7 @@ import {
   FileDown, Eye,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { locNhanSu } from '../lib/quyen'
 import { Button, Textarea, Select, Badge, Input } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
 import { XuatHopDongForm, hdTuHopDongDaLuu } from './ContractsPage'
@@ -51,7 +52,10 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const isAdmin = currentProfile?.role === 'admin'
   const { benB, taiLai: taiLaiBenB } = useBenB()
   const [moBenB, setMoBenB] = useState(false)
-  const suaDuoc = cuaMinh || isAdmin || chung || !customer.sale_id
+  // Leader sửa được khách của sale cùng phòng ban
+  const cuaTeam = currentProfile?.role === 'leader' && !!currentProfile.phong_ban &&
+    profiles.find((p) => p.id === customer.sale_id)?.phong_ban === currentProfile.phong_ban
+  const suaDuoc = cuaMinh || cuaTeam || isAdmin || chung || !customer.sale_id
 
   useEffect(() => { load() }, [customer.id])
 
@@ -62,7 +66,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
         .order('ngay_thuc_hien', { ascending: false }),
       supabase.from('customer_logs').select('*').eq('customer_id', customer.id)
         .order('created_at', { ascending: false }).limit(50),
-      supabase.from('profiles').select('id, full_name'),
+      supabase.from('profiles').select('id, full_name, role, phong_ban'),
       supabase.from('orders').select('*').eq('customer_id', customer.id).order('ngay_chot', { ascending: false }),
       supabase.from('contracts').select('*').eq('customer_id', customer.id).order('ngay_ky', { ascending: false }),
       supabase.from('service_packages').select('*'),
@@ -313,7 +317,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                       <Select label="Sale phụ trách" value={formTT.sale_id}
                         onChange={(e) => setFormTT({ ...formTT, sale_id: e.target.value })}>
                         <option value="">-- Chưa gán --</option>
-                        {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                        {(currentProfile?.role === 'leader' ? locNhanSu(currentProfile, profiles) : profiles).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                       </Select>
                       <Input label="Chăm sóc tiếp theo" type="date" value={formTT.ngay_cham_soc_tiep_theo}
                         onChange={(e) => setFormTT({ ...formTT, ngay_cham_soc_tiep_theo: e.target.value })} />
@@ -536,7 +540,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                                 {tenNguoi(it.sale_id)} · {new Date(it.ngay_thuc_hien).toLocaleString('vi-VN')}
                               </p>
                             </div>
-                            {(it.sale_id === currentProfile?.id || isAdmin) && (
+                            {(it.sale_id === currentProfile?.id || isAdmin || cuaTeam) && (
                               <button onClick={() => xoaTuongTac(it)}
                                 className="flex-none text-ink-400 hover:text-rose-500" title="Xoá">
                                 <Trash2 size={14} />

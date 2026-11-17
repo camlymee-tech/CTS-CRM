@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Phone, CalendarCheck, CalendarClock, CircleAlert, CircleCheck, RefreshCw, BarChart3 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
 import { Select, Badge } from './ui'
 import CustomerDetail from './CustomerDetail'
 import OrderForm from './OrderForm'
@@ -28,7 +29,7 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   const [taiKy, setTaiKy] = useState(null)   // { khach, muc } đang mở form tái ký
   const [dangDong, setDangDong] = useState('')
 
-  const isAdmin = currentProfile?.role === 'admin'
+  const isAdmin = laQuanLy(currentProfile)   // admin hoặc leader: xem được nhiều người
   const homNay = homNayLocal()
 
   useEffect(() => { load() }, [])
@@ -37,7 +38,7 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
     setLoading(true)
     const [{ data: c }, { data: p }, { data: hd }, { data: dn }, { data: it }, { data: bc }, { data: lg }] = await Promise.all([
       supabase.from('customers').select('*').order('ngay_cham_soc_tiep_theo'),
-      supabase.from('profiles').select('id, full_name').order('full_name'),
+      supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
       supabase.from('contracts').select('*').eq('trang_thai', 'hieu_luc'),
       supabase.from('orders').select('*').neq('trang_thai', 'huy'),
       supabase.from('order_items').select('order_id, ten_dich_vu'),
@@ -50,26 +51,27 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
     onDoiViec?.()   // báo App cập nhật huy hiệu số việc cần nhắc
   }
 
+  const uids = useMemo(() => nhanSuXemDuoc(currentProfile, profiles), [currentProfile, profiles])
   const tenSale = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
   // Follow-up đến hạn: ngày dự kiến liên hệ lại là hôm nay, bỏ qua khách đã chốt/đang triển khai/hoàn thành
   const dungHomNay = useMemo(() => tinhFollowUpHomNay({
-    khach: customers, maDaChot, isAdmin, userId: currentProfile?.id, homNay,
+    khach: customers, maDaChot, isAdmin: uids === null, userId: currentProfile?.id, uids, homNay,
   }).filter((c) => !filterSale || c.sale_id === filterSale),
-  [customers, homNay, isAdmin, currentProfile?.id, filterSale, maDaChot])
+  [customers, homNay, uids, currentProfile?.id, filterSale, maDaChot])
 
   // Khách cần gọi lại: trạng thái đã gửi báo giá / hẹn đi đơn mà 7 ngày chưa liên hệ lại, chưa đổi trạng thái
   const canGoiLai = useMemo(() => tinhCanGoiLai({
-    khach: customers, logs: logsDoiTT, statuses, isAdmin, userId: currentProfile?.id, homNay,
+    khach: customers, logs: logsDoiTT, statuses, isAdmin: uids === null, userId: currentProfile?.id, uids, homNay,
   }).filter((r) => !filterSale || r.saleId === filterSale),
-  [customers, logsDoiTT, statuses, isAdmin, currentProfile?.id, filterSale, homNay])
+  [customers, logsDoiTT, statuses, uids, currentProfile?.id, filterSale, homNay])
 
   // Việc cần nhắc: tái ký hợp đồng ADS + báo cáo chỉ số ADS (sale chỉ thấy của mình, admin thấy cả team)
   const { nhacBaoCao } = useMemo(() => {
-    const r = tinhNhacViec({ khach: customers, hopDong, don, items: itemsDon, baoCao, isAdmin, userId: currentProfile?.id })
+    const r = tinhNhacViec({ khach: customers, hopDong, don, items: itemsDon, baoCao, isAdmin: uids === null, userId: currentProfile?.id, uids })
     const loc = (ds) => ds.filter((x) => !filterSale || x.saleId === filterSale)
     return { nhacBaoCao: loc(r.baoCaoAds) }
-  }, [customers, hopDong, don, itemsDon, baoCao, isAdmin, currentProfile?.id, filterSale])
+  }, [customers, hopDong, don, itemsDon, baoCao, uids, currentProfile?.id, filterSale])
 
   async function khongTaiKy(r) {
     if (!window.confirm(`Đánh dấu hợp đồng ${r.hd.so_hop_dong} của ${r.khach.ten_khach} là HẾT HẠN, khách không tái ký?\nNhắc tái ký sẽ biến mất.`)) return
@@ -88,11 +90,11 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
       if (!c.ngay_cham_soc_tiep_theo) return false
       if (c.ngay_cham_soc_tiep_theo <= homNay || c.ngay_cham_soc_tiep_theo > h) return false
       if (maDaChot.includes(c.trang_thai_cham_soc)) return false
-      if (!isAdmin && c.sale_id !== currentProfile?.id) return false
+      if (uids ? !uids.has(c.sale_id) : false) return false
       if (filterSale && c.sale_id !== filterSale) return false
       return true
     })
-  }, [customers, homNay, isAdmin, currentProfile?.id, filterSale, maDaChot])
+  }, [customers, homNay, uids, currentProfile?.id, filterSale, maDaChot])
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -101,13 +103,13 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
           <h1 className="font-display text-xl font-bold text-navy-900">Checklist hôm nay</h1>
           <p className="text-sm text-ink-600">
             {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' })}
-            {' · '}{isAdmin ? 'toàn team' : 'khách của bạn'}
+            {' · '}{uids === null ? 'toàn công ty' : isAdmin ? `team ${currentProfile?.phong_ban || ''}` : 'khách của bạn'}
           </p>
         </div>
         {isAdmin && (
           <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-48">
             <option value="">Tất cả sale</option>
-            {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+            {locNhanSu(currentProfile, profiles).filter((p) => p.role !== 'admin').map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </Select>
         )}
       </header>

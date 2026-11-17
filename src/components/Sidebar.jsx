@@ -1,5 +1,6 @@
 import { Users, LogOut, UserCog, KeyRound, BookOpen, Bell, PieChart, ListChecks, Calculator } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { laQuanLy, tenVaiTro } from '../lib/quyen'
 
 const NAV = [
   { key: 'checklist', label: 'Checklist hôm nay', icon: ListChecks, ready: true },
@@ -23,7 +24,7 @@ export default function Sidebar({ current, onNavigate, profile, onChangePassword
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
-        {NAV.filter((item) => !item.adminOnly || profile?.role === 'admin').map((item) => {
+        {NAV.filter((item) => !item.adminOnly || laQuanLy(profile)).map((item) => {
           const Icon = item.icon
           const active = current === item.key
           const showBadge = item.key === 'notifications' && unreadCount > 0
@@ -59,7 +60,7 @@ export default function Sidebar({ current, onNavigate, profile, onChangePassword
 
       <div className="border-t border-white/10 px-4 py-4">
         <p className="truncate text-sm font-medium">{profile?.full_name || 'Nhân viên'}</p>
-        <p className="truncate text-xs text-white/40">{profile?.role === 'admin' ? 'Quản trị' : 'Sale'}</p>
+        <p className="truncate text-xs text-white/40">{tenVaiTro(profile?.role)}{profile?.phong_ban ? ` · ${profile.phong_ban}` : ''}</p>
         <button
           onClick={onChangePassword}
           className="mt-3 flex items-center gap-2 text-xs text-white/60 hover:text-white"

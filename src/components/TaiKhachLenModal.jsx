@@ -5,6 +5,7 @@ import { Modal, Button } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
 import { TINH_THANH } from '../lib/constants'
 import { maChuaLienHe } from '../lib/nhacViec'
+import { laQuanLy } from '../lib/quyen'
 
 const boDau = (t = '') => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim()
 const chiSo = (v) => String(v || '').replace(/\D/g, '')
@@ -28,7 +29,7 @@ const layCot = (row, khoa) => {
 
 export default function TaiKhachLenModal({ customers, profiles, currentProfile, onClose, onDone }) {
   const { statuses } = useTrangThai()
-  const laAdmin = currentProfile?.role === 'admin'
+  const laAdmin = laQuanLy(currentProfile)   // admin / leader được ghi tên sale (leader: chỉ sale trong team)
   const inputRef = useRef(null)
   const [tenFile, setTenFile] = useState('')
   const [rows, setRows] = useState(null)      // đã đọc từ file
