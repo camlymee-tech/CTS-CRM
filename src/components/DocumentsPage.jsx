@@ -3,6 +3,7 @@ import { Plus, Search, Pin, Pencil, Trash2, ExternalLink, ArrowLeft, Paperclip }
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Textarea, Badge, Modal } from './ui'
 import DocumentFiles from './DocumentFiles'
+import { laAdmin, laLeader, laQuanLy } from '../lib/quyen'
 
 export const DANH_MUC = [
   { value: 'tai_lieu_cong_viec', label: 'Tài liệu công việc', className: 'bg-slate-100 text-slate-600' },
@@ -25,7 +26,9 @@ export default function DocumentsPage({ currentProfile }) {
   const [editing, setEditing] = useState(null)
   const [viewing, setViewing] = useState(null)
 
-  const isAdmin = currentProfile?.role === 'admin'
+  const isAdmin = laAdmin(currentProfile)
+  const quanLy = laQuanLy(currentProfile)   // admin / leader được thêm tài liệu
+  const suaDuoc = (d) => isAdmin || (quanLy && d?.created_by === currentProfile.id)   // leader chỉ sửa tài liệu mình tạo
 
   useEffect(() => { load() }, [])
 
@@ -83,7 +86,7 @@ export default function DocumentsPage({ currentProfile }) {
                 Cập nhật {new Date(viewing.updated_at || viewing.created_at).toLocaleDateString('vi-VN')}
               </p>
             </div>
-            {isAdmin && (
+            {suaDuoc(viewing) && (
               <Button variant="secondary" onClick={() => { setEditing(viewing); setShowForm(true) }}>
                 <Pencil size={15} /> Sửa
               </Button>
@@ -103,7 +106,7 @@ export default function DocumentsPage({ currentProfile }) {
           </div>
 
           <div className="mt-6 border-t border-slate-100 pt-5">
-            <DocumentFiles documentId={viewing.id} isAdmin={isAdmin} onChanged={load} />
+            <DocumentFiles documentId={viewing.id} isAdmin={suaDuoc(viewing)} onChanged={load} />
           </div>
         </div>
 
@@ -128,7 +131,7 @@ export default function DocumentsPage({ currentProfile }) {
           <h1 className="font-display text-xl font-bold text-navy-900">Tài liệu</h1>
           <p className="text-sm text-ink-600">Quy định, chính sách, tài liệu đào tạo và hướng dẫn công việc</p>
         </div>
-        {isAdmin && (
+        {quanLy && (
           <Button onClick={() => { setEditing(null); setShowForm(true) }}>
             <Plus size={16} /> Thêm tài liệu
           </Button>
@@ -172,6 +175,7 @@ export default function DocumentsPage({ currentProfile }) {
                     <div className="flex items-center gap-2">
                       {d.ghim && <Pin size={13} className="flex-none text-coral-500" />}
                       <p className="truncate font-medium text-navy-900">{d.tieu_de}</p>
+                      {d.phong_ban?.length > 0 && <Badge className="flex-none bg-amber-100 text-amber-700">{d.phong_ban.join(', ')}</Badge>}
                     </div>
                     {d.mo_ta && <p className="mt-0.5 truncate text-sm text-ink-600">{d.mo_ta}</p>}
                   </div>
@@ -189,7 +193,7 @@ export default function DocumentsPage({ currentProfile }) {
                     {new Date(d.updated_at || d.created_at).toLocaleDateString('vi-VN')}
                   </span>
 
-                  {isAdmin && (
+                  {suaDuoc(d) && (
                     <div className="flex flex-none gap-2">
                       <button onClick={(e) => { e.stopPropagation(); setEditing(d); setShowForm(true) }}
                         className="text-ink-400 hover:text-coral-500"><Pencil size={14} /></button>
@@ -223,6 +227,11 @@ function DocumentForm({ doc, currentProfile, onClose, onSaved }) {
     link_ngoai: doc?.link_ngoai || '',
     ghim: doc?.ghim || false,
   })
+  const leader = laLeader(currentProfile)
+  const [pham, setPham] = useState(doc?.phong_ban?.length ? 'pb' : 'all')   // all = toàn công ty, pb = chỉ một số phòng ban
+  const [chonPB, setChonPB] = useState(doc?.phong_ban || (leader && currentProfile.phong_ban ? [currentProfile.phong_ban] : []))
+  const [dsPB, setDsPB] = useState([])
+  useEffect(() => { supabase.from('phong_ban').select('ten').order('ten').then(({ data }) => setDsPB((data || []).map((x) => x.ten))) }, [])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -230,8 +239,10 @@ function DocumentForm({ doc, currentProfile, onClose, onSaved }) {
     e.preventDefault()
     setSaving(true)
     setError('')
+    if (pham === 'pb' && chonPB.length === 0) { setSaving(false); setError('Hãy chọn ít nhất một phòng ban được xem tài liệu này.'); return }
     const payload = {
       ...form,
+      phong_ban: pham === 'pb' ? chonPB : null,
       mo_ta: form.mo_ta || null,
       noi_dung: form.noi_dung || null,
       link_ngoai: form.link_ngoai || null,
@@ -278,6 +289,30 @@ function DocumentForm({ doc, currentProfile, onClose, onSaved }) {
           </p>
         )}
 
+        <div className="rounded-xl border border-slate-200 p-4">
+          <p className="mb-2 text-sm font-medium text-navy-900">Ai được xem tài liệu này?</p>
+          <label className="flex items-center gap-2 py-1 text-sm">
+            <input type="radio" checked={pham === 'all'} onChange={() => setPham('all')} />
+            <span className="text-navy-900">Toàn công ty</span>
+          </label>
+          <label className="flex items-center gap-2 py-1 text-sm">
+            <input type="radio" checked={pham === 'pb'} onChange={() => setPham('pb')} />
+            <span className="text-navy-900">{leader ? 'Chỉ team của tôi' : 'Chỉ một số phòng ban'}</span>
+          </label>
+          {pham === 'pb' && (
+            <div className="mt-2 flex flex-wrap gap-2 pl-6">
+              {(leader ? [currentProfile.phong_ban].filter(Boolean) : dsPB).map((t) => (
+                <label key={t} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm">
+                  <input type="checkbox" checked={chonPB.includes(t)} disabled={leader}
+                    onChange={(e) => setChonPB(e.target.checked ? [...chonPB, t] : chonPB.filter((x) => x !== t))} />
+                  <span className="text-navy-900">{t}</span>
+                </label>
+              ))}
+              {!leader && dsPB.length === 0 && <span className="text-xs text-ink-400">Chưa có phòng ban nào. Tạo ở Nhân sự → Phòng ban.</span>}
+            </div>
+          )}
+        </div>
+
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.ghim}
             onChange={(e) => setForm({ ...form, ghim: e.target.checked })}
@@ -287,7 +322,7 @@ function DocumentForm({ doc, currentProfile, onClose, onSaved }) {
 
         {!isEdit && (
           <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-ink-600">
-            Khi lưu, toàn bộ nhân sự sẽ nhận được thông báo về tài liệu này.
+            Khi lưu, những người được xem tài liệu sẽ nhận được thông báo.
           </p>
         )}
 

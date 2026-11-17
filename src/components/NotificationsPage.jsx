@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Megaphone, FileText, UserPlus2, ShoppingBag, Cake, CheckCheck, Trash2, Send } from 'lucide-react'
+import { laAdmin as vaiLaAdmin, laLeader as vaiLaLeader, laQuanLy, locNhanSu } from '../lib/quyen'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Textarea, Select, Badge, Modal } from './ui'
 
@@ -30,18 +31,21 @@ export default function NotificationsPage({ currentProfile, onRead }) {
   const [loading, setLoading] = useState(true)
   const [showCompose, setShowCompose] = useState(false)
 
-  const isAdmin = currentProfile?.role === 'admin'
+  const isAdmin = vaiLaAdmin(currentProfile)
+  const quanLy = laQuanLy(currentProfile)   // admin / leader được gửi thông báo
 
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
-    const [{ data: notis }, { data: readRows }, { data: profs }] = await Promise.all([
+    const [{ data: notis }, { data: readRows }, { data: profs }, { data: an }] = await Promise.all([
       supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(100),
       supabase.from('notification_reads').select('notification_id').eq('user_id', currentProfile.id),
       supabase.from('profiles').select('id, full_name, ngay_sinh, active'),
+      supabase.from('notification_dismissed').select('notification_id').eq('user_id', currentProfile.id),
     ])
-    setItems(notis || [])
+    const daAn = new Set((an || []).map((r) => r.notification_id))
+    setItems((notis || []).filter((n) => !daAn.has(n.id)))
     setReads(new Set((readRows || []).map((r) => r.notification_id)))
     setBirthdays(sinhNhatHomNay(profs))
     setLoading(false)
@@ -70,6 +74,24 @@ export default function NotificationsPage({ currentProfile, onRead }) {
     load()
   }
 
+  // Xoá tất cả: admin xoá vĩnh viễn cho mọi người; leader / sale chỉ ẩn khỏi danh sách của mình
+  async function xoaTatCa() {
+    if (items.length === 0) return
+    if (isAdmin) {
+      if (!window.confirm(`Xoá TẤT CẢ ${items.length} thông báo? Thông báo bị xoá khỏi danh sách của mọi người và không khôi phục được.`)) return
+      const { error } = await supabase.from('notifications').delete().in('id', items.map((i) => i.id))
+      if (error) { window.alert('Không xoá được: ' + error.message); return }
+    } else {
+      if (!window.confirm(`Xoá ${items.length} thông báo khỏi danh sách của bạn?`)) return
+      const ids = items.map((i) => i.id)
+      await supabase.from('notification_dismissed').upsert(ids.map((id) => ({ notification_id: id, user_id: currentProfile.id })))
+      const chuaDoc = ids.filter((id) => !reads.has(id))
+      if (chuaDoc.length) await supabase.from('notification_reads').upsert(chuaDoc.map((id) => ({ notification_id: id, user_id: currentProfile.id })))
+    }
+    load()
+    onRead?.()
+  }
+
   const soChuaDoc = items.filter((i) => !reads.has(i.id)).length
 
   return (
@@ -87,7 +109,12 @@ export default function NotificationsPage({ currentProfile, onRead }) {
               <CheckCheck size={15} /> Đánh dấu đã đọc hết
             </Button>
           )}
-          {isAdmin && (
+          {items.length > 0 && (
+            <Button variant="danger" onClick={xoaTatCa}>
+              <Trash2 size={15} /> Xoá tất cả
+            </Button>
+          )}
+          {quanLy && (
             <Button onClick={() => setShowCompose(true)}>
               <Send size={15} /> Gửi thông báo
             </Button>
@@ -130,7 +157,7 @@ export default function NotificationsPage({ currentProfile, onRead }) {
                   <p className={`${daDoc ? 'font-medium' : 'font-semibold'} text-navy-900`}>{n.tieu_de}</p>
                   <div className="flex flex-none items-center gap-2">
                     {!daDoc && <Badge className="bg-coral-50 text-coral-600">Mới</Badge>}
-                    {isAdmin && (
+                    {(isAdmin || n.created_by === currentProfile.id) && (
                       <button onClick={(e) => { e.stopPropagation(); remove(n.id) }}
                         className="text-ink-400 hover:text-rose-500"><Trash2 size={14} /></button>
                     )}
@@ -139,7 +166,7 @@ export default function NotificationsPage({ currentProfile, onRead }) {
                 {n.noi_dung && <p className="mt-1 text-sm text-ink-600">{n.noi_dung}</p>}
                 <p className="mt-2 text-xs text-ink-400">
                   {new Date(n.created_at).toLocaleString('vi-VN')}
-                  {n.target_user_id && ' · Gửi riêng cho bạn'}
+                  {n.target_user_id ? (n.created_by === currentProfile.id ? ' · Gửi riêng' : ' · Gửi riêng cho bạn') : n.phong_ban?.length ? ` · ${n.phong_ban.join(', ')}` : ''}
                 </p>
               </div>
             </div>
@@ -157,25 +184,34 @@ export default function NotificationsPage({ currentProfile, onRead }) {
 }
 
 function ComposeForm({ currentProfile, onClose, onSent }) {
-  const [form, setForm] = useState({ tieu_de: '', noi_dung: '', target_user_id: '' })
+  const leader = vaiLaLeader(currentProfile)
+  const [form, setForm] = useState({ tieu_de: '', noi_dung: '', doi_tuong: 'all' })
   const [profiles, setProfiles] = useState([])
+  const [dsPB, setDsPB] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    supabase.from('profiles').select('id, full_name').order('full_name')
-      .then(({ data }) => setProfiles(data || []))
+    Promise.all([
+      supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
+      supabase.from('phong_ban').select('ten').order('ten'),
+    ]).then(([{ data }, { data: pb }]) => {
+      setProfiles(locNhanSu(currentProfile, data || []))
+      setDsPB((pb || []).map((x) => x.ten))
+    })
   }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
     setError('')
+    const [loai, giaTri] = form.doi_tuong.split(':')
     const { error } = await supabase.from('notifications').insert({
       loai: 'chung',
       tieu_de: form.tieu_de,
       noi_dung: form.noi_dung || null,
-      target_user_id: form.target_user_id || null,
+      target_user_id: loai === 'user' ? giaTri : null,
+      phong_ban: loai === 'pb' ? [giaTri] : null,
       created_by: currentProfile.id,
     })
     setSaving(false)
@@ -191,10 +227,15 @@ function ComposeForm({ currentProfile, onClose, onSent }) {
           placeholder="VD: Họp team sáng thứ 2" />
         <Textarea label="Nội dung" rows={4} value={form.noi_dung}
           onChange={(e) => setForm({ ...form, noi_dung: e.target.value })} />
-        <Select label="Gửi cho" value={form.target_user_id}
-          onChange={(e) => setForm({ ...form, target_user_id: e.target.value })}>
-          <option value="">Toàn công ty</option>
-          {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+        <Select label="Gửi cho" value={form.doi_tuong}
+          onChange={(e) => setForm({ ...form, doi_tuong: e.target.value })}>
+          <option value="all">Toàn công ty</option>
+          <optgroup label="Theo phòng ban">
+            {(leader ? [currentProfile.phong_ban].filter(Boolean) : dsPB).map((t) => <option key={t} value={`pb:${t}`}>{t}</option>)}
+          </optgroup>
+          <optgroup label="Một người">
+            {profiles.map((p) => <option key={p.id} value={`user:${p.id}`}>{p.full_name}</option>)}
+          </optgroup>
         </Select>
 
         {error && <p className="text-sm text-rose-600">{error}</p>}
