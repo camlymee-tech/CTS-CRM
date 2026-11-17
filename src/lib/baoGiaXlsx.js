@@ -75,7 +75,6 @@ export async function xuatBaoGia({ loai, st }) {
     gop('Giá bán dự kiến (đơn giá)', kq.kg.duKienDg, kq.m3.duKienDg)
     gop('Giá bán chốt (thành tiền)', so(st.chotKg) ? kq.kg.chotTT : '', so(st.chotM3) ? kq.m3.chotTT : '')
     gop('Chênh lệch chốt - dự kiến', kq.kg.cl, kq.m3.cl)
-    gop('Cước vận chuyển chốt', kq.kg.cuocChot, kq.m3.cuocChot)
 
     {
       const w2 = wb.addWorksheet('Khai báo thuế', { views: [{ showGridLines: false }] })

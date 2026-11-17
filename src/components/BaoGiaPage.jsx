@@ -186,7 +186,6 @@ function BangXNK({ st, up, loai, order = false, phang = false, tieuDe }) {
               ['Giá bán chốt (đơn giá, sale nhập)', <O key="a" v={st.chotKg} set={(v) => up({ chotKg: v })} />, <O key="b" v={st.chotM3} set={(v) => up({ chotM3: v })} />],
               ['Giá bán chốt (thành tiền)', so(st.chotKg) ? vnd(kq.kg.chotTT) : '', so(st.chotM3) ? vnd(kq.m3.chotTT) : ''],
               ['Chênh lệch chốt - dự kiến', kq.kg.cl === null ? '' : vnd(kq.kg.cl), kq.m3.cl === null ? '' : vnd(kq.m3.cl), true],
-              ['Cước vận chuyển chốt', kq.kg.cuocChot === null ? '' : vnd(kq.kg.cuocChot), kq.m3.cuocChot === null ? '' : vnd(kq.m3.cuocChot)],
             ].map(([nd, a, b, dam], i) => (
               <tr key={i} className={dam ? 'bg-slate-50 font-semibold' : ''}>
                 <td className={TD}>{nd}</td><td className={`${TD} w-52 text-right`}>{a}</td><td className={`${TD} w-52 text-right`}>{b}</td>
