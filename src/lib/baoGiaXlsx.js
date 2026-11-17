@@ -1,5 +1,5 @@
 // Xuất báo giá dịch vụ CTS ra Excel: bảng kẻ ô, đúng thứ tự các dòng như file báo giá mẫu
-import { so, tinhThue, tinhXNK, khungXNK, khungMuaBan, TEN_DV, HINH_THUC_UT } from './baoGia'
+import { so, tinhThue, tinhXNK, khungXNK, khungMuaBan, TEN_DV } from './baoGia'
 
 const NAVY = 'FF0A2463', CAM = 'FFFFEDD5', XAM = 'FFF1F5F9', TRANG = 'FFFFFFFF'
 const mau = { argb: 'FFCBD5E1' }
@@ -51,9 +51,6 @@ export async function xuatBaoGia({ loai, st }) {
     ws.columns = [7, 52, 8, 14, 15, 20, 20].map((width) => ({ width }))
     tieuDe(ws, heads.length, order ? `BÁO GIÁ VẬN CHUYỂN - ${TEN_DV[dv]}` : `BÁO GIÁ DỊCH VỤ ${TEN_DV[loai]}`, st.khach, st.ma)
     let r = 4
-    if (dv === 'uy_thac') {
-      ws.mergeCells(r, 1, r, 7); const c = ws.getCell(r, 1); c.value = `Hình thức: ${HINH_THUC_UT[st.hinhThuc]?.ten || ''}`; c.font = { size: 10, bold: true }; r++
-    }
     r++
     dongDau(ws, r, heads); r++
     const giaTri = (x) => (x && typeof x === 'object' ? (x.fix ?? so(st[x.k])) : x)

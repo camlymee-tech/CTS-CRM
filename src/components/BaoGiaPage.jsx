@@ -5,7 +5,7 @@ import DanhSachBaoGia from './DanhSachBaoGia'
 import { Button } from './ui'
 import {
   so, tinhThue, tinhXNK, tinhOrder, TEN_DV, khungXNK, ORDER_MAC_DINH, SP_ORDER,
-  MUA_BAN_MAC_DINH, VAN_CHUYEN_MAC_DINH, UY_THAC_MAC_DINH, SP_THUE, HINH_THUC_UT,
+  MUA_BAN_MAC_DINH, VAN_CHUYEN_MAC_DINH, UY_THAC_MAC_DINH, SP_THUE,
 } from '../lib/baoGia'
 import { xuatBaoGia } from '../lib/baoGiaXlsx'
 
@@ -315,20 +315,13 @@ function OrderFlow({ st, up }) {
         <div className="mb-4 grid gap-3 md:grid-cols-3">
           {DICH_VU.map((d) => (
             <button key={d.k} type="button"
-              onClick={() => up({ dichVu: d.k, ...(d.k === 'uy_thac' ? { phiTach: HINH_THUC_UT[st.hinhThuc]?.phiTach || st.phiTach } : {}) })}
+              onClick={() => up({ dichVu: d.k })}
               className={`rounded-xl border-2 p-3 text-left transition ${st.dichVu === d.k ? 'border-coral-500 bg-orange-50' : 'border-slate-200 hover:border-slate-300'}`}>
               <p className="font-semibold text-navy-900">{d.ten}</p>
               <p className="text-xs text-ink-600">{d.mota}</p>
             </button>
           ))}
         </div>
-        {st.dichVu === 'uy_thac' && (
-          <label className="mb-4 flex max-w-sm flex-col gap-1 text-sm"><span className="font-medium text-navy-900">Hình thức uỷ thác</span>
-            <select value={st.hinhThuc} onChange={(e) => up({ hinhThuc: e.target.value, phiTach: HINH_THUC_UT[e.target.value].phiTach })}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500">
-              {Object.entries(HINH_THUC_UT).map(([k, v]) => <option key={k} value={k}>{v.ten}</option>)}
-            </select></label>
-        )}
         <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-ink-600">
           Nhập số <b className="text-navy-900">KG</b> và <b className="text-navy-900">M3</b> cùng đơn giá ở hai dòng cước vận chuyển bên dưới.
         </p>
@@ -502,17 +495,6 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
 
         <ThongTinChung st={st} up={up} />
         {tab === 'order' && <OrderFlow st={st} up={up} />}
-        {tab === 'uy_thac' && (
-          <div className="flex flex-wrap items-end gap-4 rounded-2xl bg-white p-4 shadow-sm">
-            <label className="flex min-w-[320px] flex-col gap-1 text-sm"><span className="font-medium text-navy-900">Hình thức uỷ thác</span>
-              <select value={st.hinhThuc}
-                onChange={(e) => up({ hinhThuc: e.target.value, phiTach: HINH_THUC_UT[e.target.value].phiTach })}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-coral-500">
-                {Object.entries(HINH_THUC_UT).map(([k, v]) => <option key={k} value={k}>{v.ten}</option>)}
-              </select></label>
-            <p className="pb-2 text-xs text-ink-400">Chọn hình thức sẽ tự điền phí tách tờ khai (3.000.000 hoặc 5.000.000), vẫn sửa tay được.</p>
-          </div>
-        )}
         {tab !== 'order' && <BangThue st={st} up={up} />}
         {tab !== 'order' && <BangXNK st={st} up={up} loai={tab} />}
         {duoi}
