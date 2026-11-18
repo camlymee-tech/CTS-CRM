@@ -1,3 +1,4 @@
+import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { Phone, CalendarCheck, CalendarClock, CircleAlert, CircleCheck, RefreshCw, BarChart3 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
@@ -37,11 +38,11 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   async function load() {
     setLoading(true)
     const [{ data: c }, { data: p }, { data: hd }, { data: dn }, { data: it }, { data: bc }, { data: lg }] = await Promise.all([
-      supabase.from('customers').select('*').order('ngay_cham_soc_tiep_theo'),
+      layHet(() => supabase.from('customers').select('*').order('ngay_cham_soc_tiep_theo').order('id')),
       supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
       supabase.from('contracts').select('*').eq('trang_thai', 'hieu_luc'),
       supabase.from('orders').select('*').neq('trang_thai', 'huy'),
-      supabase.from('order_items').select('order_id, ten_dich_vu'),
+      layHet(() => supabase.from('order_items').select('order_id, ten_dich_vu').order('id')),
       supabase.from('ads_bao_cao').select('*'),   // chưa chạy SQL thì rỗng
       supabase.from('customer_logs').select('customer_id, hanh_dong, created_at').eq('hanh_dong', 'Đổi trạng thái').order('created_at', { ascending: false }).limit(5000),
     ])

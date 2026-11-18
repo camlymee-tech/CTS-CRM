@@ -1,3 +1,4 @@
+import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
 import { supabase } from '../supabaseClient'
@@ -66,9 +67,9 @@ export default function BaoCaoPage({ currentProfile }) {
   async function load() {
     setLoading(true)
     const [a, b, c, d, e, f] = await Promise.all([
-      supabase.from('customers').select('id, ten_khach, sale_id, trang_thai_cham_soc, khu_vuc, created_at, ngay_lien_he_gan_nhat'),
+      layHet(() => supabase.from('customers').select('id, ten_khach, sale_id, trang_thai_cham_soc, khu_vuc, created_at, ngay_lien_he_gan_nhat').order('id')),
       supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
-      supabase.from('customer_interactions').select('customer_id, sale_id, ngay_thuc_hien, created_at').limit(20000),
+      layHet(() => supabase.from('customer_interactions').select('customer_id, sale_id, ngay_thuc_hien, created_at').order('id')),
       supabase.from('customer_logs').select('customer_id, user_id, hanh_dong, chi_tiet, created_at')
         .eq('hanh_dong', 'Đổi trạng thái').order('created_at', { ascending: false }).limit(10000),
       supabase.from('muc_tieu_so').select('user_id, ngay, loai, muc_tieu'),

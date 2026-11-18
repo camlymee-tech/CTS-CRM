@@ -1,3 +1,4 @@
+import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { Search, Pencil, Trash2, Tags, Columns3, Download, X } from 'lucide-react'
 import { supabase } from '../supabaseClient'
@@ -73,9 +74,9 @@ export default function OrdersPage({ currentProfile }) {
   async function load() {
     setLoading(true)
     const [{ data: ords }, { data: its }, { data: custs }, { data: profs }] = await Promise.all([
-      supabase.from('orders').select('*').order('ngay_chot', { ascending: false }),
-      supabase.from('order_items').select('*'),
-      supabase.from('customers').select('*').order('ten_khach'),
+      layHet(() => supabase.from('orders').select('*').order('ngay_chot', { ascending: false }).order('id')),
+      layHet(() => supabase.from('order_items').select('*').order('id')),
+      layHet(() => supabase.from('customers').select('*').order('ten_khach').order('id')),
       supabase.from('profiles').select('id, full_name').order('full_name'),
     ])
     setOrders(ords || [])

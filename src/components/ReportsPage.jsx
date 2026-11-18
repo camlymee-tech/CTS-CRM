@@ -1,3 +1,4 @@
+import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Select, Input } from './ui'
@@ -44,10 +45,10 @@ export default function ReportsPage() {
   async function load() {
     setLoading(true)
     const [{ data: ords }, { data: its }, { data: profs }, { data: khs }] = await Promise.all([
-      supabase.from('orders').select('*'),
-      supabase.from('order_items').select('*'),
+      layHet(() => supabase.from('orders').select('*').order('id')),
+      layHet(() => supabase.from('order_items').select('*').order('id')),
       supabase.from('profiles').select('id, full_name'),
-      supabase.from('customers').select('id, nguon_khach, trang_thai_cham_soc'),
+      layHet(() => supabase.from('customers').select('id, nguon_khach, trang_thai_cham_soc').order('id')),
     ])
     setNguonKhach(Object.fromEntries((khs || []).map((k) => [k.id, k.nguon_khach])))
     setTtKhach(Object.fromEntries((khs || []).map((k) => [k.id, k.trang_thai_cham_soc])))

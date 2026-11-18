@@ -1,3 +1,4 @@
+import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye, Printer, Download, Trash2, Save } from 'lucide-react'
 import { supabase } from '../supabaseClient'
@@ -69,9 +70,9 @@ export default function ContractsPage({ currentProfile }) {
     setLoading(true)
     const [{ data: ct }, { data: cu }, { data: od }, { data: it }, { data: pf }, { data: pk }] = await Promise.all([
       supabase.from('contracts').select('*').order('ngay_ky', { ascending: false }),
-      supabase.from('customers').select('id, ten_khach, ma_khach, sdt, dia_chi, mst, nguoi_dai_dien, chuc_vu, email, ten_viet_tat, link_shop'),
-      supabase.from('orders').select('id, ma_don, sale_id'),
-      supabase.from('order_items').select('*'),
+      layHet(() => supabase.from('customers').select('id, ten_khach, ma_khach, sdt, dia_chi, mst, nguoi_dai_dien, chuc_vu, email, ten_viet_tat, link_shop').order('id')),
+      layHet(() => supabase.from('orders').select('id, ma_don, sale_id').order('id')),
+      layHet(() => supabase.from('order_items').select('*').order('id')),
       supabase.from('profiles').select('id, full_name'),
       supabase.from('service_packages').select('*'),
     ])

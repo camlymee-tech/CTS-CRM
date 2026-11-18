@@ -1,3 +1,4 @@
+import { layHet } from './layHet'
 import { danhSachNhacTaiKy } from './taiKy'
 import { danhSachNhacBaoCao } from './baoCaoAds'
 import { homNayLocal } from './taiKy'
@@ -68,10 +69,10 @@ export function tinhFollowUpHomNay({ khach = [], maDaChot = [], isAdmin = false,
 // Đếm số việc cần nhắc cho huy hiệu ở sidebar (tự tải dữ liệu cần thiết)
 export async function demNhacViec(supabase, { isAdmin, userId, me = null }) {
   const [{ data: khach }, { data: hopDong }, { data: don }, { data: items }, { data: baoCao }, { data: tt }, { data: logs }, { data: ps }] = await Promise.all([
-    supabase.from('customers').select('id, sale_id, trang_thai_cham_soc, ngay_cham_soc_tiep_theo, ngay_lien_he_gan_nhat, created_at'),
+    layHet(() => supabase.from('customers').select('id, sale_id, trang_thai_cham_soc, ngay_cham_soc_tiep_theo, ngay_lien_he_gan_nhat, created_at').order('id')),
     supabase.from('contracts').select('*').eq('trang_thai', 'hieu_luc'),
     supabase.from('orders').select('*').neq('trang_thai', 'huy'),
-    supabase.from('order_items').select('order_id, ten_dich_vu'),
+    layHet(() => supabase.from('order_items').select('order_id, ten_dich_vu').order('id')),
     supabase.from('ads_bao_cao').select('contract_id, ngay_bao_cao'),   // chưa chạy SQL thì trả rỗng, không sao
     supabase.from('customer_statuses').select('ma, ten, la_chot, active'),
     supabase.from('customer_logs').select('customer_id, hanh_dong, created_at').eq('hanh_dong', 'Đổi trạng thái').order('created_at', { ascending: false }).limit(5000),

@@ -61,7 +61,7 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
       const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' })
       const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false })
       if (data.length === 0) { setLoi('File không có dòng dữ liệu nào.'); return }
-      if (data.length > 2000) { setLoi('File quá lớn (tối đa 2.000 dòng mỗi lần). Chị chia nhỏ file rồi tải lại.'); return }
+      if (data.length > 20000) { setLoi('File quá lớn (tối đa 20.000 dòng mỗi lần). Chị chia nhỏ file rồi tải lại.'); return }
       setRows(data)
     } catch {
       setLoi('Không đọc được file. Chị dùng file Excel (.xlsx) hoặc CSV theo file mẫu.')

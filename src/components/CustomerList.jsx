@@ -1,3 +1,4 @@
+import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, ListPlus, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download, Upload, UserCog, UserRoundCheck } from 'lucide-react'
 import { supabase } from '../supabaseClient'
@@ -142,24 +143,22 @@ export default function CustomerList({ currentProfile }) {
 
   async function loadCustomers() {
     setLoading(true)
-    const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false })
+    const { data } = await layHet(() => supabase.from('customers').select('*').order('created_at', { ascending: false }).order('id'))
     setCustomers(data || [])
     setLoading(false)
     // Lấy dòng nhật ký mới nhất cho mỗi khách (để hiện cột "Cập nhật gần nhất")
-    const { data: logs } = await supabase.from('customer_logs')
+    const { data: logs } = await layHet(() => supabase.from('customer_logs')
       .select('customer_id, hanh_dong, user_id, created_at')
-      .order('created_at', { ascending: false })
-      .limit(2000)
+      .order('created_at', { ascending: false }).order('id'))
     const map = {}
     for (const l of logs || []) if (!map[l.customer_id]) map[l.customer_id] = l
     setNhatKyGanNhat(map)
     // Lịch sử chăm sóc (cho cột Trao đổi gần nhất / Chăm sóc) và đơn hàng (cho Tổng doanh thu)
     const [{ data: its }, { data: dh }] = await Promise.all([
-      supabase.from('customer_interactions')
+      layHet(() => supabase.from('customer_interactions')
         .select('customer_id, sale_id, loai, noi_dung, ngay_thuc_hien, created_at')
-        .order('ngay_thuc_hien', { ascending: false })
-        .limit(5000),
-      supabase.from('orders').select('customer_id, gia_tri, trang_thai'),
+        .order('ngay_thuc_hien', { ascending: false }).order('id')),
+      layHet(() => supabase.from('orders').select('customer_id, gia_tri, trang_thai').order('id')),
     ])
     setInteractions(its || [])
     setDonHang(dh || [])

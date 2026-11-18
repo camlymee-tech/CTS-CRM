@@ -1,3 +1,4 @@
+import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
@@ -59,9 +60,9 @@ export default function BaoCaoTongHopPage() {
   useEffect(() => {
     (async () => {
       const [{ data: o }, { data: it }, { data: c }, { data: p }] = await Promise.all([
-        supabase.from('orders').select('*'),
-        supabase.from('order_items').select('*'),
-        supabase.from('customers').select('id, nguon_khach, created_at, trang_thai_cham_soc, sale_id'),
+        layHet(() => supabase.from('orders').select('*').order('id')),
+        layHet(() => supabase.from('order_items').select('*').order('id')),
+        layHet(() => supabase.from('customers').select('id, nguon_khach, created_at, trang_thai_cham_soc, sale_id').order('id')),
         supabase.from('profiles').select('id, full_name').order('full_name'),
       ])
       setOrders(o || []); setItems(it || []); setCustomers(c || []); setProfiles(p || [])

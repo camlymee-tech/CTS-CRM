@@ -1,3 +1,4 @@
+import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
@@ -41,7 +42,7 @@ export default function AnalyticsPage() {
   async function load() {
     setLoading(true)
     const [{ data: c }, { data: p }] = await Promise.all([
-      supabase.from('customers').select('*'),
+      layHet(() => supabase.from('customers').select('*').order('id')),
       supabase.from('profiles').select('id, full_name'),
     ])
     setCustomers(c || []); setProfiles(p || [])

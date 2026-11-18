@@ -1,3 +1,4 @@
+import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useTrangThai } from '../lib/StatusContext'
@@ -53,8 +54,8 @@ export default function ChuyenDoiNguonPage() {
   async function load() {
     setLoading(true)
     const [{ data }, { data: ords }, { data: profs }] = await Promise.all([
-      supabase.from('customers').select('id, nguon_khach, trang_thai_cham_soc, sale_id, created_at'),
-      supabase.from('orders').select('customer_id, gia_tri, trang_thai'),
+      layHet(() => supabase.from('customers').select('id, nguon_khach, trang_thai_cham_soc, sale_id, created_at').order('id')),
+      layHet(() => supabase.from('orders').select('customer_id, gia_tri, trang_thai').order('id')),
       supabase.from('profiles').select('id, full_name'),
     ])
     setCustomers(data || [])
