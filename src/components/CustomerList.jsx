@@ -183,7 +183,7 @@ export default function CustomerList({ currentProfile }) {
       }
       if (filterLoai && c.loai_khach !== filterLoai) return false
       if (filterTrangThai && c.trang_thai_cham_soc !== filterTrangThai) return false
-      if (filterSale === '__chua_chia' ? !!c.sale_id : (filterSale && c.sale_id !== filterSale)) return false
+      if (filterSale && c.sale_id !== filterSale) return false
       if (filterDichVu && !(c.dich_vu || []).includes(filterDichVu)) return false
       if (filterNguon && c.nguon_khach !== filterNguon) return false
       const ngayTao = ngayLocal(c.created_at)
@@ -201,7 +201,7 @@ export default function CustomerList({ currentProfile }) {
       if (!c._tuTraCuu) return false
     }
     if (filterLoai && c.loai_khach !== filterLoai) return false
-    if (filterSale === '__chua_chia' ? !!c.sale_id : (filterSale && c.sale_id !== filterSale)) return false
+    if (filterSale && c.sale_id !== filterSale) return false
     if (filterDichVu && !(c.dich_vu || []).includes(filterDichVu)) return false
     if (filterNguon && c.nguon_khach !== filterNguon) return false
     const ngayTao = ngayLocal(c.created_at)
@@ -366,7 +366,6 @@ export default function CustomerList({ currentProfile }) {
           </Select>
           <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
             <option value="">Tất cả sale</option>
-            {isAdmin && <option value="__chua_chia">Data chưa chia ({nguon.filter((c) => !c.sale_id).length.toLocaleString('vi-VN')} khách)</option>}
             {(laQuanLy(currentProfile) ? dsSale : profiles).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </Select>
           <div className="flex items-center gap-2 text-sm text-ink-600">
