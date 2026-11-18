@@ -181,7 +181,7 @@ function BangXNK({ st, up, loai, order = false, phang = false, tieuDe }) {
           <tbody>
             {[
               ['Số lượng (KG / M3)', so(st.kg).toLocaleString('vi-VN'), so(st.m3).toLocaleString('vi-VN')],
-              ['Giá bán dự kiến (thành tiền) = cước + phí tách tờ khai + thuế + CP nội địa VN + CP nội địa TQ', vnd(kq.kg.duKien), vnd(kq.m3.duKien), true],
+              [(loai === 'mua_ban' ? 'Giá bán dự kiến (thành tiền) = cước + phí mua hàng + thuế + CP nội địa VN + CP nội địa TQ' : 'Giá bán dự kiến (thành tiền) = cước + phí tách tờ khai + thuế + CP nội địa VN + CP nội địa TQ'), vnd(kq.kg.duKien), vnd(kq.m3.duKien), true],
               ['Giá bán dự kiến (đơn giá)', vnd(kq.kg.duKienDg), vnd(kq.m3.duKienDg)],
               ['Giá bán chốt (đơn giá, sale nhập)', <O key="a" v={st.chotKg} set={(v) => up({ chotKg: v })} />, <O key="b" v={st.chotM3} set={(v) => up({ chotM3: v })} />],
               ['Giá bán chốt (thành tiền)', so(st.chotKg) ? vnd(kq.kg.chotTT) : '', so(st.chotM3) ? vnd(kq.m3.chotTT) : ''],
