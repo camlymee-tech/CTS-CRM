@@ -13,7 +13,7 @@ import {
 } from '../lib/constants'
 
 export default function CustomerForm({ customer, profiles, currentProfile, onClose, onSaved, onTaiFile }) {
-  const { options: TRANG_THAI, tenTrangThai, classTrangThai, maTaoDon } = useTrangThai()
+  const { options: TRANG_THAI, tenTrangThai, classTrangThai, maTaoDon, maDaChot } = useTrangThai()
   const isEdit = !!customer
   const trangThaiCu = customer?.trang_thai_cham_soc || null
   const [form, setForm] = useState({
@@ -46,6 +46,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
   const [dangKiemTra, setDangKiemTra] = useState(false)
   const [saleList, setSaleList] = useState({})
 
+  const daChot = !!khachTrung && maDaChot.includes(khachTrung.trang_thai_cham_soc)
   const chiSo = (v) => (v || '').replace(/\D/g, '')
 
   // Kiểm tra trùng số điện thoại ngay khi gõ
@@ -142,10 +143,14 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
           placeholder="https://shopee.vn/... hoặc TikTok Shop" />
 
         {khachTrung && (
-          <div className="col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-4">
-            <div className="flex items-center gap-2 text-amber-900">
+          <div className={`col-span-2 rounded-xl border p-4 ${daChot ? 'border-rose-300 bg-rose-50' : 'border-amber-300 bg-amber-50'}`}>
+            <div className={`flex items-center gap-2 ${daChot ? 'text-rose-800' : 'text-amber-900'}`}>
               <TriangleAlert size={16} />
-              <p className="text-sm font-semibold">Số điện thoại này đã có trong hệ thống</p>
+              <p className="text-sm font-semibold">
+                {daChot
+                  ? `⚠ Khách hàng này ĐÃ CHỐT rồi — của ${saleList[khachTrung.sale_id] || 'sale khác'} (${tenTrangThai(khachTrung.trang_thai_cham_soc)})`
+                  : 'Số điện thoại này đã có trong hệ thống'}
+              </p>
             </div>
             <div className="mt-3 rounded-lg bg-white/70 p-3">
               <div className="flex items-start justify-between gap-3">

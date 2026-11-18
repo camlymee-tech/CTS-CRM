@@ -53,6 +53,7 @@ export default function BaoCaoPage({ currentProfile }) {
   const [tu, setTu] = useState(homNayLocal())
   const [den, setDen] = useState(homNayLocal())
   const [locSale, setLocSale] = useState('')
+  const [locPhong, setLocPhong] = useState('')
   const [loading, setLoading] = useState(true)
   const [customers, setCustomers] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -99,8 +100,16 @@ export default function BaoCaoPage({ currentProfile }) {
     if (currentProfile?.phong_ban) return khongAdmin.filter((p) => p.phong_ban === currentProfile.phong_ban)
     return khongAdmin.filter((p) => p.id === currentProfile?.id)
   }, [profiles, currentProfile])
-  const saleDangXem = laAdmin ? locSale : ''
-  const dsSale = useMemo(() => (saleDangXem ? thanhVien.filter((p) => p.id === saleDangXem) : thanhVien), [thanhVien, saleDangXem])
+  const CHUA_CHIA = '__chua_chia'
+  const xemChuaChia = false   // chỉ xem data chưa chia cho sale nào
+  const dsPhong = useMemo(() => [...new Set(thanhVien.map((p) => p.phong_ban).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi')), [thanhVien])
+  const thanhVienLoc = useMemo(() => (locPhong ? thanhVien.filter((p) => p.phong_ban === locPhong) : thanhVien), [thanhVien, locPhong])
+  const saleDangXem = laAdmin && !xemChuaChia ? locSale : ''
+  const dsSale = useMemo(() => {
+    if (xemChuaChia) return []
+    return saleDangXem ? thanhVienLoc.filter((p) => p.id === saleDangXem) : thanhVienLoc
+  }, [thanhVienLoc, saleDangXem, xemChuaChia])
+  const soChuaChia = useMemo(() => customers.filter((c) => !c.sale_id).length, [customers])
   const idSale = useMemo(() => new Set(dsSale.map((s) => s.id)), [dsSale])
 
   const maChua = maChuaLienHe(statuses)
@@ -112,7 +121,7 @@ export default function BaoCaoPage({ currentProfile }) {
   const laChamSoc = (l) => { const x = tachLog(l); return x.doi && !maChua.includes(x.tu) }
 
   // Dữ liệu đã lọc theo sale
-  const khach = useMemo(() => customers.filter((c) => idSale.has(c.sale_id)), [customers, idSale])
+  const khach = useMemo(() => (xemChuaChia ? customers.filter((c) => !c.sale_id) : customers.filter((c) => idSale.has(c.sale_id))), [customers, idSale, xemChuaChia])
   const csLoc = useMemo(() => cs.filter((x) => idSale.has(x.sale_id)), [cs, idSale])
   const logLoc = useMemo(() => logs.filter((l) => idSale.has(l.user_id)), [logs, idSale])
   const ngayCs = (x) => ngayLocal(x.ngay_thuc_hien || x.created_at)
@@ -158,8 +167,8 @@ export default function BaoCaoPage({ currentProfile }) {
     const lay = (k) => { if (!m.has(k)) m.set(k, { ten: k, dem: {}, tong: 0, soSale: 0 }); return m.get(k) }
     const phongCua = new Map()
     for (const s of dsSale) { phongCua.set(s.id, tenPB(s)); lay(tenPB(s)).soSale += 1 }
-    for (const c of khachKy) { const o = lay(phongCua.get(c.sale_id) || 'Chưa có phòng ban'); o.dem[c.trang_thai_cham_soc] = (o.dem[c.trang_thai_cham_soc] || 0) + 1; o.tong += 1 }
-    if (!locSale) {
+    for (const c of khachKy) { if (!c.sale_id) continue; const o = lay(phongCua.get(c.sale_id) || 'Chưa có phòng ban'); o.dem[c.trang_thai_cham_soc] = (o.dem[c.trang_thai_cham_soc] || 0) + 1; o.tong += 1 }
+    if (false) {
       const chua = customers.filter((c) => !c.sale_id && trongKy(ngayLocal(c.created_at)))
       if (chua.length) {
         const o = lay('Chưa chia sale'); o.chua = true
@@ -167,7 +176,7 @@ export default function BaoCaoPage({ currentProfile }) {
       }
     }
     return [...m.values()].sort((a, b) => (a.chua ? 1 : 0) - (b.chua ? 1 : 0) || a.ten.localeCompare(b.ten, 'vi'))
-  }, [laAdminHan, dsSale, khachKy, customers, locSale, tuNgay, denNgay])
+  }, [laAdminHan, dsSale, khachKy, customers, locSale, locPhong, xemChuaChia, tuNgay, denNgay])
 
   // Ngày khách đã chuyển từ "Chưa liên hệ" → trong ngày đó các lần đổi tiếp theo chỉ tính là KH liên hệ được, không tính chăm sóc
   const lanLienHeDau = useMemo(() => {
@@ -226,7 +235,7 @@ export default function BaoCaoPage({ currentProfile }) {
   const tatCa = useMemo(() => gopNhom('Toàn công ty', dongHienThi), [dongHienThi])
 
   const tenKy = ky === 'tat_ca' ? 'Tất cả thời gian' : ky === 'hom_nay' ? `Hôm nay (${dmy(tuNgay)})` : `${dmy(tuNgay)} – ${dmy(denNgay)}`
-  const tenSaleXem = laAdmin ? (locSale ? dsSale[0]?.full_name : (currentProfile?.role === 'leader' ? `Phòng ${currentProfile.phong_ban || ''}` : 'Tất cả sale')) : `Phòng ${currentProfile?.phong_ban || ''}`
+  const tenSaleXem = laAdmin ? (xemChuaChia ? 'Data chưa chia' : locSale ? dsSale[0]?.full_name : locPhong ? `Phòng ${locPhong}` : (currentProfile?.role === 'leader' ? `Phòng ${currentProfile.phong_ban || ''}` : 'Tất cả sale')) : `Phòng ${currentProfile?.phong_ban || ''}`
   const phuDe = `Kỳ: ${tenKy} · ${tenSaleXem || ''}`
 
   // ===== Excel =====
@@ -320,10 +329,16 @@ export default function BaoCaoPage({ currentProfile }) {
               <Input label="Đến ngày" type="date" value={den} onChange={(e) => setDen(e.target.value)} />
             </>
           )}
+          {laAdminHan && (
+            <Select label="Phòng" value={locPhong} onChange={(e) => { setLocPhong(e.target.value); setLocSale('') }} className="w-44">
+              <option value="">Tất cả phòng</option>
+              {dsPhong.map((p) => <option key={p} value={p}>{p}</option>)}
+            </Select>
+          )}
           {laAdmin && (
-            <Select label="Sale" value={locSale} onChange={(e) => setLocSale(e.target.value)} className="w-52">
-              <option value="">Tất cả sale</option>
-              {thanhVien.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+            <Select label="Sale" value={locSale} onChange={(e) => setLocSale(e.target.value)} className="w-64">
+              <option value="">{locPhong ? `Tất cả sale phòng ${locPhong}` : 'Tất cả sale'}</option>
+              {thanhVienLoc.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
             </Select>
           )}
           <button type="button" onClick={taiExcel} disabled={loading}
@@ -344,14 +359,14 @@ export default function BaoCaoPage({ currentProfile }) {
               const soChua = khachKy.filter((c) => maChua.includes(c.trang_thai_cham_soc)).length
               const daLH = tong - soChua
               const pc = (x) => (tong ? x / tong : 0)
-              const tiLeChot = (so, t) => (t ? hienPt2(so / t) : '—')
+              const tiLeChotRow = (dem, tongRow) => { const lh = tongRow - maChua.reduce((a, m) => a + (dem[m] || 0), 0); return lh > 0 ? hienPt2(demChot(dem) / lh) : '—' }
               const demChot = (dem) => maChot.reduce((a, m) => a + (dem[m] || 0), 0)
               return (
                 <>
                   {/* Chỉ số chính */}
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <TheKpi lon tieuDe="Tổng khách hàng" so={tong.toLocaleString('vi-VN')} phu={tenKy} icon={Users} />
-                    <TheKpi tieuDe="Tỷ lệ chốt" so={tiLeChot(soChot, tong)} phu={`${soChot.toLocaleString('vi-VN')} khách đã chốt`} tone="emerald" icon={Trophy} />
+                    <TheKpi tieuDe="Tỷ lệ chốt" so={daLH > 0 ? hienPt2(soChot / daLH) : '—'} phu={`${soChot.toLocaleString('vi-VN')} chốt / ${daLH.toLocaleString('vi-VN')} khách liên hệ được`} tone="emerald" icon={Trophy} />
                     <TheKpi tieuDe="Đã liên hệ" so={daLH.toLocaleString('vi-VN')} phu={`${hienPt2(pc(daLH))} tổng số khách`} tone="sky" icon={PhoneCall} />
                     <TheKpi tieuDe="Chưa liên hệ" so={soChua.toLocaleString('vi-VN')} phu={soChua ? `${hienPt2(pc(soChua))} — cần gọi sớm` : 'Đã liên hệ hết'} tone="amber" icon={Hourglass} />
                   </div>
@@ -360,7 +375,7 @@ export default function BaoCaoPage({ currentProfile }) {
                   <section className="rounded-2xl bg-white p-5 shadow-sm">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <h2 className="font-display text-base font-semibold text-navy-900">Cơ cấu khách theo trạng thái</h2>
-                      <p className="text-xs text-ink-400">Trạng thái hiện tại · khách thêm trong kỳ</p>
+                      <p className="text-xs text-ink-400">Trạng thái hiện tại · khách thêm trong kỳ · Tỷ lệ chốt = khách chốt ÷ khách liên hệ được (không ở Chưa liên hệ)</p>
                     </div>
                     <div className="mt-4 flex h-4 overflow-hidden rounded-full bg-slate-100">
                       {demTT.filter((b) => b.so > 0).map((b) => (
@@ -406,7 +421,7 @@ export default function BaoCaoPage({ currentProfile }) {
                                 <td className={`${td} text-center`}>{o.chua ? '—' : o.soSale}</td>
                                 <td className={`${td} bg-blue-50/60 text-center font-display text-base font-bold text-navy-900`}>{o.tong.toLocaleString('vi-VN')}</td>
                                 {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center ${o.dem[b.ma] ? 'text-navy-900' : 'text-slate-300'}`}>{o.dem[b.ma] || 0}</td>)}
-                                <td className={`${td} text-center font-semibold text-emerald-600`}>{tiLeChot(demChot(o.dem), o.tong)}</td>
+                                <td className={`${td} text-center font-semibold text-emerald-600`}>{tiLeChotRow(o.dem, o.tong)}</td>
                               </tr>
                             ))}
                             {bangPhong.length > 1 && (() => {
@@ -419,7 +434,7 @@ export default function BaoCaoPage({ currentProfile }) {
                                   <td className={`${td} text-center`}>{bangPhong.reduce((a, o) => a + o.soSale, 0)}</td>
                                   <td className={`${td} text-center font-display text-base`}>{t.toLocaleString('vi-VN')}</td>
                                   {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center`}>{dem[b.ma] || 0}</td>)}
-                                  <td className={`${td} text-center`}>{tiLeChot(demChot(dem), t)}</td>
+                                  <td className={`${td} text-center`}>{tiLeChotRow(dem, t)}</td>
                                 </tr>
                               )
                             })()}
@@ -429,6 +444,7 @@ export default function BaoCaoPage({ currentProfile }) {
                     </section>
                   )}
 
+                  {!xemChuaChia && (
                   <section className="rounded-2xl bg-white p-5 shadow-sm">
                     <h2 className="mb-3 font-display text-base font-semibold text-navy-900">Chi tiết từng phòng — từng sale</h2>
                     <div className="overflow-x-auto">
@@ -454,14 +470,14 @@ export default function BaoCaoPage({ currentProfile }) {
                                   <td className={`${td} pl-7 font-medium text-navy-900`}>{r.sale.full_name}</td>
                                   <td className={`${td} text-center font-display text-base font-bold text-navy-900`}>{r.tong.toLocaleString('vi-VN')}</td>
                                   {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center ${r.dem[b.ma] ? 'text-navy-900' : 'text-slate-300'}`}>{r.dem[b.ma] || 0}</td>)}
-                                  <td className={`${td} text-center font-semibold text-emerald-600`}>{tiLeChot(demChot(r.dem), r.tong)}</td>
+                                  <td className={`${td} text-center font-semibold text-emerald-600`}>{tiLeChotRow(r.dem, r.tong)}</td>
                                 </tr>
                               ))}
                               <tr className="bg-slate-100 font-semibold text-navy-900">
                                 <td className={td}>Tổng phòng {g.ten}</td>
                                 <td className={`${td} text-center font-display text-base`}>{g.tong.toLocaleString('vi-VN')}</td>
                                 {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center`}>{g.dem[b.ma] || 0}</td>)}
-                                <td className={`${td} text-center text-emerald-600`}>{tiLeChot(demChot(g.dem), g.tong)}</td>
+                                <td className={`${td} text-center text-emerald-600`}>{tiLeChotRow(g.dem, g.tong)}</td>
                               </tr>
                             </Fragment>
                           ))}
@@ -469,6 +485,7 @@ export default function BaoCaoPage({ currentProfile }) {
                       </table>
                     </div>
                   </section>
+                  )}
                 </>
               )
             })()}
@@ -538,7 +555,7 @@ export default function BaoCaoPage({ currentProfile }) {
                       </thead>
                       <tbody>
                         {nhomPhong.length === 0 ? (
-                          <tr><td colSpan={8} className={`${td} py-6 text-center text-ink-400`}>Chưa có sale nào.</td></tr>
+                          <tr><td colSpan={8} className={`${td} py-6 text-center text-ink-400`}>{xemChuaChia ? 'Data chưa chia chưa thuộc sale nào nên chưa có mục tiêu.' : 'Chưa có sale nào.'}</td></tr>
                         ) : nhomPhong.map((g) => (
                           <Fragment key={g.ten}>
                             <tr className="bg-blue-50">
