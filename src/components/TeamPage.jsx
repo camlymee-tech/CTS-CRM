@@ -37,7 +37,7 @@ export default function TeamPage({ currentProfile }) {
   async function updateProfile(id, patch) {
     // Leader không sửa trực tiếp được hồ sơ người khác: đi qua hàm quản lý tài khoản (có kiểm tra team)
     const { data, error: fe } = laLeader(currentProfile)
-      ? await supabase.functions.invoke('quan-ly-tai-khoan', { body: { action: 'update', id, patch } })
+      ? await supabase.functions.invoke('quan-ly-tai-khoa', { body: { action: 'update', id, patch } })
       : { data: null, error: null }
     if (laLeader(currentProfile)) {
       const m = data?.error || fe?.message
@@ -75,7 +75,7 @@ export default function TeamPage({ currentProfile }) {
       `Xoá hẳn tài khoản "${p.full_name || p.email}"?\n\nNgười này sẽ không đăng nhập được nữa và không thể khôi phục.\nNếu chỉ muốn tạm ngưng thì nên dùng nút Khoá.`
     )
     if (!ok) return
-    const { data, error } = await supabase.functions.invoke('quan-ly-tai-khoan', { body: { action: 'delete', id: p.id } })
+    const { data, error } = await supabase.functions.invoke('quan-ly-tai-khoa', { body: { action: 'delete', id: p.id } })
     const msg = data?.error || error?.message
     if (msg) { setMessage(msg); return }
     setMessage('')
@@ -308,7 +308,7 @@ function CreateAccountForm({ me, dsPhongBan, onClose, onCreated }) {
     setError('')
     if (leader && !me.phong_ban) { setSaving(false); setError('Hồ sơ của bạn chưa có phòng ban. Hãy nhờ quản trị viên cập nhật trước.'); return }
 
-    const { data, error: fnError } = await supabase.functions.invoke('quan-ly-tai-khoan', {
+    const { data, error: fnError } = await supabase.functions.invoke('quan-ly-tai-khoa', {
       body: { action: 'create', profile: { ...form, role: leader ? 'sale' : form.role, phong_ban: canPhongBan ? form.phong_ban : '' } },
     })
     const msg = data?.error || fnError?.message
@@ -398,7 +398,7 @@ function EditProfileForm({ profile, isMe, me, dsPhongBan, onClose, onSaved }) {
     }
     if (!leader) { patch.role = form.role; patch.phong_ban = canPhongBan ? (form.phong_ban || null) : null }
     const { error: err } = leader
-      ? await supabase.functions.invoke('quan-ly-tai-khoan', { body: { action: 'update', id: profile.id, patch } }).then(({ data, error: fe }) => ({ error: (data?.error || fe?.message) ? { message: data?.error || fe?.message } : null }))
+      ? await supabase.functions.invoke('quan-ly-tai-khoa', { body: { action: 'update', id: profile.id, patch } }).then(({ data, error: fe }) => ({ error: (data?.error || fe?.message) ? { message: data?.error || fe?.message } : null }))
       : await supabase.from('profiles').update(patch).eq('id', profile.id)
     setSaving(false)
     if (err) { setError(err.message); return }
