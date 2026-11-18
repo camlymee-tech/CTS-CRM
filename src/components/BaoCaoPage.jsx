@@ -1,6 +1,6 @@
 import { layHet } from '../lib/layHet'
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { Download } from 'lucide-react'
+import { Download, Users, Trophy, PhoneCall, Hourglass, MessageCircle, UserPlus, AlertTriangle } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Select, Input } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
@@ -269,6 +269,7 @@ export default function BaoCaoPage({ currentProfile }) {
   }
 
   const th = 'border border-slate-200 px-4 py-2.5'
+  const thD = 'border border-navy-800 px-4 py-2.5'
   const td = 'border border-slate-200 px-4 py-2.5'
   const pctCls = (p) => (p != null && p >= 1 ? 'text-emerald-600' : p != null && p < 0.5 ? 'text-rose-500' : 'text-navy-900')
 
@@ -285,7 +286,7 @@ export default function BaoCaoPage({ currentProfile }) {
         <td className={`${td} text-center`}>{f(o.sum.luot)}</td>
         <td className={`${td} text-center`}>{f(o.sum.nghe)}</td>
         <td className={`${td} text-center`}>{f(o.sum.ht)} / {f(o.sum.mt)}</td>
-        <td className={`${td} text-center ${toi ? '' : pctCls(pt)}`}>{pt == null ? '—' : hienPt2(pt)}</td>
+        <td className={td}>{toi ? <p className="text-center">{pt == null ? '—' : hienPt2(pt)}</p> : <OPt pt={pt} />}</td>
         <td className={`${td} text-center ${toi ? '' : o.sum.ton > 0 ? 'text-rose-500' : 'text-ink-400'}`}>{f(o.sum.ton)}</td>
       </tr>
     )
@@ -336,159 +337,314 @@ export default function BaoCaoPage({ currentProfile }) {
         ) : (
           <div className="space-y-5 p-8">
             {/* ===== 1. Tổng quan ===== */}
-            {tab === 'tong_quan' && (
-              <>
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                  <div className="rounded-2xl bg-navy-900 px-5 py-4 shadow-sm">
-                    <p className="text-sm text-white/70">Tổng khách hàng</p>
-                    <p className="mt-1 font-display text-3xl font-bold text-white">{khachKy.length}</p>
+            {tab === 'tong_quan' && (() => {
+              const tong = khachKy.length
+              const maChot = TRANG_THAI.filter((b) => b.la_chot).map((b) => b.ma)
+              const soChot = khachKy.filter((c) => maChot.includes(c.trang_thai_cham_soc)).length
+              const soChua = khachKy.filter((c) => maChua.includes(c.trang_thai_cham_soc)).length
+              const daLH = tong - soChua
+              const pc = (x) => (tong ? x / tong : 0)
+              const tiLeChot = (so, t) => (t ? hienPt2(so / t) : '—')
+              const demChot = (dem) => maChot.reduce((a, m) => a + (dem[m] || 0), 0)
+              return (
+                <>
+                  {/* Chỉ số chính */}
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <TheKpi lon tieuDe="Tổng khách hàng" so={tong.toLocaleString('vi-VN')} phu={tenKy} icon={Users} />
+                    <TheKpi tieuDe="Tỷ lệ chốt" so={tiLeChot(soChot, tong)} phu={`${soChot.toLocaleString('vi-VN')} khách đã chốt`} tone="emerald" icon={Trophy} />
+                    <TheKpi tieuDe="Đã liên hệ" so={daLH.toLocaleString('vi-VN')} phu={`${hienPt2(pc(daLH))} tổng số khách`} tone="sky" icon={PhoneCall} />
+                    <TheKpi tieuDe="Chưa liên hệ" so={soChua.toLocaleString('vi-VN')} phu={soChua ? `${hienPt2(pc(soChua))} — cần gọi sớm` : 'Đã liên hệ hết'} tone="amber" icon={Hourglass} />
                   </div>
-                  {demTT.map((b) => (
-                    <div key={b.ma} className="rounded-2xl bg-white px-5 py-4 shadow-sm">
-                      <p className="flex items-center gap-2 text-sm text-ink-600">
-                        <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ backgroundColor: MAU_HEX[b.mau] || MAU_HEX.slate }} />{b.ten}
-                      </p>
-                      <p className="mt-1 font-display text-3xl font-bold text-navy-900">{b.so}</p>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-ink-400">Số khách theo trạng thái hiện tại · tính các khách được thêm trong kỳ báo cáo ({tenKy}).</p>
 
-                {laAdminHan && (
+                  {/* Cơ cấu trạng thái */}
                   <section className="rounded-2xl bg-white p-5 shadow-sm">
-                    <h2 className="mb-3 font-display text-base font-semibold text-navy-900">Khách theo trạng thái — từng phòng <span className="text-sm font-normal text-ink-400">({tenKy})</span></h2>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h2 className="font-display text-base font-semibold text-navy-900">Cơ cấu khách theo trạng thái</h2>
+                      <p className="text-xs text-ink-400">Trạng thái hiện tại · khách thêm trong kỳ</p>
+                    </div>
+                    <div className="mt-4 flex h-4 overflow-hidden rounded-full bg-slate-100">
+                      {demTT.filter((b) => b.so > 0).map((b) => (
+                        <div key={b.ma} style={{ width: `${pc(b.so) * 100}%`, backgroundColor: MAU_HEX[b.mau] || MAU_HEX.slate }} title={`${b.ten}: ${b.so}`} />
+                      ))}
+                    </div>
+                    <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+                      {demTT.map((b) => {
+                        const m = MAU_HEX[b.mau] || MAU_HEX.slate
+                        return (
+                          <div key={b.ma} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3" style={{ borderLeft: `4px solid ${m}` }}>
+                            <p className="text-xs leading-snug text-ink-600">{b.ten}</p>
+                            <p className="mt-1 flex items-baseline gap-2">
+                              <span className="font-display text-2xl font-bold text-navy-900">{b.so.toLocaleString('vi-VN')}</span>
+                              <span className="text-xs font-medium" style={{ color: m }}>{hienPt2(pc(b.so))}</span>
+                            </p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </section>
+
+                  {laAdminHan && (
+                    <section className="rounded-2xl bg-white p-5 shadow-sm">
+                      <h2 className="mb-3 font-display text-base font-semibold text-navy-900">So sánh các phòng</h2>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-sm">
+                          <thead>
+                            <tr className="bg-navy-900 text-left font-semibold text-white">
+                              <th className={thD}>Phòng</th>
+                              <th className={`${thD} text-center`}>Số sale</th>
+                              <th className={`${thD} text-center`}>Tổng khách</th>
+                              {TRANG_THAI.map((b) => <th key={b.ma} className={`${thD} text-center`}>{b.ten}</th>)}
+                              <th className={`${thD} text-center`}>Tỷ lệ chốt</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {bangPhong.length === 0 ? (
+                              <tr><td colSpan={4 + TRANG_THAI.length} className={`${td} py-6 text-center text-ink-400`}>Chưa có dữ liệu.</td></tr>
+                            ) : bangPhong.map((o) => (
+                              <tr key={o.ten} className={o.chua ? 'bg-amber-50/70' : 'odd:bg-white even:bg-slate-50/50'}>
+                                <td className={`${td} font-semibold text-navy-900`}>{o.ten}</td>
+                                <td className={`${td} text-center`}>{o.chua ? '—' : o.soSale}</td>
+                                <td className={`${td} bg-blue-50/60 text-center font-display text-base font-bold text-navy-900`}>{o.tong.toLocaleString('vi-VN')}</td>
+                                {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center ${o.dem[b.ma] ? 'text-navy-900' : 'text-slate-300'}`}>{o.dem[b.ma] || 0}</td>)}
+                                <td className={`${td} text-center font-semibold text-emerald-600`}>{tiLeChot(demChot(o.dem), o.tong)}</td>
+                              </tr>
+                            ))}
+                            {bangPhong.length > 1 && (() => {
+                              const dem = {}
+                              for (const o of bangPhong) for (const [k, v] of Object.entries(o.dem)) dem[k] = (dem[k] || 0) + v
+                              const t = bangPhong.reduce((a, o) => a + o.tong, 0)
+                              return (
+                                <tr className="bg-navy-900 font-semibold text-white">
+                                  <td className={td}>TỔNG CỘNG</td>
+                                  <td className={`${td} text-center`}>{bangPhong.reduce((a, o) => a + o.soSale, 0)}</td>
+                                  <td className={`${td} text-center font-display text-base`}>{t.toLocaleString('vi-VN')}</td>
+                                  {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center`}>{dem[b.ma] || 0}</td>)}
+                                  <td className={`${td} text-center`}>{tiLeChot(demChot(dem), t)}</td>
+                                </tr>
+                              )
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  )}
+
+                  <section className="rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 className="mb-3 font-display text-base font-semibold text-navy-900">Chi tiết từng phòng — từng sale</h2>
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse text-sm">
                         <thead>
-                          <tr className="bg-slate-100 text-left font-semibold text-navy-900">
-                            <th className={th}>Phòng</th>
-                            <th className={`${th} text-center`}>Số sale</th>
-                            <th className={`${th} text-center`}>Tổng khách</th>
-                            {TRANG_THAI.map((b) => <th key={b.ma} className={`${th} text-center`}>{b.ten}</th>)}
+                          <tr className="bg-navy-900 text-left font-semibold text-white">
+                            <th className={thD}>Sale</th>
+                            <th className={`${thD} text-center`}>Tổng khách</th>
+                            {TRANG_THAI.map((b) => <th key={b.ma} className={`${thD} text-center`}>{b.ten}</th>)}
+                            <th className={`${thD} text-center`}>Tỷ lệ chốt</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {bangPhong.length === 0 ? (
+                          {chiTiet.length === 0 ? (
                             <tr><td colSpan={3 + TRANG_THAI.length} className={`${td} py-6 text-center text-ink-400`}>Chưa có dữ liệu.</td></tr>
-                          ) : bangPhong.map((o) => (
-                            <tr key={o.ten} className={o.chua ? 'bg-amber-50/60' : ''}>
-                              <td className={`${td} font-medium text-navy-900`}>{o.ten}</td>
-                              <td className={`${td} text-center`}>{o.chua ? '—' : o.soSale}</td>
-                              <td className={`${td} text-center font-semibold text-navy-900`}>{o.tong}</td>
-                              {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center ${o.dem[b.ma] ? 'text-navy-900' : 'text-slate-300'}`}>{o.dem[b.ma] || 0}</td>)}
-                            </tr>
+                          ) : chiTiet.map((g) => (
+                            <Fragment key={g.ten}>
+                              <tr className="bg-blue-50">
+                                <td colSpan={3 + TRANG_THAI.length} className={`${td} border-l-4 border-l-coral-500 font-display font-semibold text-navy-900`}>Phòng {g.ten} <span className="text-xs font-normal text-ink-400">· {g.rows.length} sale</span></td>
+                              </tr>
+                              {g.rows.map((r) => (
+                                <tr key={r.sale.id} className="odd:bg-white even:bg-slate-50/50">
+                                  <td className={`${td} pl-7 font-medium text-navy-900`}>{r.sale.full_name}</td>
+                                  <td className={`${td} text-center font-display text-base font-bold text-navy-900`}>{r.tong.toLocaleString('vi-VN')}</td>
+                                  {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center ${r.dem[b.ma] ? 'text-navy-900' : 'text-slate-300'}`}>{r.dem[b.ma] || 0}</td>)}
+                                  <td className={`${td} text-center font-semibold text-emerald-600`}>{tiLeChot(demChot(r.dem), r.tong)}</td>
+                                </tr>
+                              ))}
+                              <tr className="bg-slate-100 font-semibold text-navy-900">
+                                <td className={td}>Tổng phòng {g.ten}</td>
+                                <td className={`${td} text-center font-display text-base`}>{g.tong.toLocaleString('vi-VN')}</td>
+                                {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center`}>{g.dem[b.ma] || 0}</td>)}
+                                <td className={`${td} text-center text-emerald-600`}>{tiLeChot(demChot(g.dem), g.tong)}</td>
+                              </tr>
+                            </Fragment>
                           ))}
-                          {bangPhong.length > 1 && (
-                            <tr className="bg-slate-50 font-semibold text-navy-900">
-                              <td className={td}>Tổng cộng</td>
-                              <td className={`${td} text-center`}>{bangPhong.reduce((a, o) => a + o.soSale, 0)}</td>
-                              <td className={`${td} text-center`}>{bangPhong.reduce((a, o) => a + o.tong, 0)}</td>
-                              {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center`}>{bangPhong.reduce((a, o) => a + (o.dem[b.ma] || 0), 0)}</td>)}
-                            </tr>
-                          )}
                         </tbody>
                       </table>
                     </div>
                   </section>
+                </>
+              )
+            })()}
+
+            {/* ===== 2. Báo cáo mục tiêu ===== */}
+            {tab === 'muc_tieu' && (
+              <>
+                {/* Chỉ số tổng */}
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+                  <div className="col-span-2 flex items-center gap-4 rounded-2xl bg-navy-900 px-5 py-4 text-white shadow-sm md:col-span-3 xl:col-span-2">
+                    <Vong pt={tatCa.ptTong} size={84} sang />
+                    <div>
+                      <p className="text-sm text-white/70">Hoàn thành mục tiêu</p>
+                      <p className="mt-0.5 font-display text-3xl font-bold">{tatCa.ptTong == null ? '—' : hienPt2(tatCa.ptTong)}</p>
+                      <p className="mt-0.5 text-xs text-white/60">{tatCa.sum.ht.toLocaleString('vi-VN')} / {tatCa.sum.mt.toLocaleString('vi-VN')} việc · {tenKy}</p>
+                    </div>
+                  </div>
+                  <TheKpi tieuDe="KH liên hệ được" so={tatCa.sum.nghe.toLocaleString('vi-VN')} phu={`TB ${tb1(tatCa.n ? tatCa.sum.nghe / tatCa.n : 0)} / sale`} tone="sky" icon={PhoneCall} nho />
+                  <TheKpi tieuDe="Lượt chăm sóc" so={tatCa.sum.luot.toLocaleString('vi-VN')} phu={`TB ${tb1(tatCa.n ? tatCa.sum.luot / tatCa.n : 0)} / sale`} tone="emerald" icon={MessageCircle} nho />
+                  <TheKpi tieuDe="Khách mới" so={tatCa.sum.moi.toLocaleString('vi-VN')} phu={`TB ${tb1(tatCa.n ? tatCa.sum.moi / tatCa.n : 0)} / sale`} tone="violet" icon={UserPlus} nho />
+                  <TheKpi tieuDe={`Tồn quá ${SO_NGAY_GOI_LAI} ngày`} so={tatCa.sum.ton.toLocaleString('vi-VN')} phu="khách cần gọi lại" tone="rose" icon={AlertTriangle} nho />
+                </div>
+
+                {/* So sánh các phòng */}
+                {nhomPhong.length > 0 && (
+                  <section className="rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 className="font-display text-base font-semibold text-navy-900">Hoàn thành mục tiêu theo phòng</h2>
+                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {[...nhomPhong].sort((x, y) => (y.ptTong ?? -1) - (x.ptTong ?? -1)).map((g) => (
+                        <div key={g.ten} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="font-display font-semibold text-navy-900">Phòng {g.ten}</p>
+                              <p className="text-xs text-ink-400">{g.n} sale · {g.sum.ht} / {g.sum.mt} việc</p>
+                            </div>
+                            <p className={`font-display text-2xl font-bold ${mauChu(g.ptTong)}`}>{g.ptTong == null ? '—' : hienPt2(g.ptTong)}</p>
+                          </div>
+                          <Thanh pt={g.ptTong} className="mt-3" />
+                          <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs text-ink-600">
+                            <div><p className="font-display text-base font-bold text-navy-900">{tb1(g.sum.nghe / g.n)}</p>liên hệ được / sale</div>
+                            <div><p className="font-display text-base font-bold text-navy-900">{tb1(g.sum.luot / g.n)}</p>chăm sóc / sale</div>
+                            <div><p className={`font-display text-base font-bold ${g.sum.ton > 0 ? 'text-rose-500' : 'text-navy-900'}`}>{g.sum.ton}</p>khách tồn</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                 )}
 
+                {/* Bảng chi tiết */}
                 <section className="rounded-2xl bg-white p-5 shadow-sm">
-                  <h2 className="mb-3 font-display text-base font-semibold text-navy-900">Chi tiết từng phòng — từng sale <span className="text-sm font-normal text-ink-400">({tenKy})</span></h2>
+                  <h2 className="mb-1 font-display text-base font-semibold text-navy-900">Chi tiết từng phòng — từng sale</h2>
+                  <p className="mb-3 text-xs text-ink-400">Mục tiêu = số KH liên hệ được sale tự đặt + số khách cần gọi lại sale đã chọn. KH liên hệ được = khách đổi từ Chưa liên hệ sang trạng thái khác. Lượt chăm sóc = khách đổi từ trạng thái khác (không phải Chưa liên hệ) sang trạng thái mới; nếu cùng ngày khách vừa đổi từ Chưa liên hệ thì chỉ tính KH liên hệ được.</p>
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-sm">
                       <thead>
-                        <tr className="bg-slate-100 text-left font-semibold text-navy-900">
-                          <th className={th}>Sale</th>
-                          <th className={`${th} text-center`}>Tổng khách</th>
-                          {TRANG_THAI.map((b) => <th key={b.ma} className={`${th} text-center`}>{b.ten}</th>)}
+                        <tr className="bg-navy-900 text-left font-semibold text-white">
+                          <th className={thD}>Sale</th>
+                          <th className={`${thD} text-center`}>Số khách phụ trách</th>
+                          <th className={`${thD} text-center`}>Khách mới</th>
+                          <th className={`${thD} text-center`}>Lượt chăm sóc</th>
+                          <th className={`${thD} text-center`}>KH liên hệ được</th>
+                          <th className={`${thD} text-center`}>Hoàn thành / mục tiêu</th>
+                          <th className={`${thD} text-center`} style={{ minWidth: 170 }}>% hoàn thành</th>
+                          <th className={`${thD} text-center`}>Khách tồn quá {SO_NGAY_GOI_LAI} ngày</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {chiTiet.length === 0 ? (
-                          <tr><td colSpan={2 + TRANG_THAI.length} className={`${td} py-6 text-center text-ink-400`}>Chưa có dữ liệu.</td></tr>
-                        ) : chiTiet.map((g) => (
+                        {nhomPhong.length === 0 ? (
+                          <tr><td colSpan={8} className={`${td} py-6 text-center text-ink-400`}>Chưa có sale nào.</td></tr>
+                        ) : nhomPhong.map((g) => (
                           <Fragment key={g.ten}>
                             <tr className="bg-blue-50">
-                              <td colSpan={2 + TRANG_THAI.length} className={`${td} font-display font-semibold text-navy-900`}>Phòng {g.ten} <span className="text-xs font-normal text-ink-400">· {g.rows.length} sale</span></td>
+                              <td colSpan={8} className={`${td} border-l-4 border-l-coral-500 font-display font-semibold text-navy-900`}>Phòng {g.ten} <span className="text-xs font-normal text-ink-400">· {g.n} sale</span></td>
                             </tr>
                             {g.rows.map((r) => (
-                              <tr key={r.sale.id}>
+                              <tr key={r.sale.id} className="odd:bg-white even:bg-slate-50/50">
                                 <td className={`${td} pl-7 font-medium text-navy-900`}>{r.sale.full_name}</td>
-                                <td className={`${td} text-center font-semibold text-navy-900`}>{r.tong}</td>
-                                {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center ${r.dem[b.ma] ? 'text-navy-900' : 'text-slate-300'}`}>{r.dem[b.ma] || 0}</td>)}
+                                <td className={`${td} text-center`}>{r.phuTrach}</td>
+                                <td className={`${td} text-center`}>{r.moi}</td>
+                                <td className={`${td} text-center`}>{r.luot}</td>
+                                <td className={`${td} text-center`}>{r.nghe}</td>
+                                <td className={`${td} text-center`}>{r.ht} / {r.mt}</td>
+                                <td className={td}><OPt pt={r.pt} /></td>
+                                <td className={`${td} text-center font-semibold ${r.ton > 0 ? 'text-rose-500' : 'text-ink-400'}`}>{r.ton}</td>
                               </tr>
                             ))}
-                            <tr className="bg-slate-50 font-semibold text-navy-900">
-                              <td className={td}>Tổng phòng {g.ten}</td>
-                              <td className={`${td} text-center`}>{g.tong}</td>
-                              {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center`}>{g.dem[b.ma] || 0}</td>)}
-                            </tr>
+                            <DongTomTat ten={`Tổng phòng ${g.ten}`} o={g} tb={false} cls="bg-slate-100 text-navy-900" />
+                            <DongTomTat ten="Trung bình / sale" o={g} tb cls="bg-orange-50 text-navy-900" />
                           </Fragment>
                         ))}
+                        {nhomPhong.length > 1 && (
+                          <>
+                            <DongTomTat ten="TỔNG TOÀN CÔNG TY" o={tatCa} tb={false} cls="bg-navy-900 text-white" />
+                            <DongTomTat ten="Trung bình / sale toàn công ty" o={tatCa} tb cls="bg-navy-900/90 text-white" />
+                          </>
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </section>
               </>
             )}
-
-            {/* ===== 2. Báo cáo mục tiêu ===== */}
-            {tab === 'muc_tieu' && (
-              <section className="rounded-2xl bg-white p-5 shadow-sm">
-                <h2 className="mb-1 font-display text-base font-semibold text-navy-900">Báo cáo mục tiêu <span className="text-sm font-normal text-ink-400">({tenKy})</span></h2>
-                <p className="mb-3 text-xs text-ink-400">Mục tiêu = số KH liên hệ được sale tự đặt + số khách cần gọi lại sale đã chọn. KH liên hệ được = khách đổi từ Chưa liên hệ sang trạng thái khác. Lượt chăm sóc = khách đổi từ trạng thái khác (không phải Chưa liên hệ) sang trạng thái mới; nếu cùng ngày khách vừa đổi từ Chưa liên hệ thì chỉ tính KH liên hệ được. Mỗi phòng có dòng Tổng phòng và dòng Trung bình / sale.</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-slate-100 text-left font-semibold text-navy-900">
-                        <th className={th}>Sale</th>
-                        <th className={`${th} text-center`}>Số khách phụ trách</th>
-                        <th className={`${th} text-center`}>Khách mới</th>
-                        <th className={`${th} text-center`}>Lượt chăm sóc</th>
-                        <th className={`${th} text-center`}>KH liên hệ được</th>
-                        <th className={`${th} text-center`}>Hoàn thành / mục tiêu</th>
-                        <th className={`${th} text-center`}>% hoàn thành</th>
-                        <th className={`${th} text-center`}>Khách tồn quá {SO_NGAY_GOI_LAI} ngày</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {nhomPhong.length === 0 ? (
-                        <tr><td colSpan={8} className={`${td} py-6 text-center text-ink-400`}>Chưa có sale nào.</td></tr>
-                      ) : nhomPhong.map((g) => (
-                        <Fragment key={g.ten}>
-                          <tr className="bg-blue-50">
-                            <td colSpan={8} className={`${td} font-display font-semibold text-navy-900`}>Phòng {g.ten} <span className="text-xs font-normal text-ink-400">· {g.n} sale</span></td>
-                          </tr>
-                          {g.rows.map((r) => (
-                            <tr key={r.sale.id}>
-                              <td className={`${td} pl-7 font-medium text-navy-900`}>{r.sale.full_name}</td>
-                              <td className={`${td} text-center`}>{r.phuTrach}</td>
-                              <td className={`${td} text-center`}>{r.moi}</td>
-                              <td className={`${td} text-center`}>{r.luot}</td>
-                              <td className={`${td} text-center`}>{r.nghe}</td>
-                              <td className={`${td} text-center`}>{r.ht} / {r.mt}</td>
-                              <td className={`${td} text-center font-semibold ${pctCls(r.pt)}`}>{r.pt == null ? '—' : hienPt2(r.pt)}</td>
-                              <td className={`${td} text-center font-semibold ${r.ton > 0 ? 'text-rose-500' : 'text-ink-400'}`}>{r.ton}</td>
-                            </tr>
-                          ))}
-                          <DongTomTat ten={`Tổng phòng ${g.ten}`} o={g} tb={false} cls="bg-slate-50 text-navy-900" />
-                          <DongTomTat ten="Trung bình / sale" o={g} tb cls="bg-orange-50 text-navy-900" />
-                        </Fragment>
-                      ))}
-                      {nhomPhong.length > 1 && (
-                        <>
-                          <DongTomTat ten="TỔNG TOÀN CÔNG TY" o={tatCa} tb={false} cls="bg-navy-900 text-white" />
-                          <DongTomTat ten="Trung bình / sale toàn công ty" o={tatCa} tb cls="bg-navy-900/90 text-white" />
-                        </>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+const mauThanh = (p) => (p == null ? 'bg-slate-300' : p >= 1 ? 'bg-emerald-500' : p >= 0.5 ? 'bg-amber-400' : 'bg-rose-400')
+const mauChu = (p) => (p == null ? 'text-ink-400' : p >= 1 ? 'text-emerald-600' : p >= 0.5 ? 'text-amber-600' : 'text-rose-500')
+
+function Thanh({ pt, className = '' }) {
+  return (
+    <div className={`h-2.5 overflow-hidden rounded-full bg-slate-200 ${className}`}>
+      <div className={`h-full rounded-full ${mauThanh(pt)}`} style={{ width: `${Math.min(Math.max((pt || 0) * 100, pt ? 2 : 0), 100)}%` }} />
+    </div>
+  )
+}
+
+// Ô % hoàn thành: số + thanh tiến độ
+function OPt({ pt }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <Thanh pt={pt} className="h-2 flex-1" />
+      <span className={`w-16 text-right font-semibold ${mauChu(pt)}`}>{pt == null ? '—' : hienPt2(pt)}</span>
+    </div>
+  )
+}
+
+// Vòng tròn tiến độ
+function Vong({ pt, size = 80, sang = false }) {
+  const r = (size - 12) / 2
+  const c = 2 * Math.PI * r
+  const v = Math.min(Math.max(pt || 0, 0), 1)
+  return (
+    <svg width={size} height={size} className="flex-none -rotate-90">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={sang ? 'rgba(255,255,255,0.18)' : '#e2e8f0'} strokeWidth="8" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth="8" strokeLinecap="round"
+        stroke={pt != null && pt >= 1 ? '#34d399' : '#ff7a00'} strokeDasharray={c} strokeDashoffset={c * (1 - v)} />
+    </svg>
+  )
+}
+
+const TONE = {
+  emerald: { vien: '#10b981', chu: 'text-emerald-600', nen: 'bg-emerald-50', icon: 'text-emerald-600' },
+  sky: { vien: '#0ea5e9', chu: 'text-sky-600', nen: 'bg-sky-50', icon: 'text-sky-600' },
+  amber: { vien: '#f59e0b', chu: 'text-amber-600', nen: 'bg-amber-50', icon: 'text-amber-600' },
+  violet: { vien: '#8b5cf6', chu: 'text-violet-600', nen: 'bg-violet-50', icon: 'text-violet-600' },
+  rose: { vien: '#f43f5e', chu: 'text-rose-500', nen: 'bg-rose-50', icon: 'text-rose-500' },
+}
+
+// Thẻ chỉ số: lon = thẻ nền xanh đậm (chỉ số quan trọng nhất)
+function TheKpi({ tieuDe, so, phu, tone, icon: Icon, lon = false, nho = false }) {
+  if (lon) {
+    return (
+      <div className="flex items-center justify-between rounded-2xl bg-navy-900 px-6 py-5 text-white shadow-sm">
+        <div>
+          <p className="text-sm text-white/70">{tieuDe}</p>
+          <p className="mt-1 font-display text-4xl font-bold">{so}</p>
+          {phu && <p className="mt-1 text-xs text-white/60">{phu}</p>}
+        </div>
+        {Icon && <Icon size={34} className="text-white/30" />}
+      </div>
+    )
+  }
+  const t = TONE[tone] || TONE.sky
+  return (
+    <div className="rounded-2xl bg-white px-5 py-4 shadow-sm" style={{ borderTop: `4px solid ${t.vien}` }}>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-ink-600">{tieuDe}</p>
+        {Icon && <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${t.nen}`}><Icon size={16} className={t.icon} /></span>}
+      </div>
+      <p className={`mt-1 font-display ${nho ? 'text-2xl' : 'text-3xl'} font-bold ${t.chu}`}>{so}</p>
+      {phu && <p className="mt-1 text-xs text-ink-400">{phu}</p>}
     </div>
   )
 }
