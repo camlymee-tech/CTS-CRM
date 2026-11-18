@@ -1,5 +1,5 @@
 import { layHet } from '../lib/layHet'
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Select, Input } from './ui'
@@ -13,9 +13,7 @@ import { laQuanLy, locNhanSu } from '../lib/quyen'
 
 const TABS = [
   { key: 'tong_quan', label: 'Tổng quan' },
-  { key: 'hieu_suat', label: 'Hiệu suất sale' },
-  { key: 'muc_tieu', label: 'Mục tiêu ngày' },
-  { key: 'khu_vuc', label: 'Khu vực & trạng thái' },
+  { key: 'muc_tieu', label: 'Báo cáo mục tiêu' },
 ]
 
 const MAU_HEX = {
@@ -31,6 +29,7 @@ const dmy = (s) => String(s).split('-').reverse().join('/')
 function khoangKy(ky, tu, den) {
   const d = new Date()
   const hom = ymd(d)
+  if (ky === 'tat_ca') return ['0000-01-01', hom]
   if (ky === 'hom_nay') return [hom, hom]
   if (ky === '7') { const x = new Date(); x.setDate(x.getDate() - 6); return [ymd(x), hom] }
   if (ky === 'thang_nay') return [`${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`, hom]
@@ -66,14 +65,24 @@ export default function BaoCaoPage({ currentProfile }) {
 
   async function load() {
     setLoading(true)
-    const [a, b, c, d, e, f] = await Promise.all([
+    const laSale = currentProfile?.role === 'sale'
+    const truyVanProfiles = supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name')
+    // Sale không xem trực tiếp được khách/nhật ký của đồng nghiệp: dùng hàm team_* (chỉ trả số liệu, không có tên/SĐT khách)
+    const [a, b, c, d, e, f] = laSale ? await Promise.all([
+      layHet(() => supabase.rpc('team_khach')),
+      truyVanProfiles,
+      layHet(() => supabase.rpc('team_interactions')),
+      layHet(() => supabase.rpc('team_logs')),
+      layHet(() => supabase.rpc('team_muc_tieu_so')),
+      layHet(() => supabase.rpc('team_muc_tieu_ngay')),
+    ]) : await Promise.all([
       layHet(() => supabase.from('customers').select('id, ten_khach, sale_id, trang_thai_cham_soc, khu_vuc, created_at, ngay_lien_he_gan_nhat').order('id')),
-      supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
+      truyVanProfiles,
       layHet(() => supabase.from('customer_interactions').select('customer_id, sale_id, ngay_thuc_hien, created_at').order('id')),
-      supabase.from('customer_logs').select('customer_id, user_id, hanh_dong, chi_tiet, created_at')
-        .eq('hanh_dong', 'Đổi trạng thái').order('created_at', { ascending: false }).limit(10000),
-      supabase.from('muc_tieu_so').select('user_id, ngay, loai, muc_tieu'),
-      supabase.from('muc_tieu_ngay').select('user_id, ngay, customer_id'),
+      layHet(() => supabase.from('customer_logs').select('customer_id, user_id, hanh_dong, chi_tiet, created_at')
+        .eq('hanh_dong', 'Đổi trạng thái').order('created_at', { ascending: false }).order('id')),
+      layHet(() => supabase.from('muc_tieu_so').select('user_id, ngay, loai, muc_tieu').order('user_id').order('ngay').order('loai')),
+      layHet(() => supabase.from('muc_tieu_ngay').select('user_id, ngay, customer_id').order('user_id').order('ngay').order('customer_id')),
     ])
     setCustomers(a.data || []); setProfiles(b.data || []); setCs(c.data || [])
     setLogs(d.data || []); setSoMt(e.data || []); setChonMt(f.data || [])
@@ -83,20 +92,24 @@ export default function BaoCaoPage({ currentProfile }) {
   const [tuNgay, denNgay] = useMemo(() => khoangKy(ky, tu, den), [ky, tu, den])
   const trongKy = (x) => !!x && x >= tuNgay && x <= denNgay
 
-  // Sale chỉ xem số của mình
-  const saleDangXem = laAdmin ? locSale : currentProfile?.id
-  const dsSale = useMemo(() => {
-    const sales = locNhanSu(currentProfile, profiles).filter((p) => p.role !== 'admin')
-    return saleDangXem ? sales.filter((p) => p.id === saleDangXem) : sales
-  }, [profiles, saleDangXem, currentProfile])
+  // Phạm vi xem: admin = tất cả phòng · leader và sale = các thành viên cùng phòng ban của mình
+  const thanhVien = useMemo(() => {
+    const khongAdmin = profiles.filter((p) => p.role !== 'admin')
+    if (currentProfile?.role === 'admin') return khongAdmin
+    if (currentProfile?.phong_ban) return khongAdmin.filter((p) => p.phong_ban === currentProfile.phong_ban)
+    return khongAdmin.filter((p) => p.id === currentProfile?.id)
+  }, [profiles, currentProfile])
+  const saleDangXem = laAdmin ? locSale : ''
+  const dsSale = useMemo(() => (saleDangXem ? thanhVien.filter((p) => p.id === saleDangXem) : thanhVien), [thanhVien, saleDangXem])
   const idSale = useMemo(() => new Set(dsSale.map((s) => s.id)), [dsSale])
 
   const maChua = maChuaLienHe(statuses)
   const maNghe = maKhNgheMay(statuses)
-  const laNgheMay = (l) => {
-    const [t, d] = String(l.chi_tiet || '').split(' → ')
-    return maChua.includes(t) && maNghe.includes(d)
-  }
+  // Quy ước: đổi trạng thái từ "Chưa liên hệ" sang bất kỳ trạng thái nào = 1 lần KH liên hệ được
+  const tachLog = (l) => { const [tu, den] = String(l.chi_tiet || '').split(' → '); return { tu, den, doi: !!tu && !!den && tu !== den } }
+  const laNgheMay = (l) => { const x = tachLog(l); return x.doi && maChua.includes(x.tu) }
+  // Đổi trạng thái từ trạng thái khác (không phải Chưa liên hệ) sang trạng thái mới = 1 lượt chăm sóc
+  const laChamSoc = (l) => { const x = tachLog(l); return x.doi && !maChua.includes(x.tu) }
 
   // Dữ liệu đã lọc theo sale
   const khach = useMemo(() => customers.filter((c) => idSale.has(c.sale_id)), [customers, idSale])
@@ -130,7 +143,59 @@ export default function BaoCaoPage({ currentProfile }) {
     return out.sort((a, b) => (a.ngay < b.ngay ? 1 : a.ngay > b.ngay ? -1 : a.sale.full_name.localeCompare(b.sale.full_name, 'vi')))
   }, [tuNgay, denNgay, dsSale, soMt, chonMt, logs, cs, maChua.join(), maNghe.join()])
 
-  // Hiệu suất từng sale
+  const laAdminHan = currentProfile?.role === 'admin'
+  const tenPB = (s) => s.phong_ban || 'Chưa có phòng ban'
+  const tb1 = (x) => (Math.round(x * 10) / 10).toLocaleString('vi-VN')
+
+  // ===== Tab 1: Tổng quan — khách theo trạng thái, lọc theo ngày thêm khách =====
+  const khachKy = useMemo(() => khach.filter((c) => trongKy(ngayLocal(c.created_at))), [khach, tuNgay, denNgay])
+  const demTT = useMemo(() => TRANG_THAI.map((b) => ({ ...b, so: khachKy.filter((c) => c.trang_thai_cham_soc === b.ma).length })), [khachKy, TRANG_THAI])
+
+  // Admin: chia theo từng phòng (thêm dòng "Chưa chia sale" cho khách chưa có sale)
+  const bangPhong = useMemo(() => {
+    if (!laAdminHan) return []
+    const m = new Map()
+    const lay = (k) => { if (!m.has(k)) m.set(k, { ten: k, dem: {}, tong: 0, soSale: 0 }); return m.get(k) }
+    const phongCua = new Map()
+    for (const s of dsSale) { phongCua.set(s.id, tenPB(s)); lay(tenPB(s)).soSale += 1 }
+    for (const c of khachKy) { const o = lay(phongCua.get(c.sale_id) || 'Chưa có phòng ban'); o.dem[c.trang_thai_cham_soc] = (o.dem[c.trang_thai_cham_soc] || 0) + 1; o.tong += 1 }
+    if (!locSale) {
+      const chua = customers.filter((c) => !c.sale_id && trongKy(ngayLocal(c.created_at)))
+      if (chua.length) {
+        const o = lay('Chưa chia sale'); o.chua = true
+        for (const c of chua) { o.dem[c.trang_thai_cham_soc] = (o.dem[c.trang_thai_cham_soc] || 0) + 1; o.tong += 1 }
+      }
+    }
+    return [...m.values()].sort((a, b) => (a.chua ? 1 : 0) - (b.chua ? 1 : 0) || a.ten.localeCompare(b.ten, 'vi'))
+  }, [laAdminHan, dsSale, khachKy, customers, locSale, tuNgay, denNgay])
+
+  // Ngày khách đã chuyển từ "Chưa liên hệ" → trong ngày đó các lần đổi tiếp theo chỉ tính là KH liên hệ được, không tính chăm sóc
+  const lanLienHeDau = useMemo(() => {
+    const set = new Set()
+    for (const l of logs) if (laNgheMay(l)) set.add(`${l.customer_id}|${ngayLocal(l.created_at)}`)
+    return set
+  }, [logs, maChua.join()])
+
+  // Chi tiết: từng phòng → từng sale (admin thấy mọi phòng · leader, sale chỉ thấy phòng mình)
+  const chiTiet = useMemo(() => {
+    const m = new Map()
+    for (const sl of dsSale) {
+      const mine = khachKy.filter((c) => c.sale_id === sl.id)
+      if (sl.role === 'leader' && mine.length === 0) continue
+      const dem = {}
+      for (const c of mine) dem[c.trang_thai_cham_soc] = (dem[c.trang_thai_cham_soc] || 0) + 1
+      const k = tenPB(sl)
+      if (!m.has(k)) m.set(k, [])
+      m.get(k).push({ sale: sl, dem, tong: mine.length })
+    }
+    return [...m.entries()].sort((x, y) => x[0].localeCompare(y[0], 'vi')).map(([ten, rows]) => {
+      const dem = {}; let tong = 0
+      for (const r of rows) { tong += r.tong; for (const [k, v] of Object.entries(r.dem)) dem[k] = (dem[k] || 0) + v }
+      return { ten, rows, dem, tong }
+    })
+  }, [dsSale, khachKy])
+
+  // ===== Tab 2: Báo cáo mục tiêu — từng phòng, từng sale, tổng & trung bình =====
   const dongSale = useMemo(() => dsSale.map((s) => {
     const mtS = dongMucTieu.filter((r) => r.sale.id === s.id)
     const mt = mtS.reduce((a, r) => a + r.mt, 0)
@@ -139,92 +204,98 @@ export default function BaoCaoPage({ currentProfile }) {
       sale: s,
       phuTrach: customers.filter((c) => c.sale_id === s.id).length,
       moi: customers.filter((c) => c.sale_id === s.id && trongKy(ngayLocal(c.created_at))).length,
-      luot: cs.filter((x) => x.sale_id === s.id && trongKy(ngayCs(x))).length,
-      doiTt: logs.filter((l) => l.user_id === s.id && trongKy(ngayLocal(l.created_at))).length,
+      luot: logs.filter((l) => l.user_id === s.id && trongKy(ngayLocal(l.created_at)) && laChamSoc(l) && !lanLienHeDau.has(`${l.customer_id}|${ngayLocal(l.created_at)}`)).length,
       nghe: logs.filter((l) => l.user_id === s.id && trongKy(ngayLocal(l.created_at)) && laNgheMay(l)).length,
       ht, mt, pt: mt ? ht / mt : null,
       ton: canGoiLai.filter((r) => r.saleId === s.id).length,
     }
   }), [dsSale, customers, cs, logs, dongMucTieu, canGoiLai, tuNgay, denNgay, maChua.join(), maNghe.join()])
 
-  const tong = useMemo(() => {
-    const t = { moi: 0, luot: 0, doiTt: 0, nghe: 0, ht: 0, mt: 0 }
-    for (const r of dongSale) { t.moi += r.moi; t.luot += r.luot; t.doiTt += r.doiTt; t.nghe += r.nghe; t.ht += r.ht; t.mt += r.mt }
-    return t
-  }, [dongSale])
-
-  // Khách theo trạng thái (hiện tại)
-  const theoTrangThai = useMemo(() => {
-    const n = khach.length
-    return TRANG_THAI.map((b) => {
-      const so = khach.filter((c) => c.trang_thai_cham_soc === b.ma).length
-      return { ...b, so, pt: n ? so / n : 0 }
-    }).filter((b) => b.so > 0)
-  }, [khach, TRANG_THAI])
-
-  // Khu vực × trạng thái
-  const bangKhuVuc = useMemo(() => {
+  const dongHienThi = useMemo(() => dongSale.filter((r) => r.sale.role !== 'leader' || r.phuTrach > 0 || r.mt > 0 || r.luot > 0), [dongSale])
+  const KEYS = ['phuTrach', 'moi', 'luot', 'nghe', 'ht', 'mt', 'ton']
+  const gopNhom = (ten, rows) => {
+    const sum = Object.fromEntries(KEYS.map((k) => [k, rows.reduce((a, r) => a + r[k], 0)]))
+    const co = rows.filter((r) => r.pt != null)
+    return { ten, rows, sum, n: rows.length, ptTong: sum.mt ? sum.ht / sum.mt : null, ptTb: co.length ? co.reduce((a, r) => a + r.pt, 0) / co.length : null }
+  }
+  const nhomPhong = useMemo(() => {
     const m = new Map()
-    for (const c of khach) {
-      const k = c.khu_vuc || 'Chưa nhập khu vực'
-      if (!m.has(k)) m.set(k, {})
-      m.get(k)[c.trang_thai_cham_soc] = (m.get(k)[c.trang_thai_cham_soc] || 0) + 1
-    }
-    return [...m.entries()].map(([ten, dem]) => ({ ten, dem, tong: Object.values(dem).reduce((a, b) => a + b, 0) }))
-      .sort((a, b) => b.tong - a.tong)
-  }, [khach])
+    for (const r of dongHienThi) { const k = tenPB(r.sale); if (!m.has(k)) m.set(k, []); m.get(k).push(r) }
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], 'vi')).map(([ten, rows]) => gopNhom(ten, rows))
+  }, [dongHienThi])
+  const tatCa = useMemo(() => gopNhom('Toàn công ty', dongHienThi), [dongHienThi])
 
-  const tenKy = ky === 'hom_nay' ? `Hôm nay (${dmy(tuNgay)})` : `${dmy(tuNgay)} – ${dmy(denNgay)}`
-  const tenSaleXem = laAdmin ? (locSale ? dsSale[0]?.full_name : (currentProfile?.role === 'leader' ? `Team ${currentProfile.phong_ban || ''}` : 'Tất cả sale')) : currentProfile?.full_name
+  const tenKy = ky === 'tat_ca' ? 'Tất cả thời gian' : ky === 'hom_nay' ? `Hôm nay (${dmy(tuNgay)})` : `${dmy(tuNgay)} – ${dmy(denNgay)}`
+  const tenSaleXem = laAdmin ? (locSale ? dsSale[0]?.full_name : (currentProfile?.role === 'leader' ? `Phòng ${currentProfile.phong_ban || ''}` : 'Tất cả sale')) : `Phòng ${currentProfile?.phong_ban || ''}`
   const phuDe = `Kỳ: ${tenKy} · ${tenSaleXem || ''}`
 
   // ===== Excel =====
   function taiExcel() {
     if (tab === 'tong_quan') {
+      const rows = []
+      const tongCong = { tong: 0, dem: {} }
+      const cong = (o) => { tongCong.tong += o.tong; for (const [k, v] of Object.entries(o.dem)) tongCong.dem[k] = (tongCong.dem[k] || 0) + v }
+      for (const g of chiTiet) {
+        for (const r of g.rows) rows.push([g.ten, r.sale.full_name, r.tong, ...TRANG_THAI.map((b) => r.dem[b.ma] || 0)])
+        rows.push([`Tổng phòng ${g.ten}`, '', g.tong, ...TRANG_THAI.map((b) => g.dem[b.ma] || 0)])
+        cong(g)
+      }
+      const chua = bangPhong.find((o) => o.chua)
+      if (chua) { rows.push(['Chưa chia sale', '', chua.tong, ...TRANG_THAI.map((b) => chua.dem[b.ma] || 0)]); cong(chua) }
+      if (chiTiet.length > 1 || chua) rows.push(['TỔNG CỘNG', '', tongCong.tong, ...TRANG_THAI.map((b) => tongCong.dem[b.ma] || 0)])
       return xuatBangXlsx({
-        tieuDe: 'Tổng quan', phuDe,
-        heads: ['Chỉ số', 'Giá trị'],
-        rows: [
-          ['Khách mới thêm', tong.moi], ['Lượt chăm sóc', tong.luot], ['Khách đổi trạng thái', tong.doiTt],
-          ['KH nghe máy', tong.nghe], ['Hoàn thành mục tiêu', tong.mt ? hienPt2(tong.ht / tong.mt) : '—'],
-          ['Khách cần gọi lại', canGoiLai.length],
-          ...theoTrangThai.map((b) => [`Số khách – ${b.ten}`, b.so]),
-        ],
-        tenFile: `bao-cao-tong-quan-${tuNgay}.xlsx`,
+        tieuDe: 'Tổng quan – khách theo trạng thái (từng phòng, từng sale)', phuDe,
+        heads: ['Phòng', 'Sale', 'Tổng khách', ...TRANG_THAI.map((b) => b.ten)],
+        rows, tenFile: `bao-cao-tong-quan-${tuNgay}.xlsx`,
       })
     }
-    if (tab === 'hieu_suat') {
-      return xuatBangXlsx({
-        tieuDe: 'Hiệu suất sale', phuDe,
-        heads: ['Sale', 'Số khách phụ trách', 'Khách mới', 'Lượt chăm sóc', 'KH nghe máy', 'Hoàn thành / mục tiêu', '% hoàn thành', `Khách tồn quá ${SO_NGAY_GOI_LAI} ngày`],
-        rows: dongSale.map((r) => [r.sale.full_name, r.phuTrach, r.moi, r.luot, r.nghe, `${r.ht} / ${r.mt}`, r.pt == null ? '—' : hienPt2(r.pt), r.ton]),
-        tenFile: `bao-cao-hieu-suat-sale-${tuNgay}.xlsx`,
-      })
+    const hang = (ten, o, tb) => {
+      const f = tb ? (x) => tb1(x / o.n) : (x) => x
+      return [ten, f(o.sum.phuTrach), f(o.sum.moi), f(o.sum.luot), f(o.sum.nghe), `${f(o.sum.ht)} / ${f(o.sum.mt)}`, (tb ? o.ptTb : o.ptTong) == null ? '—' : hienPt2(tb ? o.ptTb : o.ptTong), f(o.sum.ton)]
     }
-    if (tab === 'muc_tieu') {
-      return xuatBangXlsx({
-        tieuDe: 'Mục tiêu ngày', phuDe,
-        heads: ['Ngày', 'Sale', 'Mục tiêu KH nghe máy', 'Đã nghe máy', 'Khách cần gọi lại (mục tiêu)', 'Đã gọi lại', 'Mục tiêu', 'Hoàn thành', '% đạt'],
-        rows: dongMucTieu.map((r) => [dmy(r.ngay), r.sale.full_name, r.mtNghe ?? '—', r.nghe, r.mtLai, r.xong, r.mt, r.ht, r.pt == null ? '—' : hienPt2(r.pt)]),
-        tenFile: `bao-cao-muc-tieu-ngay-${tuNgay}.xlsx`,
-      })
+    const rows = []
+    for (const g of nhomPhong) {
+      rows.push([`PHÒNG ${g.ten}`, '', '', '', '', '', '', ''])
+      for (const r of g.rows) rows.push([r.sale.full_name, r.phuTrach, r.moi, r.luot, r.nghe, `${r.ht} / ${r.mt}`, r.pt == null ? '—' : hienPt2(r.pt), r.ton])
+      rows.push(hang(`Tổng phòng ${g.ten}`, g, false))
+      rows.push(hang('Trung bình / sale', g, true))
     }
+    if (nhomPhong.length > 1) { rows.push(hang('TỔNG TOÀN CÔNG TY', tatCa, false)); rows.push(hang('Trung bình / sale toàn công ty', tatCa, true)) }
     return xuatBangXlsx({
-      tieuDe: 'Khu vực & trạng thái', phuDe: `Toàn bộ khách hiện có · ${tenSaleXem || ''}`,
-      heads: ['Khu vực', 'Tổng', ...TRANG_THAI.map((b) => b.ten)],
-      rows: bangKhuVuc.map((r) => [r.ten, r.tong, ...TRANG_THAI.map((b) => r.dem[b.ma] || 0)]),
-      tenFile: 'bao-cao-khu-vuc-trang-thai.xlsx',
+      tieuDe: 'Báo cáo mục tiêu', phuDe,
+      heads: ['Sale', 'Số khách phụ trách', 'Khách mới', 'Lượt chăm sóc', 'KH liên hệ được', 'Hoàn thành / mục tiêu', '% hoàn thành', `Khách tồn quá ${SO_NGAY_GOI_LAI} ngày`],
+      rows, tenFile: `bao-cao-muc-tieu-${tuNgay}.xlsx`,
     })
   }
 
   const th = 'border border-slate-200 px-4 py-2.5'
   const td = 'border border-slate-200 px-4 py-2.5'
+  const pctCls = (p) => (p != null && p >= 1 ? 'text-emerald-600' : p != null && p < 0.5 ? 'text-rose-500' : 'text-navy-900')
+
+  // Hai dòng tóm tắt của một nhóm: Tổng + Trung bình / sale
+  const DongTomTat = ({ ten, o, tb, cls }) => {
+    const f = tb ? (x) => tb1(x / o.n) : (x) => x
+    const pt = tb ? o.ptTb : o.ptTong
+    const toi = cls.includes('bg-navy')   // dòng nền xanh đậm: giữ chữ trắng
+    return (
+      <tr className={`font-semibold ${cls}`}>
+        <td className={td}>{ten}</td>
+        <td className={`${td} text-center`}>{f(o.sum.phuTrach)}</td>
+        <td className={`${td} text-center`}>{f(o.sum.moi)}</td>
+        <td className={`${td} text-center`}>{f(o.sum.luot)}</td>
+        <td className={`${td} text-center`}>{f(o.sum.nghe)}</td>
+        <td className={`${td} text-center`}>{f(o.sum.ht)} / {f(o.sum.mt)}</td>
+        <td className={`${td} text-center ${toi ? '' : pctCls(pt)}`}>{pt == null ? '—' : hienPt2(pt)}</td>
+        <td className={`${td} text-center ${toi ? '' : o.sum.ton > 0 ? 'text-rose-500' : 'text-ink-400'}`}>{f(o.sum.ton)}</td>
+      </tr>
+    )
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex gap-1 border-b border-slate-200 bg-white px-8 pt-3">
         {TABS.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
+          <button key={t.key} onClick={() => { setTab(t.key); if (t.key === 'muc_tieu' && ky === 'tat_ca') setKy('thang_nay') }}
             className={`-mb-px border-b-2 px-3 py-2.5 text-sm transition ${
               tab === t.key ? 'border-coral-500 font-medium text-navy-900' : 'border-transparent text-ink-600 hover:text-navy-900'
             }`}>
@@ -235,26 +306,23 @@ export default function BaoCaoPage({ currentProfile }) {
 
       <div className="flex-1 overflow-y-auto">
         <div className="mx-8 mt-6 flex flex-wrap items-end gap-3 rounded-2xl bg-white p-4 shadow-sm">
-          {tab !== 'khu_vuc' && (
+          <Select label="Kỳ báo cáo" value={ky} onChange={(e) => setKy(e.target.value)} className="w-44">
+            {tab === 'tong_quan' && <option value="tat_ca">Tất cả thời gian</option>}
+            <option value="hom_nay">Hôm nay</option>
+            <option value="7">7 ngày qua</option>
+            <option value="thang_nay">Tháng này</option>
+            <option value="tuy_chon">Chọn ngày...</option>
+          </Select>
+          {ky === 'tuy_chon' && (
             <>
-              <Select label="Kỳ báo cáo" value={ky} onChange={(e) => setKy(e.target.value)} className="w-44">
-                <option value="hom_nay">Hôm nay</option>
-                <option value="7">7 ngày qua</option>
-                <option value="thang_nay">Tháng này</option>
-                <option value="tuy_chon">Chọn ngày...</option>
-              </Select>
-              {ky === 'tuy_chon' && (
-                <>
-                  <Input label="Từ ngày" type="date" value={tu} onChange={(e) => setTu(e.target.value)} />
-                  <Input label="Đến ngày" type="date" value={den} onChange={(e) => setDen(e.target.value)} />
-                </>
-              )}
+              <Input label="Từ ngày" type="date" value={tu} onChange={(e) => setTu(e.target.value)} />
+              <Input label="Đến ngày" type="date" value={den} onChange={(e) => setDen(e.target.value)} />
             </>
           )}
           {laAdmin && (
             <Select label="Sale" value={locSale} onChange={(e) => setLocSale(e.target.value)} className="w-52">
               <option value="">Tất cả sale</option>
-              {locNhanSu(currentProfile, profiles).filter((p) => p.role !== 'admin').map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+              {thanhVien.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
             </Select>
           )}
           <button type="button" onClick={taiExcel} disabled={loading}
@@ -270,58 +338,105 @@ export default function BaoCaoPage({ currentProfile }) {
             {/* ===== 1. Tổng quan ===== */}
             {tab === 'tong_quan' && (
               <>
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-                  <The nhan="Khách mới thêm" so={tong.moi} />
-                  <The nhan="Lượt chăm sóc" so={tong.luot} />
-                  <The nhan="Khách đổi trạng thái" so={tong.doiTt} />
-                  <The nhan="KH nghe máy" so={tong.nghe} />
-                  <The nhan="Hoàn thành mục tiêu" so={tong.mt ? hienPt2(tong.ht / tong.mt) : '—'}
-                    phu={tong.mt ? `${tong.ht} / ${tong.mt} việc` : 'Chưa đặt mục tiêu trong kỳ'} cam />
-                  <The nhan="Khách cần gọi lại" so={canGoiLai.length} phu={`Báo giá / hẹn đi đơn quá ${SO_NGAY_GOI_LAI} ngày`} />
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  <div className="rounded-2xl bg-navy-900 px-5 py-4 shadow-sm">
+                    <p className="text-sm text-white/70">Tổng khách hàng</p>
+                    <p className="mt-1 font-display text-3xl font-bold text-white">{khachKy.length}</p>
+                  </div>
+                  {demTT.map((b) => (
+                    <div key={b.ma} className="rounded-2xl bg-white px-5 py-4 shadow-sm">
+                      <p className="flex items-center gap-2 text-sm text-ink-600">
+                        <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ backgroundColor: MAU_HEX[b.mau] || MAU_HEX.slate }} />{b.ten}
+                      </p>
+                      <p className="mt-1 font-display text-3xl font-bold text-navy-900">{b.so}</p>
+                    </div>
+                  ))}
                 </div>
+                <p className="text-xs text-ink-400">Số khách theo trạng thái hiện tại · tính các khách được thêm trong kỳ báo cáo ({tenKy}).</p>
+
+                {laAdminHan && (
+                  <section className="rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 className="mb-3 font-display text-base font-semibold text-navy-900">Khách theo trạng thái — từng phòng <span className="text-sm font-normal text-ink-400">({tenKy})</span></h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-slate-100 text-left font-semibold text-navy-900">
+                            <th className={th}>Phòng</th>
+                            <th className={`${th} text-center`}>Số sale</th>
+                            <th className={`${th} text-center`}>Tổng khách</th>
+                            {TRANG_THAI.map((b) => <th key={b.ma} className={`${th} text-center`}>{b.ten}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bangPhong.length === 0 ? (
+                            <tr><td colSpan={3 + TRANG_THAI.length} className={`${td} py-6 text-center text-ink-400`}>Chưa có dữ liệu.</td></tr>
+                          ) : bangPhong.map((o) => (
+                            <tr key={o.ten} className={o.chua ? 'bg-amber-50/60' : ''}>
+                              <td className={`${td} font-medium text-navy-900`}>{o.ten}</td>
+                              <td className={`${td} text-center`}>{o.chua ? '—' : o.soSale}</td>
+                              <td className={`${td} text-center font-semibold text-navy-900`}>{o.tong}</td>
+                              {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center ${o.dem[b.ma] ? 'text-navy-900' : 'text-slate-300'}`}>{o.dem[b.ma] || 0}</td>)}
+                            </tr>
+                          ))}
+                          {bangPhong.length > 1 && (
+                            <tr className="bg-slate-50 font-semibold text-navy-900">
+                              <td className={td}>Tổng cộng</td>
+                              <td className={`${td} text-center`}>{bangPhong.reduce((a, o) => a + o.soSale, 0)}</td>
+                              <td className={`${td} text-center`}>{bangPhong.reduce((a, o) => a + o.tong, 0)}</td>
+                              {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center`}>{bangPhong.reduce((a, o) => a + (o.dem[b.ma] || 0), 0)}</td>)}
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )}
 
                 <section className="rounded-2xl bg-white p-5 shadow-sm">
-                  <h2 className="font-display text-base font-semibold text-navy-900">Số khách theo trạng thái</h2>
-                  <p className="mt-0.5 text-xs text-ink-400">Tình trạng hiện tại của khách đang phụ trách, không phụ thuộc kỳ báo cáo.</p>
-                  {theoTrangThai.length === 0 ? (
-                    <p className="py-10 text-center text-sm text-ink-400">Chưa có khách nào.</p>
-                  ) : (
-                    <>
-                      <div className="mt-4 flex h-3.5 overflow-hidden rounded-full bg-slate-100">
-                        {theoTrangThai.map((b) => (
-                          <div key={b.ma} style={{ width: `${b.pt * 100}%`, backgroundColor: MAU_HEX[b.mau] || MAU_HEX.slate }} title={`${b.ten}: ${b.so} khách`} />
+                  <h2 className="mb-3 font-display text-base font-semibold text-navy-900">Chi tiết từng phòng — từng sale <span className="text-sm font-normal text-ink-400">({tenKy})</span></h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-slate-100 text-left font-semibold text-navy-900">
+                          <th className={th}>Sale</th>
+                          <th className={`${th} text-center`}>Tổng khách</th>
+                          {TRANG_THAI.map((b) => <th key={b.ma} className={`${th} text-center`}>{b.ten}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chiTiet.length === 0 ? (
+                          <tr><td colSpan={2 + TRANG_THAI.length} className={`${td} py-6 text-center text-ink-400`}>Chưa có dữ liệu.</td></tr>
+                        ) : chiTiet.map((g) => (
+                          <Fragment key={g.ten}>
+                            <tr className="bg-blue-50">
+                              <td colSpan={2 + TRANG_THAI.length} className={`${td} font-display font-semibold text-navy-900`}>Phòng {g.ten} <span className="text-xs font-normal text-ink-400">· {g.rows.length} sale</span></td>
+                            </tr>
+                            {g.rows.map((r) => (
+                              <tr key={r.sale.id}>
+                                <td className={`${td} pl-7 font-medium text-navy-900`}>{r.sale.full_name}</td>
+                                <td className={`${td} text-center font-semibold text-navy-900`}>{r.tong}</td>
+                                {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center ${r.dem[b.ma] ? 'text-navy-900' : 'text-slate-300'}`}>{r.dem[b.ma] || 0}</td>)}
+                              </tr>
+                            ))}
+                            <tr className="bg-slate-50 font-semibold text-navy-900">
+                              <td className={td}>Tổng phòng {g.ten}</td>
+                              <td className={`${td} text-center`}>{g.tong}</td>
+                              {TRANG_THAI.map((b) => <td key={b.ma} className={`${td} text-center`}>{g.dem[b.ma] || 0}</td>)}
+                            </tr>
+                          </Fragment>
                         ))}
-                      </div>
-                      <ul className="mt-4 divide-y divide-slate-100">
-                        {theoTrangThai.map((b) => {
-                          const m = MAU_HEX[b.mau] || MAU_HEX.slate
-                          return (
-                            <li key={b.ma} className="grid grid-cols-[minmax(150px,240px)_1fr_auto] items-center gap-4 py-2.5">
-                              <div className="flex items-center gap-2.5">
-                                <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ backgroundColor: m }} />
-                                <span className="font-medium text-navy-900">{b.ten}</span>
-                              </div>
-                              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                                <div className="h-full rounded-full" style={{ width: `${Math.max(b.pt * 100, 2)}%`, backgroundColor: m }} />
-                              </div>
-                              <div className="w-32 text-right">
-                                <span className="font-display text-lg font-bold text-navy-900">{b.so}</span>
-                                <span className="ml-2 text-sm text-ink-400">{hienPt2(b.pt)}</span>
-                              </div>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </>
-                  )}
+                      </tbody>
+                    </table>
+                  </div>
                 </section>
               </>
             )}
 
-            {/* ===== 2. Hiệu suất sale ===== */}
-            {tab === 'hieu_suat' && (
+            {/* ===== 2. Báo cáo mục tiêu ===== */}
+            {tab === 'muc_tieu' && (
               <section className="rounded-2xl bg-white p-5 shadow-sm">
-                <h2 className="mb-3 font-display text-base font-semibold text-navy-900">Hiệu suất từng sale <span className="text-sm font-normal text-ink-400">({tenKy})</span></h2>
+                <h2 className="mb-1 font-display text-base font-semibold text-navy-900">Báo cáo mục tiêu <span className="text-sm font-normal text-ink-400">({tenKy})</span></h2>
+                <p className="mb-3 text-xs text-ink-400">Mục tiêu = số KH liên hệ được sale tự đặt + số khách cần gọi lại sale đã chọn. KH liên hệ được = khách đổi từ Chưa liên hệ sang trạng thái khác. Lượt chăm sóc = khách đổi từ trạng thái khác (không phải Chưa liên hệ) sang trạng thái mới; nếu cùng ngày khách vừa đổi từ Chưa liên hệ thì chỉ tính KH liên hệ được. Mỗi phòng có dòng Tổng phòng và dòng Trung bình / sale.</p>
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-sm">
                     <thead>
@@ -330,95 +445,42 @@ export default function BaoCaoPage({ currentProfile }) {
                         <th className={`${th} text-center`}>Số khách phụ trách</th>
                         <th className={`${th} text-center`}>Khách mới</th>
                         <th className={`${th} text-center`}>Lượt chăm sóc</th>
-                        <th className={`${th} text-center`}>KH nghe máy</th>
+                        <th className={`${th} text-center`}>KH liên hệ được</th>
                         <th className={`${th} text-center`}>Hoàn thành / mục tiêu</th>
                         <th className={`${th} text-center`}>% hoàn thành</th>
                         <th className={`${th} text-center`}>Khách tồn quá {SO_NGAY_GOI_LAI} ngày</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {dongSale.length === 0 ? (
+                      {nhomPhong.length === 0 ? (
                         <tr><td colSpan={8} className={`${td} py-6 text-center text-ink-400`}>Chưa có sale nào.</td></tr>
-                      ) : dongSale.map((r) => (
-                        <tr key={r.sale.id}>
-                          <td className={`${td} font-medium text-navy-900`}>{r.sale.full_name}</td>
-                          <td className={`${td} text-center`}>{r.phuTrach}</td>
-                          <td className={`${td} text-center`}>{r.moi}</td>
-                          <td className={`${td} text-center`}>{r.luot}</td>
-                          <td className={`${td} text-center`}>{r.nghe}</td>
-                          <td className={`${td} text-center`}>{r.ht} / {r.mt}</td>
-                          <td className={`${td} text-center font-semibold ${r.pt != null && r.pt >= 1 ? 'text-emerald-600' : 'text-navy-900'}`}>{r.pt == null ? '—' : hienPt2(r.pt)}</td>
-                          <td className={`${td} text-center font-semibold ${r.ton > 0 ? 'text-rose-500' : 'text-ink-400'}`}>{r.ton}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
-
-            {/* ===== 3. Mục tiêu ngày ===== */}
-            {tab === 'muc_tieu' && (
-              <section className="rounded-2xl bg-white p-5 shadow-sm">
-                <h2 className="mb-1 font-display text-base font-semibold text-navy-900">Mục tiêu ngày theo từng sale <span className="text-sm font-normal text-ink-400">({tenKy})</span></h2>
-                <p className="mb-3 text-xs text-ink-400">Mục tiêu = số KH nghe máy sale tự đặt + số khách cần gọi lại sale đã chọn. Chỉ hiện những ngày có đặt mục tiêu.</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-slate-100 text-left font-semibold text-navy-900">
-                        <th className={th}>Ngày</th>
-                        <th className={th}>Sale</th>
-                        <th className={`${th} text-center`}>KH nghe máy (đạt / mục tiêu)</th>
-                        <th className={`${th} text-center`}>Gọi lại (đạt / mục tiêu)</th>
-                        <th className={`${th} text-center`}>Hoàn thành / mục tiêu</th>
-                        <th className={`${th} text-center`}>% đạt</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dongMucTieu.length === 0 ? (
-                        <tr><td colSpan={6} className={`${td} py-6 text-center text-ink-400`}>Chưa có mục tiêu nào trong kỳ này.</td></tr>
-                      ) : dongMucTieu.map((r) => (
-                        <tr key={r.ngay + r.sale.id}>
-                          <td className={td}>{dmy(r.ngay)}</td>
-                          <td className={`${td} font-medium text-navy-900`}>{r.sale.full_name}</td>
-                          <td className={`${td} text-center`}>{r.nghe} / {r.mtNghe ?? '—'}</td>
-                          <td className={`${td} text-center`}>{r.xong} / {r.mtLai}</td>
-                          <td className={`${td} text-center`}>{r.ht} / {r.mt}</td>
-                          <td className={`${td} text-center font-semibold ${r.pt != null && r.pt >= 1 ? 'text-emerald-600' : r.pt != null && r.pt < 0.5 ? 'text-rose-500' : 'text-navy-900'}`}>{r.pt == null ? '—' : hienPt2(r.pt)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
-
-            {/* ===== 4. Khu vực & trạng thái ===== */}
-            {tab === 'khu_vuc' && (
-              <section className="rounded-2xl bg-white p-5 shadow-sm">
-                <h2 className="mb-1 font-display text-base font-semibold text-navy-900">Khách theo khu vực và trạng thái</h2>
-                <p className="mb-3 text-xs text-ink-400">Tính trên toàn bộ khách hiện có của {laAdmin ? (locSale ? 'sale đang chọn' : (currentProfile?.role === 'leader' ? 'team của bạn' : 'cả team')) : 'bạn'}.</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-slate-100 text-left font-semibold text-navy-900">
-                        <th className={th}>Khu vực</th>
-                        <th className={`${th} text-center`}>Tổng</th>
-                        {TRANG_THAI.map((b) => <th key={b.ma} className={`${th} text-center`}>{b.ten}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bangKhuVuc.length === 0 ? (
-                        <tr><td colSpan={2 + TRANG_THAI.length} className={`${td} py-6 text-center text-ink-400`}>Chưa có khách nào.</td></tr>
-                      ) : bangKhuVuc.map((r) => (
-                        <tr key={r.ten}>
-                          <td className={`${td} font-medium text-navy-900`}>{r.ten}</td>
-                          <td className={`${td} text-center font-semibold text-navy-900`}>{r.tong}</td>
-                          {TRANG_THAI.map((b) => (
-                            <td key={b.ma} className={`${td} text-center ${r.dem[b.ma] ? 'text-navy-900' : 'text-slate-300'}`}>{r.dem[b.ma] || 0}</td>
+                      ) : nhomPhong.map((g) => (
+                        <Fragment key={g.ten}>
+                          <tr className="bg-blue-50">
+                            <td colSpan={8} className={`${td} font-display font-semibold text-navy-900`}>Phòng {g.ten} <span className="text-xs font-normal text-ink-400">· {g.n} sale</span></td>
+                          </tr>
+                          {g.rows.map((r) => (
+                            <tr key={r.sale.id}>
+                              <td className={`${td} pl-7 font-medium text-navy-900`}>{r.sale.full_name}</td>
+                              <td className={`${td} text-center`}>{r.phuTrach}</td>
+                              <td className={`${td} text-center`}>{r.moi}</td>
+                              <td className={`${td} text-center`}>{r.luot}</td>
+                              <td className={`${td} text-center`}>{r.nghe}</td>
+                              <td className={`${td} text-center`}>{r.ht} / {r.mt}</td>
+                              <td className={`${td} text-center font-semibold ${pctCls(r.pt)}`}>{r.pt == null ? '—' : hienPt2(r.pt)}</td>
+                              <td className={`${td} text-center font-semibold ${r.ton > 0 ? 'text-rose-500' : 'text-ink-400'}`}>{r.ton}</td>
+                            </tr>
                           ))}
-                        </tr>
+                          <DongTomTat ten={`Tổng phòng ${g.ten}`} o={g} tb={false} cls="bg-slate-50 text-navy-900" />
+                          <DongTomTat ten="Trung bình / sale" o={g} tb cls="bg-orange-50 text-navy-900" />
+                        </Fragment>
                       ))}
+                      {nhomPhong.length > 1 && (
+                        <>
+                          <DongTomTat ten="TỔNG TOÀN CÔNG TY" o={tatCa} tb={false} cls="bg-navy-900 text-white" />
+                          <DongTomTat ten="Trung bình / sale toàn công ty" o={tatCa} tb cls="bg-navy-900/90 text-white" />
+                        </>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -427,16 +489,6 @@ export default function BaoCaoPage({ currentProfile }) {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function The({ nhan, so, phu, cam = false }) {
-  return (
-    <div className="rounded-2xl bg-white px-5 py-4 shadow-sm">
-      <p className="text-sm text-ink-600">{nhan}</p>
-      <p className={`mt-1 font-display text-3xl font-bold ${cam ? 'text-coral-500' : 'text-navy-900'}`}>{so}</p>
-      {phu && <p className="mt-1 text-xs text-ink-400">{phu}</p>}
     </div>
   )
 }

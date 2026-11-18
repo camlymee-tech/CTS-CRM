@@ -7,7 +7,7 @@ import { homNayLocal } from '../lib/taiKy'
 import { maChuaLienHe, maKhNgheMay } from '../lib/nhacViec'
 import { laQuanLy, locNhanSu } from '../lib/quyen'
 
-// Mục tiêu ngày: (1) số khách chuyển từ "Chưa liên hệ" sang "KH nghe máy" hôm nay,
+// Mục tiêu ngày: (1) số khách chuyển từ "Chưa liên hệ" sang trạng thái khác (KH liên hệ được) hôm nay,
 // (2) danh sách khách cần liên hệ lại do sale tự chọn — tự báo "Đã hoàn thành" khi đổi trạng thái hoặc có trao đổi mới.
 export default function MucTieuNgay({ currentProfile, customers, onMoKhach }) {
   // Quản trị / leader xem báo cáo mục tiêu của sale (leader: chỉ team mình); sale mới là người nhập và làm
@@ -93,13 +93,13 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
 
   const khachTheoId = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers])
 
-  // ---- Mục tiêu 1: KH nghe máy ----
+  // ---- Mục tiêu 1: KH liên hệ được ----
   const maChua = maChuaLienHe(statuses)
   const maNghe = maKhNgheMay(statuses)
   const soNgheMay = logs.filter((l) => {
     if (l.user_id !== currentProfile.id) return false
     const [tu, den] = String(l.chi_tiet || '').split(' → ')
-    return maChua.includes(tu) && maNghe.includes(den)
+    return !!tu && !!den && tu !== den && maChua.includes(tu)   // Chưa liên hệ → trạng thái khác = 1 lần KH liên hệ được
   }).length
   const conChuaLienHe = customers.filter((c) =>
     maChua.includes(c.trang_thai_cham_soc) && (isAdmin || c.sale_id === currentProfile.id)).length
@@ -183,9 +183,9 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
       <table className="mb-3 w-full border-collapse text-sm">
         <tbody>
           <tr>
-            <td className="border border-slate-200 bg-slate-50 px-4 py-4 font-display text-lg font-semibold text-navy-900" style={{ width: '22%' }}>KH nghe máy</td>
+            <td className="border border-slate-200 bg-slate-50 px-4 py-4 font-display text-lg font-semibold text-navy-900" style={{ width: '22%' }}>KH liên hệ được</td>
             <td className="border border-slate-200 px-4 py-3 text-ink-600">
-              Khách chuyển từ trạng thái <b className="text-navy-900">Chưa liên hệ</b> sang <b className="text-navy-900">KH nghe máy</b> trong hôm nay
+              Khách chuyển từ trạng thái <b className="text-navy-900">Chưa liên hệ</b> sang <b className="text-navy-900">trạng thái khác</b> trong hôm nay
               <span className="text-ink-400"> · còn {conChuaLienHe} khách chưa liên hệ</span>
             </td>
             <td className="border border-slate-200 px-4 py-3 text-center" style={{ width: 190 }}>
@@ -337,7 +337,7 @@ function BaoCaoMucTieu({ customers, currentProfile }) {
     const nghe = logs.filter((l) => {
       if (l.user_id !== sl.id) return false
       const [tu, den] = String(l.chi_tiet || '').split(' → ')
-      return maChua.includes(tu) && maNghe.includes(den)
+      return !!tu && !!den && tu !== den && maChua.includes(tu)
     }).length
     const ds = chon.filter((x) => x.user_id === sl.id).map((x) => khachTheoId.get(x.customer_id)).filter(Boolean)
     const xong = ds.filter((c) => c.ngay_lien_he_gan_nhat === ngay || logs.some((l) => l.customer_id === c.id)).length
@@ -365,7 +365,7 @@ function BaoCaoMucTieu({ customers, currentProfile }) {
             <thead>
               <tr className="bg-slate-100 text-left text-sm font-semibold text-navy-900">
                 <th className="border border-slate-200 px-4 py-2.5">Sale</th>
-                <th className="border border-slate-200 px-4 py-2.5 text-center">KH nghe máy (hoàn thành / mục tiêu)</th>
+                <th className="border border-slate-200 px-4 py-2.5 text-center">KH liên hệ được (hoàn thành / mục tiêu)</th>
                 <th className="border border-slate-200 px-4 py-2.5 text-center">Khách cần liên hệ lại (hoàn thành / mục tiêu)</th>
               </tr>
             </thead>
