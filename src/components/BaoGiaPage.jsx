@@ -228,13 +228,12 @@ function OrderFlow({ st, up }) {
     const sp = st.sp.map((x, j) => (j === i ? { ...x, ...p } : x))
     up({ sp })
   }
-  const reHon = kq.ve.kg.motSp && kq.ve.m3.motSp ? (kq.ve.kg.motSp <= kq.ve.m3.motSp ? 'kg' : 'm3') : null
-  const heads1 = ['STT', 'Sản phẩm', 'Link SP', 'Số lượng', 'Giá web (¥)', 'Ship nội địa (¥)', 'Giá trị đơn hàng (¥)', '']
+  const heads1 = ['STT', 'Sản phẩm', 'Link SP', 'Số lượng', 'Giá web (¥)', 'Giá trị đơn hàng (¥)', '']
 
   return (
     <div className="space-y-5">
       {/* BƯỚC 1 */}
-      <Buoc n={1} id="order-b1" ten="Giá xưởng" mota="Nhập sản phẩm khách muốn order: số lượng, giá web (tệ) và ship nội địa Trung Quốc.">
+      <Buoc n={1} id="order-b1" ten="Giá xưởng" mota="Nhập sản phẩm khách muốn order: số lượng và giá web (tệ). Ship nội địa Trung Quốc nhập một lần ở dòng tổng bên dưới.">
         <div className="mb-4 flex flex-wrap items-end gap-4">
           {[['tyGiaTe', 'Tỷ giá tệ (VND)', false], ['phiDVPct', 'Tỷ lệ phí dịch vụ mua hàng (%)', true], ['tamUngPct', 'Tiền tạm ứng (%)', true]].map(([k, nhan, tp]) => (
             <label key={k} className="flex w-52 flex-col gap-1 text-sm"><span className="font-medium text-navy-900">{nhan}</span>
@@ -252,7 +251,6 @@ function OrderFlow({ st, up }) {
                   <td className={`${TD} min-w-[140px]`}><Chu v={p.link} set={(v) => setSp(i, { link: v })} ph="Dán link" /></td>
                   <td className={`${TD} w-24`}><O v={p.sl} set={(v) => setSp(i, { sl: v })} /></td>
                   <td className={`${TD} w-28`}><O v={p.dg} set={(v) => setSp(i, { dg: v })} tp /></td>
-                  <td className={`${TD} w-28`}><O v={p.ship} set={(v) => setSp(i, { ship: v })} tp /></td>
                   <td className={`${TD} bg-amber-50 text-right font-semibold`}>{te2(kq.tri[i])}</td>
                   <td className={`${TD} w-10 text-center`}>
                     {st.sp.length > 1 && <button type="button" onClick={() => { const sp = st.sp.filter((_, j) => j !== i); up({ sp }) }} className="text-ink-400 hover:text-rose-500"><Trash2 size={15} /></button>}
@@ -273,14 +271,14 @@ function OrderFlow({ st, up }) {
               {[
                 ['1', 'Giá trị đơn hàng', kq.gt1],
                 ['2', 'Tổng tiền ship nội địa', kq.ship],
-                ['3', 'Giá trị đơn hàng + ship nội địa TQ', kq.gt3],
-                ['4', `Phí dịch vụ mua hàng (${pt2(so(st.phiDVPct))})`, kq.phi],
-                ['5', 'TỔNG PHẢI THANH TOÁN', kq.tong, 'bg-orange-100 font-bold'],
-                ['6', `${pt2(so(st.tamUngPct))} tiền tạm ứng`, kq.tamUng],
+                ['3', 'TỔNG THANH TOÁN CHO XƯỞNG (hàng + ship nội địa TQ)', kq.gt3, 'bg-orange-100 font-bold'],
               ].map(([stt, nd, v, cls = '']) => (
                 <tr key={stt} className={cls}>
                   <td className={`${TD} w-14 text-center`}>{stt}</td><td className={TD}>{nd}</td>
-                  <td className={`${TD} text-right`}>¥ {te2(v.te)}</td><td className={`${TD} text-right`}>{vnd(v.vnd)}</td>
+                  {stt === '2'
+                    ? <td className={`${TD} w-48`}><O v={st.shipTong} set={(x) => up({ shipTong: x })} tp /></td>
+                    : <td className={`${TD} text-right`}>¥ {te2(v.te)}</td>}
+                  <td className={`${TD} text-right`}>{vnd(v.vnd)}</td>
                 </tr>
               ))}
             </tbody>
@@ -313,42 +311,44 @@ function OrderFlow({ st, up }) {
 
       {/* BƯỚC 4 */}
       <Buoc n={4} id="order-b4" ten="Giá về tay" mota="Tổng tiền hàng ở bước 1 cộng chi phí vận chuyển và thuế ở bước 3, chia cho số lượng sản phẩm.">
-        <div className="mb-4 grid gap-4 md:grid-cols-2">
-          {[['kg', 'Vận chuyển theo KG'], ['m3', 'Vận chuyển theo M3']].map(([k, nhan]) => (
-            <div key={k} className={`rounded-2xl border-2 p-5 ${reHon === k ? 'border-emerald-400 bg-emerald-50/60' : 'border-slate-200 bg-slate-50'}`}>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-ink-600">{nhan}</p>
-                {reHon === k && <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-xs font-semibold text-white">Rẻ hơn</span>}
-              </div>
-              <p className="mt-2 font-display text-3xl font-bold text-navy-900">{vnd(kq.ve[k].motSp)} <span className="text-base font-medium text-ink-600">đ / sản phẩm</span></p>
-              <p className="mt-1 text-sm text-ink-600">Tổng tiền hàng về tay: <b className="text-navy-900">{vnd(kq.ve[k].tongVe)}</b></p>
-            </div>
-          ))}
+        <div className="mb-4 rounded-2xl border-2 border-emerald-400 bg-emerald-50/60 p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-ink-600">Vận chuyển tính theo {kq.cao === 'kg' ? 'KG' : 'M3'}</p>
+            <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-xs font-semibold text-white">Cước cao hơn</span>
+          </div>
+          <p className="mt-2 font-display text-3xl font-bold text-navy-900">{vnd(kq.ve.motSp)} <span className="text-base font-medium text-ink-600">đ / sản phẩm</span></p>
+          <p className="mt-1 text-sm text-ink-600">Tổng tiền hàng về tay: <b className="text-navy-900">{vnd(kq.ve.tongVe)}</b></p>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            <thead><tr>{['Nội dung', 'Theo KG', 'Theo M3'].map((h) => <th key={h} className={TH}>{h}</th>)}</tr></thead>
+            <thead><tr>{['STT', 'Nội dung', 'Thành tiền'].map((h) => <th key={h} className={TH}>{h}</th>)}</tr></thead>
             <tbody>
-              <tr><td className={TD}>Tổng số lượng sản phẩm</td><td className={`${TD} text-right`}>{vnd(kq.tongSl)}</td><td className={`${TD} text-right`}>{vnd(kq.tongSl)}</td></tr>
-              <tr><td className={TD}>Tổng phải thanh toán tiền hàng (bước 1, đã gồm phí mua hàng)</td><td className={`${TD} text-right`}>{vnd(kq.tong.vnd)}</td><td className={`${TD} text-right`}>{vnd(kq.tong.vnd)}</td></tr>
-              <tr><td className={TD}>Chi phí vận chuyển + thuế (bước 2 và 3)</td><td className={`${TD} text-right`}>{vnd(kq.ve.kg.vc)}</td><td className={`${TD} text-right`}>{vnd(kq.ve.m3.vc)}</td></tr>
-              <tr className="bg-slate-100 font-bold"><td className={TD}>TỔNG TIỀN HÀNG VỀ TAY</td><td className={`${TD} text-right`}>{vnd(kq.ve.kg.tongVe)}</td><td className={`${TD} text-right`}>{vnd(kq.ve.m3.tongVe)}</td></tr>
-              <tr className="bg-orange-100 font-bold"><td className={TD}>GIÁ VỀ TAY 1 SẢN PHẨM</td><td className={`${TD} text-right text-base`}>{vnd(kq.ve.kg.motSp)}</td><td className={`${TD} text-right text-base`}>{vnd(kq.ve.m3.motSp)}</td></tr>
+              {[
+                ['1', 'Tổng số lượng sản phẩm', kq.tongSl, ''],
+                ['2', 'Tổng thanh toán cho xưởng (tiền hàng + ship nội địa, bước 1)', kq.tong.vnd, ''],
+                ['3', `Phí dịch vụ mua hàng (${pt2(so(st.phiDVPct))})`, kq.phi.vnd, ''],
+                ['4', `Chi phí vận chuyển + thuế (bước 2, 3, theo ${kq.cao === 'kg' ? 'KG' : 'M3'}) và VAT dịch vụ ${pt2(so(st.vatDV))} trên phí mua hàng + ship nội địa`, kq.ve.vcGop, ''],
+                ['5', 'TỔNG TIỀN HÀNG VỀ TAY', kq.ve.tongVe, 'bg-slate-200 font-extrabold text-navy-900 text-base'],
+                ['6', `TIỀN TẠM ỨNG (${pt2(so(st.tamUngPct))} × tiền hàng + ship nội địa)`, kq.ve.tamUng, 'bg-amber-100 font-extrabold text-amber-900 text-base'],
+                ['7', 'TIỀN THANH TOÁN CÒN LẠI SAU KHI HÀNG VỀ', kq.ve.conLai, 'bg-amber-100 font-extrabold text-amber-900 text-base'],
+                ['8', 'GIÁ VỀ TAY 1 SẢN PHẨM', kq.ve.motSp, 'bg-orange-100 font-bold text-base'],
+              ].map(([stt, nd, v, cls]) => (
+                <tr key={stt} className={cls}><td className={`${TD} w-14 text-center`}>{stt}</td><td className={TD}>{nd}</td><td className={`${TD} text-right`}>{vnd(v)}</td></tr>
+              ))}
             </tbody>
           </table>
         </div>
         {st.sp.length > 1 && (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full border-collapse">
-              <thead><tr>{['Sản phẩm', 'SL', 'Giá về tay 1 SP theo KG', 'Giá về tay 1 SP theo M3'].map((h) => <th key={h} className={TH}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Sản phẩm', 'SL', 'Giá về tay 1 SP'].map((h) => <th key={h} className={TH}>{h}</th>)}</tr></thead>
               <tbody>
                 {st.sp.map((x, i) => (
                   <tr key={i}>
                     <td className={TD}>{x.ten || `Sản phẩm ${i + 1}`}</td>
                     <td className={`${TD} text-right`}>{vnd(so(x.sl))}</td>
-                    <td className={`${TD} text-right font-semibold`}>{vnd(kq.ve.kg.dong[i]?.mot)}</td>
-                    <td className={`${TD} text-right font-semibold`}>{vnd(kq.ve.m3.dong[i]?.mot)}</td>
+                    <td className={`${TD} text-right font-semibold`}>{vnd(kq.ve.dong[i]?.mot)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -431,11 +431,11 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
   async function luu() {
     if (!khach) { alert('Chọn khách hàng để lưu báo giá vào hồ sơ khách.'); return }
     setDangLuu(true)
-    const tong = tab === 'order' ? tinhOrder(st).ve : null
+    const tong = tab === 'order' ? tinhOrder(st).ve : null   // order: chỉ 1 cột (cước cao hơn)
     const kq = tab === 'order' ? null : tinhXNK(st, tab)
     const row = {
       customer_id: khach.id, loai: tab, ten: (st.ma || '').trim() || `Báo giá ${TEN_DV[tab].toLowerCase()}`,
-      du_lieu: st, tong_kg: tong ? tong.kg.tongVe : kq.kg.phaiTra, tong_m3: tong ? tong.m3.tongVe : kq.m3.phaiTra, updated_at: new Date().toISOString(),
+      du_lieu: st, tong_kg: tong ? tong.tongVe : kq.kg.phaiTra, tong_m3: tong ? tong.tongVe : kq.m3.phaiTra, updated_at: new Date().toISOString(),
     }
     const { data: r, error } = idLuu
       ? await supabase.from('bao_gia').update(row).eq('id', idLuu).select('id').single()

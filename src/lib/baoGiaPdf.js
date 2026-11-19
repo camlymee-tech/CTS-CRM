@@ -60,25 +60,25 @@ function bangChinh(st, dv, order) {
   return h + '</tbody></table>'
 }
 
-function bangOrder(st) {
+function bangOrder(st, phan) {
   const kq = tinhOrder(st)
   const tb = (heads, rows) => `<table><thead><tr>${heads.map((x) => `<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr class="${r.c || ''}">${r.v.map((v, i) => `<td class="${i === 0 ? 'c' : i >= 2 ? 'r' : ''}">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
-  const sp = st.sp.map((p, i) => ({ v: [i + 1, p.ten || `Sản phẩm ${i + 1}`, so2(so(p.sl)), te(so(p.dg)), te(so(p.ship)), te(kq.tri[i])] }))
-  return `<h2>1. Danh sách sản phẩm</h2>${tb(['STT', 'Sản phẩm', 'Số lượng', 'Giá web (¥)', 'Ship nội địa (¥)', 'Giá trị (¥)'], sp)}
+  const sp = st.sp.map((p, i) => ({ v: [i + 1, p.ten || `Sản phẩm ${i + 1}`, so2(so(p.sl)), te(so(p.dg)), te(kq.tri[i])] }))
+  if (phan === 'truoc') return `<h2>1. Danh sách sản phẩm</h2>${tb(['STT', 'Sản phẩm', 'Số lượng', 'Giá web (¥)', 'Giá trị (¥)'], sp)}
   <h2>2. Giá xưởng</h2>${tb(['STT', 'Nội dung', 'Số tiền (¥)', 'Quy đổi VND'], [
     { v: [1, 'Giá trị đơn hàng', te(kq.gt1.te), tien(kq.gt1.vnd)] },
     { v: [2, 'Tổng tiền ship nội địa', te(kq.ship.te), tien(kq.ship.vnd)] },
-    { v: [3, 'Giá trị đơn hàng + ship nội địa TQ', te(kq.gt3.te), tien(kq.gt3.vnd)] },
-    { v: [4, `Phí dịch vụ mua hàng (${pt(st.phiDVPct)})`, te(kq.phi.te), tien(kq.phi.vnd)] },
-    { c: 'lon', v: [5, 'TỔNG PHẢI THANH TOÁN', te(kq.tong.te), tien(kq.tong.vnd)] },
-    { v: [6, `${pt(st.tamUngPct)} tiền tạm ứng`, te(kq.tamUng.te), tien(kq.tamUng.vnd)] },
-  ])}
-  <h2>3. Giá về tay</h2>${tb(['STT', 'Nội dung', 'Theo KG', 'Theo M3'], [
-    { v: [1, 'Tổng số lượng sản phẩm', so2(kq.tongSl), so2(kq.tongSl)] },
-    { v: [2, 'Tổng phải thanh toán tiền hàng (đã gồm phí mua hàng)', tien(kq.tong.vnd), tien(kq.tong.vnd)] },
-    { v: [3, 'Chi phí vận chuyển + thuế', tien(kq.ve.kg.vc), tien(kq.ve.m3.vc)] },
-    { c: 'tong', v: [4, 'TỔNG TIỀN HÀNG VỀ TAY', tien(kq.ve.kg.tongVe), tien(kq.ve.m3.tongVe)] },
-    { c: 'lon', v: [5, 'GIÁ VỀ TAY 1 SẢN PHẨM', tien(kq.ve.kg.motSp), tien(kq.ve.m3.motSp)] },
+    { c: 'lon', v: [3, 'TỔNG THANH TOÁN CHO XƯỞNG', te(kq.gt3.te), tien(kq.gt3.vnd)] },
+  ])}`
+  return `<h2>4. Giá về tay</h2>${tb(['STT', 'Nội dung', 'Thành tiền'], [
+    { v: [1, 'Tổng số lượng sản phẩm', so2(kq.tongSl)] },
+    { v: [2, 'Tổng thanh toán cho xưởng', tien(kq.tong.vnd)] },
+    { v: [3, `Phí dịch vụ mua hàng (${pt(st.phiDVPct)})`, tien(kq.phi.vnd)] },
+    { v: [4, `Chi phí vận chuyển + thuế (theo ${kq.cao === 'kg' ? 'KG' : 'M3'}) và VAT dịch vụ ${pt(st.vatDV)} trên phí mua hàng + ship nội địa`, tien(kq.ve.vcGop)] },
+    { c: 'tong', v: [5, 'TỔNG TIỀN HÀNG VỀ TAY', tien(kq.ve.tongVe)] },
+    { c: 'nhan', v: [6, `TIỀN TẠM ỨNG (${pt(st.tamUngPct)} × tiền hàng + ship nội địa)`, tien(kq.ve.tamUng)] },
+    { c: 'nhan', v: [7, 'TIỀN THANH TOÁN CÒN LẠI SAU KHI HÀNG VỀ', tien(kq.ve.conLai)] },
+    { c: 'lon', v: [8, 'GIÁ VỀ TAY 1 SẢN PHẨM', tien(kq.ve.motSp)] },
   ])}`
 }
 
@@ -91,8 +91,9 @@ export async function xuatBaoGiaPdf({ loai, st }) {
   <div class="top"><img src="${logo}" alt="CTS GROUP"><div class="ct"><b style="color:#0a2463">CTS GROUP</b><br>Dịch vụ logistics &amp; xuất nhập khẩu</div></div>
   <div class="tt"><h1>${esc(tieu)}</h1><p>Mã báo giá: ${esc(st.ma || '..........')}</p></div>
   <div class="info"><div><small>Khách hàng</small><b>${esc(st.khach || '..........')}</b></div><div><small>Ngày báo giá</small><b>${new Date().toLocaleDateString('vi-VN')}</b></div>${order ? `<div><small>Tỷ giá tệ</small><b>${so2(so(st.tyGiaTe))}</b></div>` : `<div><small>Tuyến</small><b>${esc(st.tuyen || 'BT-HN')}</b></div>`}</div>
-  ${order ? bangOrder(st) + `<h2>4. Báo giá vận chuyển - ${esc(TEN_DV[dv] || '')}</h2>` : ''}
+  ${order ? bangOrder(st, 'truoc') + `<h2>3. Báo giá vận chuyển - ${esc(TEN_DV[dv] || '')}</h2>` : ''}
   ${bangChinh(st, dv, order)}
+  ${order ? bangOrder(st, 'sau') : ''}
   <div class="ft">Cảm ơn quý khách đã tin tưởng sử dụng dịch vụ của CTS GROUP</div>`
   const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${esc(tieu)}${st.khach ? ' - ' + esc(st.khach) : ''}</title><style>${CSS}</style></head><body>${body}</body></html>`
 
