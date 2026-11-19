@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   X, Phone, MessageCircle, Users as UsersIcon, MoreHorizontal, Plus,
   Link2, Store, HandHeart, CircleAlert, CircleCheck, History, Check, Trash2, CalendarClock, FileText, ShoppingBag,
-  FileDown, Eye,
+  FileDown, Eye, PhoneOutgoing, PhoneIncoming, PhoneOff, Clock,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { locNhanSu } from '../lib/quyen'
@@ -41,6 +41,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   }, [khachBanDau.id, lamMoiBG])
   const [interactions, setInteractions] = useState([])
   const [logs, setLogs] = useState([])
+  const [cuocGoi, setCuocGoi] = useState([])   // nhật ký cuộc gọi + ghi âm
   const [donHang, setDonHang] = useState([])
   const [hopDong, setHopDong] = useState([])
   const [dvTheoDon, setDvTheoDon] = useState({})
@@ -69,7 +70,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   async function load() {
     setLoading(true)
-    const [{ data: it }, { data: lg }, { data: pf }, { data: od }, { data: ct }, { data: pk }, { data: bcAds }] = await Promise.all([
+    const [{ data: it }, { data: lg }, { data: pf }, { data: od }, { data: ct }, { data: pk }, { data: bcAds }, { data: cg }] = await Promise.all([
       supabase.from('customer_interactions').select('*').eq('customer_id', customer.id)
         .order('ngay_thuc_hien', { ascending: false }),
       supabase.from('customer_logs').select('*').eq('customer_id', customer.id)
@@ -79,7 +80,9 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
       supabase.from('contracts').select('*').eq('customer_id', customer.id).order('ngay_ky', { ascending: false }),
       supabase.from('service_packages').select('*'),
       supabase.from('ads_bao_cao').select('*').eq('customer_id', customer.id).order('ngay_bao_cao', { ascending: false }),
+      supabase.from('cuoc_goi').select('*').eq('customer_id', customer.id).order('bat_dau', { ascending: false }),
     ])
+    setCuocGoi(cg || [])
     setBaoCaoAds(bcAds || [])
     setInteractions(it || []); setLogs(lg || []); setProfiles(pf || [])
     setDonHang(od || []); setHopDong(ct || [])
@@ -205,6 +208,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const TABS = [
     { key: 'thong_tin', label: 'Thông tin' },
     { key: 'cham_soc', label: `Chăm sóc (${interactions.length})` },
+    { key: 'cuoc_goi', label: `Cuộc gọi (${cuocGoi.length})` },
     { key: 'bao_gia', label: `Báo giá (${demBG})` },
     { key: 'nhat_ky', label: 'Nhật ký' },
   ]
@@ -575,6 +579,10 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                   )
               )}
 
+              {tab === 'cuoc_goi' && (
+                <NhatKyCuocGoi ds={cuocGoi} tenNguoi={tenNguoi} />
+              )}
+
               {tab === 'nhat_ky' && (
                 logs.length === 0
                   ? <p className="text-sm text-ink-400">Chưa có thay đổi nào được ghi nhận.</p>
@@ -834,5 +842,87 @@ function AddInteraction({ customerId, currentProfile, ngayHen, onAdded }) {
         <Plus size={15} /> {saving ? 'Đang lưu...' : 'Lưu chăm sóc' + (ngayTiepTheo ? ' & đặt lịch hẹn' : '')}
       </Button>
     </form>
+  )
+}
+
+
+// ============ NHẬT KÝ CUỘC GỌI + GHI ÂM ============
+const TT_GOI = {
+  nghe_may: { ten: 'Nghe máy', cls: 'bg-emerald-50 text-emerald-700' },
+  khong_nghe: { ten: 'Không nghe máy', cls: 'bg-rose-50 text-rose-600' },
+  ban: { ten: 'Máy bận', cls: 'bg-amber-50 text-amber-700' },
+  tu_choi: { ten: 'Từ chối', cls: 'bg-rose-50 text-rose-600' },
+}
+const ngayGoi = (t) => { const d = new Date(t); const p2 = (n) => String(n).padStart(2, '0'); return `${p2(d.getDate())}/${p2(d.getMonth() + 1)} ${p2(d.getHours())}:${p2(d.getMinutes())}` }
+const phutGiay = (s) => `${Math.floor((s || 0) / 60)}:${String((s || 0) % 60).padStart(2, '0')}`
+const tongThoiLuong = (s) => {
+  const p = Math.round((s || 0) / 60)
+  return p >= 60 ? `${Math.floor(p / 60)} giờ ${p % 60} phút` : `${p} phút`
+}
+
+function NhatKyCuocGoi({ ds, tenNguoi }) {
+  if (ds.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
+        <Phone size={28} className="mx-auto text-ink-400" />
+        <p className="mt-2 font-medium text-navy-900">Chưa có cuộc gọi nào với khách này</p>
+        <p className="mt-1 text-sm text-ink-600">Cuộc gọi từ CRM sẽ tự hiện ở đây kèm ghi âm.</p>
+      </div>
+    )
+  }
+  const ngheMay = ds.filter((c) => c.trang_thai === 'nghe_may')
+  const gan = new Date(ds[0].bat_dau)
+  const homNay = gan.toDateString() === new Date().toDateString()
+  const stat = [
+    ['Tổng cuộc gọi', ds.length, Phone, 'bg-navy-900 text-white', 'border-navy-900/15 bg-slate-50'],
+    ['Nghe máy', ngheMay.length, CircleCheck, 'bg-emerald-500 text-white', 'border-emerald-200 bg-emerald-50'],
+    ['Tổng thời lượng', tongThoiLuong(ds.reduce((a, c) => a + (c.thoi_luong_giay || 0), 0)), Clock, 'bg-coral-500 text-white', 'border-orange-200 bg-orange-50'],
+    ['Gọi gần nhất', homNay ? 'Hôm nay' : gan.toLocaleDateString('vi-VN'), CalendarClock, 'bg-sky-500 text-white', 'border-sky-200 bg-sky-50'],
+  ]
+  return (
+    <div>
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {stat.map(([nhan, v, Ic, mauIcon, mauO]) => (
+          <div key={nhan} className={`rounded-2xl border-2 px-3.5 py-3 ${mauO}`}>
+            <div className="flex items-center gap-2">
+              <div className={`flex h-8 w-8 flex-none items-center justify-center rounded-lg ${mauIcon}`}><Ic size={16} strokeWidth={2.4} /></div>
+              <p className="text-xs font-bold leading-tight text-ink-600">{nhan}</p>
+            </div>
+            <p className="mt-2 font-display text-2xl font-extrabold leading-tight text-navy-900">{v}</p>
+          </div>
+        ))}
+      </div>
+
+      <ul className="space-y-3">
+        {ds.map((c) => {
+          const Icon = c.trang_thai !== 'nghe_may' ? PhoneOff : c.huong === 'den' ? PhoneIncoming : PhoneOutgoing
+          const mau = c.trang_thai !== 'nghe_may' ? 'bg-rose-50 text-rose-500' : c.huong === 'den' ? 'bg-sky-50 text-sky-600' : 'bg-emerald-50 text-emerald-600'
+          const tt = TT_GOI[c.trang_thai] || TT_GOI.nghe_may
+          return (
+            <li key={c.id} className="rounded-xl border border-slate-100 p-3">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-8 w-8 flex-none items-center justify-center rounded-full ${mau}`}><Icon size={15} /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-navy-900">
+                    {c.huong === 'den' ? 'Gọi đến' : 'Gọi đi'} · {ngayGoi(c.bat_dau)}
+                  </p>
+                  <p className="text-xs text-ink-400">{tenNguoi(c.sale_id)}{c.so_dien_thoai ? ` · ${c.so_dien_thoai}` : ''}</p>
+                </div>
+                <Badge className={tt.cls}>{tt.ten}</Badge>
+                <span className="w-12 flex-none text-right text-sm tabular-nums text-ink-600">{phutGiay(c.thoi_luong_giay)}</span>
+              </div>
+              {c.link_ghi_am && c.trang_thai === 'nghe_may' && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5">
+                  <audio controls preload="none" src={c.link_ghi_am} className="h-8 w-full" />
+                  <a href={c.link_ghi_am} download target="_blank" rel="noreferrer"
+                    className="flex-none text-ink-400 hover:text-coral-500" title="Tải ghi âm"><FileDown size={15} /></a>
+                </div>
+              )}
+              {c.ghi_chu && <p className="mt-2 text-xs text-ink-600">Ghi chú: {c.ghi_chu}</p>}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
