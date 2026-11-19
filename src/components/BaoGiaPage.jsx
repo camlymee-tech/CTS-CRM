@@ -49,37 +49,10 @@ function ThongTinChung({ st, up }) {
   )
 }
 
-// Đồng bộ đơn giá tệ <-> đơn giá khai USD: điền bên nào trước thì bên kia tự nhảy (theo tỷ giá tệ / tỷ giá USD).
-// Bên đã được nhập tay thì không bị ghi đè khi sửa bên còn lại.
-const lamTron4 = (n) => String(Math.round(n * 10000) / 10000).replace('.', ',')
-function dongBoGia(p, te, usd, sua) {
-  te = so(te); usd = so(usd)
-  const r = { ...p }
-  const ok = te > 0 && usd > 0
-  if (sua === 'dg') {
-    r.dgAuto = false
-    if (!r.dgUsd || r.dgUsdAuto) { r.dgUsd = ok && so(r.dg) > 0 ? lamTron4(so(r.dg) * te / usd) : ''; r.dgUsdAuto = !!r.dgUsd }
-  } else if (sua === 'dgUsd') {
-    r.dgUsdAuto = false
-    if (!r.dg || r.dgAuto) { r.dg = ok && so(r.dgUsd) > 0 ? lamTron4(so(r.dgUsd) * usd / te) : ''; r.dgAuto = !!r.dg }
-  } else {   // đổi tỷ giá: tính lại bên đang ở chế độ tự nhảy
-    if (r.dgUsdAuto) { r.dgUsd = ok && so(r.dg) > 0 ? lamTron4(so(r.dg) * te / usd) : ''; r.dgUsdAuto = !!r.dgUsd }
-    else if (r.dgAuto) { r.dg = ok && so(r.dgUsd) > 0 ? lamTron4(so(r.dgUsd) * usd / te) : ''; r.dgAuto = !!r.dg }
-  }
-  return r
-}
-
 // ================= BẢNG KHAI BÁO THUẾ (Uỷ thác) =================
 function BangThue({ st, up, khoa = false, phang = false, tieuDe }) {
   const th = useMemo(() => tinhThue(st), [st])
-  const setSp = (i, p) => up({
-    sp: st.sp.map((x, j) => {
-      if (j !== i) return x
-      const m = { ...x, ...p }
-      return 'dg' in p ? dongBoGia(m, st.tyGiaTe, st.tyGiaUsd, 'dg') : 'dgUsd' in p ? dongBoGia(m, st.tyGiaTe, st.tyGiaUsd, 'dgUsd') : m
-    }),
-  })
-  const setTyGia = (k, v) => up({ [k]: v, sp: st.sp.map((x) => dongBoGia(x, k === 'tyGiaTe' ? v : st.tyGiaTe, k === 'tyGiaUsd' ? v : st.tyGiaUsd, 'ty')) })
+  const setSp = (i, p) => up({ sp: st.sp.map((x, j) => (j === i ? { ...x, ...p } : x)) })
   const heads = ['STT', 'Sản phẩm', 'Số lượng', 'Đơn giá khách báo (tệ)', 'Giá trị (tệ)', 'Tiền hàng (VND)', 'Đơn giá khai (USD)', 'Giá trị khai (USD)', 'Giá trị khai (VND)', 'TS thuế NK (%)', 'TS GTGT (%)', 'CBPG (%)', 'TTDB (%)', 'BVMT (VND)', 'Thuế NK', 'CBPG', 'TTDB', 'Thuế GTGT', 'Tổng thuế', '']
   return (
     <div className={phang ? 'overflow-x-auto' : 'overflow-x-auto rounded-2xl bg-white p-4 shadow-sm'}>
@@ -88,9 +61,9 @@ function BangThue({ st, up, khoa = false, phang = false, tieuDe }) {
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-sm"><span className="font-medium text-navy-900">Tỷ giá tệ (VND)</span>
             {khoa ? <span className="font-semibold text-navy-900">{vnd(so(st.tyGiaTe))}</span>
-              : <span className="w-28"><O v={st.tyGiaTe} set={(v) => setTyGia('tyGiaTe', v)} /></span>}</label>
+              : <span className="w-28"><O v={st.tyGiaTe} set={(v) => up({ tyGiaTe: v })} /></span>}</label>
           <label className="flex items-center gap-2 text-sm"><span className="font-medium text-navy-900">Tỷ giá USD (VND)</span>
-            <span className="w-28"><O v={st.tyGiaUsd} set={(v) => setTyGia('tyGiaUsd', v)} /></span></label>
+            <span className="w-28"><O v={st.tyGiaUsd} set={(v) => up({ tyGiaUsd: v })} /></span></label>
         </div>
       </div>
       <table className="w-full min-w-[2000px] border-collapse">
