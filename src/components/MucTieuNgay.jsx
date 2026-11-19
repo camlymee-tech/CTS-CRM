@@ -9,9 +9,9 @@ import { laQuanLy, locNhanSu } from '../lib/quyen'
 
 // Mục tiêu ngày: (1) số khách chuyển từ "Chưa liên hệ" sang trạng thái khác (KH liên hệ được) hôm nay,
 // (2) danh sách khách cần liên hệ lại do sale tự chọn — tự báo "Đã hoàn thành" khi đổi trạng thái hoặc có trao đổi mới.
-export default function MucTieuNgay({ currentProfile, customers, onMoKhach }) {
+export default function MucTieuNgay({ currentProfile, customers, onMoKhach, phong = '' }) {
   // Quản trị / leader xem báo cáo mục tiêu của sale (leader: chỉ team mình); sale mới là người nhập và làm
-  if (laQuanLy(currentProfile)) return <KhuQuanLy currentProfile={currentProfile} customers={customers} onMoKhach={onMoKhach} />
+  if (laQuanLy(currentProfile)) return <KhuQuanLy currentProfile={currentProfile} customers={customers} onMoKhach={onMoKhach} phong={phong} />
   return <MucTieuCuaToi nguoiDung={currentProfile} customers={customers} onMoKhach={onMoKhach} />
 }
 
@@ -24,17 +24,18 @@ function gioVN() {
 }
 
 // Quản trị: xem báo cáo cả team, và đặt / chỉnh mục tiêu thay cho sale (nhất là sau 10h khi sale đã bị khoá)
-function KhuQuanLy({ currentProfile, customers, onMoKhach }) {
+function KhuQuanLy({ currentProfile, customers, onMoKhach, phong = '' }) {
   const [sales, setSales] = useState([])
   const [saleId, setSaleId] = useState('')
   useEffect(() => {
     supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name')
       .then(({ data }) => setSales(locNhanSu(currentProfile, data || []).filter((x) => x.role !== 'admin')))
   }, [])
-  const sale = sales.find((x) => x.id === saleId)
+  const salesHienThi = sales.filter((x) => !phong || x.phong_ban === phong)
+  const sale = salesHienThi.find((x) => x.id === saleId)
   return (
     <>
-      <BaoCaoMucTieu customers={customers} currentProfile={currentProfile} />
+      <BaoCaoMucTieu customers={customers} currentProfile={currentProfile} phong={phong} />
       <div className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <h2 className="font-display text-lg font-semibold text-navy-900">Đặt / chỉnh mục tiêu cho sale</h2>
@@ -42,7 +43,7 @@ function KhuQuanLy({ currentProfile, customers, onMoKhach }) {
           <div className="ml-auto w-56">
             <Select value={saleId} onChange={(e) => setSaleId(e.target.value)}>
               <option value="">-- Chọn sale --</option>
-              {sales.map((x) => <option key={x.id} value={x.id}>{x.full_name}</option>)}
+              {salesHienThi.map((x) => <option key={x.id} value={x.id}>{x.full_name}</option>)}
             </Select>
           </div>
         </div>
@@ -302,7 +303,7 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
 
 
 // ---- Báo cáo mục tiêu ngày của từng sale (chỉ xem) — dành cho quản trị ----
-function BaoCaoMucTieu({ customers, currentProfile }) {
+function BaoCaoMucTieu({ customers, currentProfile, phong = '' }) {
   const { statuses } = useTrangThai()
   const [ngay, setNgay] = useState(homNayLocal())
   const [sales, setSales] = useState([])
@@ -332,7 +333,7 @@ function BaoCaoMucTieu({ customers, currentProfile }) {
   const maNghe = maKhNgheMay(statuses)
   const khachTheoId = new Map(customers.map((c) => [c.id, c]))
 
-  const dong = sales.map((sl) => {
+  const dong = sales.filter((sl) => !phong || sl.phong_ban === phong).map((sl) => {
     const mt = (loai) => so.find((x) => x.user_id === sl.id && x.loai === loai)?.muc_tieu
     const nghe = logs.filter((l) => {
       if (l.user_id !== sl.id) return false

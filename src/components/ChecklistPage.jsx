@@ -20,6 +20,7 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [filterSale, setFilterSale] = useState('')
+  const [filterPhong, setFilterPhong] = useState('')   // chỉ admin: lọc theo phòng ban
   const [xemKhach, setXemKhach] = useState(null)
   const [hopDong, setHopDong] = useState([])
   const [don, setDon] = useState([])
@@ -53,26 +54,30 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   }
 
   const uids = useMemo(() => nhanSuXemDuoc(currentProfile, profiles), [currentProfile, profiles])
+  const dsPhong = useMemo(() => [...new Set(profiles.filter((p) => p.role !== 'admin' && p.phong_ban).map((p) => p.phong_ban))].sort((a, b) => a.localeCompare(b, 'vi')), [profiles])
+  const idsPhong = useMemo(() => new Set(profiles.filter((p) => p.phong_ban === filterPhong).map((p) => p.id)), [profiles, filterPhong])
+  // Khớp bộ lọc phòng + sale đang chọn
+  const khopLoc = (saleId) => (!filterSale || saleId === filterSale) && (!filterPhong || idsPhong.has(saleId))
   const tenSale = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
   // Follow-up đến hạn: ngày dự kiến liên hệ lại là hôm nay, bỏ qua khách đã chốt/đang triển khai/hoàn thành
   const dungHomNay = useMemo(() => tinhFollowUpHomNay({
     khach: customers, maDaChot, isAdmin: uids === null, userId: currentProfile?.id, uids, homNay,
-  }).filter((c) => !filterSale || c.sale_id === filterSale),
-  [customers, homNay, uids, currentProfile?.id, filterSale, maDaChot])
+  }).filter((c) => khopLoc(c.sale_id)),
+  [customers, homNay, uids, currentProfile?.id, filterSale, filterPhong, idsPhong, maDaChot])
 
   // Khách cần gọi lại: trạng thái đã gửi báo giá / hẹn đi đơn mà 7 ngày chưa liên hệ lại, chưa đổi trạng thái
   const canGoiLai = useMemo(() => tinhCanGoiLai({
     khach: customers, logs: logsDoiTT, statuses, isAdmin: uids === null, userId: currentProfile?.id, uids, homNay,
-  }).filter((r) => !filterSale || r.saleId === filterSale),
-  [customers, logsDoiTT, statuses, uids, currentProfile?.id, filterSale, homNay])
+  }).filter((r) => khopLoc(r.saleId)),
+  [customers, logsDoiTT, statuses, uids, currentProfile?.id, filterSale, filterPhong, idsPhong, homNay])
 
   // Việc cần nhắc: tái ký hợp đồng ADS + báo cáo chỉ số ADS (sale chỉ thấy của mình, admin thấy cả team)
   const { nhacBaoCao } = useMemo(() => {
     const r = tinhNhacViec({ khach: customers, hopDong, don, items: itemsDon, baoCao, isAdmin: uids === null, userId: currentProfile?.id, uids })
-    const loc = (ds) => ds.filter((x) => !filterSale || x.saleId === filterSale)
+    const loc = (ds) => ds.filter((x) => khopLoc(x.saleId))
     return { nhacBaoCao: loc(r.baoCaoAds) }
-  }, [customers, hopDong, don, itemsDon, baoCao, uids, currentProfile?.id, filterSale])
+  }, [customers, hopDong, don, itemsDon, baoCao, uids, currentProfile?.id, filterSale, filterPhong, idsPhong])
 
   async function khongTaiKy(r) {
     if (!window.confirm(`Đánh dấu hợp đồng ${r.hd.so_hop_dong} của ${r.khach.ten_khach} là HẾT HẠN, khách không tái ký?\nNhắc tái ký sẽ biến mất.`)) return
@@ -94,10 +99,18 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
           </p>
         </div>
         {isAdmin && (
-          <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-48">
-            <option value="">Tất cả sale</option>
-            {locNhanSu(currentProfile, profiles).filter((p) => p.role !== 'admin').map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-          </Select>
+          <div className="flex items-center gap-2">
+            {uids === null && (
+              <Select value={filterPhong} onChange={(e) => { setFilterPhong(e.target.value); setFilterSale('') }} className="w-44">
+                <option value="">Tất cả phòng</option>
+                {dsPhong.map((pb) => <option key={pb} value={pb}>Phòng {pb}</option>)}
+              </Select>
+            )}
+            <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-48">
+              <option value="">{filterPhong ? `Tất cả sale phòng ${filterPhong}` : 'Tất cả sale'}</option>
+              {locNhanSu(currentProfile, profiles).filter((p) => p.role !== 'admin' && (!filterPhong || p.phong_ban === filterPhong)).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+            </Select>
+          </div>
         )}
       </header>
 
@@ -105,7 +118,7 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
         <p className="py-16 text-center text-ink-400">Đang tải...</p>
       ) : (
         <div className="space-y-4 p-8">
-          <MucTieuNgay currentProfile={currentProfile} customers={customers} onMoKhach={setXemKhach} />
+          <MucTieuNgay currentProfile={currentProfile} customers={customers} onMoKhach={setXemKhach} phong={filterPhong} />
 
           {nhacBaoCao.length > 0 && (
             <NhacBaoCaoAds ds={nhacBaoCao} tenSale={tenSale} onMoKhach={setXemKhach} onGhi={(r) => setGhiBaoCao(r)} />
