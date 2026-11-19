@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, Lock, Unlock, Pencil, Link2, Trash2, Building2, X } from 'lucide-react'
+import { UserPlus, Lock, Unlock, Pencil, Link2, Trash2, Building2, X, KeyRound, Search } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Modal } from './ui'
 import { laAdmin, laLeader, laQuanLy, tenVaiTro } from '../lib/quyen'
@@ -18,6 +18,8 @@ export default function TeamPage({ currentProfile }) {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [message, setMessage] = useState('')
+  const [tim, setTim] = useState('')   // tìm theo tên, email, mã sale
+  const [datMK, setDatMK] = useState(null)   // nhân sự đang đặt lại mật khẩu
 
   useEffect(() => { load() }, [])
 
@@ -82,6 +84,11 @@ export default function TeamPage({ currentProfile }) {
     load()
   }
 
+  const boDau = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
+  const dsHienThi = tim.trim() ? profiles.filter((p) => [p.full_name, p.email, p.ma_sale].some((x) => boDau(x).includes(boDau(tim.trim())))) : profiles
+  // Admin: thao tác với mọi người; leader: chỉ sale trong phòng mình (danh sách đã lọc theo phòng)
+  const duocQuanLy = (p) => laAdmin(currentProfile) || p.role === 'sale'
+
   if (!laQuanLy(currentProfile)) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -111,7 +118,16 @@ export default function TeamPage({ currentProfile }) {
 
       {message && <p className="mx-8 mt-4 rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-600">{message}</p>}
 
-      <div className="mx-8 my-6 overflow-x-auto rounded-2xl bg-white shadow-sm">
+      <div className="mx-8 mt-6 flex items-center gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+          <input value={tim} onChange={(e) => setTim(e.target.value)} placeholder="Tìm tên sale, email hoặc mã sale..."
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-coral-500" />
+        </div>
+        {tim.trim() && <span className="text-sm text-ink-600">{dsHienThi.length} / {profiles.length} nhân sự</span>}
+      </div>
+
+      <div className="mx-8 mb-6 mt-3 overflow-x-auto rounded-2xl bg-white shadow-sm">
         <table className="w-full min-w-[900px] border-collapse text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-ink-400">
@@ -128,7 +144,9 @@ export default function TeamPage({ currentProfile }) {
           <tbody>
             {loading ? (
               <tr><td colSpan={8} className="px-5 py-8 text-center text-ink-400">Đang tải...</td></tr>
-            ) : profiles.map((p) => {
+            ) : dsHienThi.length === 0 ? (
+              <tr><td colSpan={8} className="px-5 py-8 text-center text-ink-400">Không tìm thấy nhân sự nào phù hợp.</td></tr>
+            ) : dsHienThi.map((p) => {
               const isMe = p.id === currentProfile.id
               return (
                 <tr key={p.id}>
@@ -178,7 +196,13 @@ export default function TeamPage({ currentProfile }) {
                         {p.active === false ? <><Unlock size={13} /> Mở khoá</> : <><Lock size={13} /> Khoá</>}
                       </button>
                     )}
-                    {!isMe && laAdmin(currentProfile) && (
+                    {!isMe && duocQuanLy(p) && (
+                      <button onClick={() => setDatMK(p)}
+                        className="ml-3 inline-flex items-center gap-1 text-xs text-ink-600 hover:text-coral-500">
+                        <KeyRound size={13} /> Đặt lại mật khẩu
+                      </button>
+                    )}
+                    {!isMe && duocQuanLy(p) && (
                       <button onClick={() => deleteAccount(p)}
                         className="ml-3 inline-flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700">
                         <Trash2 size={13} /> Xoá
@@ -192,6 +216,7 @@ export default function TeamPage({ currentProfile }) {
         </table>
       </div>
 
+      {datMK && <DatLaiMatKhauModal p={datMK} onClose={() => setDatMK(null)} />}
       {showCreate && (
         <CreateAccountForm me={currentProfile} dsPhongBan={dsPB}
           onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />
@@ -442,6 +467,43 @@ function EditProfileForm({ profile, isMe, me, dsPhongBan, onClose, onSaved }) {
           <Button type="submit" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu hồ sơ'}</Button>
         </div>
       </form>
+    </Modal>
+  )
+}
+
+function DatLaiMatKhauModal({ p, onClose }) {
+  const [mk, setMk] = useState('')
+  const [dang, setDang] = useState(false)
+  const [loi, setLoi] = useState('')
+  const [xong, setXong] = useState(false)
+
+  async function luu(e) {
+    e.preventDefault()
+    setDang(true); setLoi('')
+    const { data, error } = await supabase.functions.invoke('quan-ly-tai-khoa', { body: { action: 'reset_password', id: p.id, password: mk } })
+    setDang(false)
+    const m = data?.error || error?.message
+    if (m) { setLoi(m); return }
+    setXong(true)
+  }
+
+  return (
+    <Modal title={`Đặt lại mật khẩu: ${p.full_name || p.email}`} onClose={onClose}>
+      {xong ? (
+        <div className="space-y-4">
+          <p className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Đã đặt mật khẩu mới. Hãy gửi mật khẩu này cho {p.full_name || 'nhân sự'} và dặn đổi lại sau khi đăng nhập.</p>
+          <div className="flex justify-end"><Button onClick={onClose}>Đóng</Button></div>
+        </div>
+      ) : (
+        <form onSubmit={luu} className="space-y-4">
+          <Input label="Mật khẩu mới *" required minLength={6} value={mk} onChange={(e) => setMk(e.target.value)} placeholder="Ít nhất 6 ký tự" />
+          {loi && <p className="rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-600">{loi}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={onClose}>Huỷ</Button>
+            <Button type="submit" disabled={dang}>{dang ? 'Đang lưu...' : 'Đặt mật khẩu'}</Button>
+          </div>
+        </form>
+      )}
     </Modal>
   )
 }
