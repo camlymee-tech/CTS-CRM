@@ -438,7 +438,7 @@ export default function CustomerList({ currentProfile }) {
         <table className="border-collapse w-full text-sm" style={{ tableLayout: 'auto' }}>
           <thead>
             <tr className="border-b border-slate-200 bg-slate-100 text-left text-sm font-semibold text-navy-900">
-              <th className="border border-slate-200 w-10 px-4 py-3">
+              <th className="border border-slate-200 w-10 px-2.5 py-3">
                 <input type="checkbox" checked={chonTatCaTrang} onChange={toggleChonTrang}
                   className="h-4 w-4 rounded border-slate-300" title="Chọn / bỏ chọn các khách trên trang này" />
               </th>
@@ -452,7 +452,7 @@ export default function CustomerList({ currentProfile }) {
                   {c.label}
                 </ThResize>
               ))}
-              <th className="border border-slate-200 px-4 py-3"></th>
+              <th className="border border-slate-200 px-2.5 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -476,17 +476,17 @@ export default function CustomerList({ currentProfile }) {
                     dongChon ? 'bg-sky-50' : idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'
                   }`}
                   onClick={() => setViewingCustomer(c)}>
-                  <td className={`relative w-10 border-l-4 px-4 py-3 ${VIEN_TRANG_THAI[mauTT] || 'border-slate-300'}`}
+                  <td className={`relative w-10 border-l-4 px-2.5 py-3 ${VIEN_TRANG_THAI[mauTT] || 'border-slate-300'}`}
                     style={{ borderTop: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}
                     onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={dongChon} onChange={() => toggleChon(c.id)}
                       className="h-4 w-4 rounded border-slate-300" />
                   </td>
-                  {hien('stt') && <td className="border border-slate-200 px-4 py-3 text-ink-600">{idx + 1}</td>}
-                  <td className="border border-slate-200 px-4 py-3" style={doRong.ten ? { maxWidth: doRong.ten } : undefined}>
+                  {hien('stt') && <td className="border border-slate-200 px-2.5 py-3 text-ink-600">{idx + 1}</td>}
+                  <td className="border border-slate-200 px-2.5 py-3" style={{ maxWidth: doRong.ten || 230 }}>
                     <div className="flex items-center gap-3">
-                      <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-300">
-                        <User size={24} fill="currentColor" />
+                      <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-300">
+                        <User size={20} fill="currentColor" />
                       </span>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
@@ -521,10 +521,10 @@ export default function CustomerList({ currentProfile }) {
                       </div>
                     </div>
                   </td>
-                  {hien('sdt') && <td className="border border-slate-200 px-4 py-3 font-medium text-indigo-800">{c.sdt || <span className="text-ink-400">—</span>}</td>}
-                  {hien('sale') && <td className="border border-slate-200 px-4 py-3 text-navy-900">{profileName(c.sale_id)}</td>}
+                  {hien('sdt') && <td className="border border-slate-200 px-2.5 py-3 font-medium text-indigo-800">{c.sdt || <span className="text-ink-400">—</span>}</td>}
+                  {hien('sale') && <td className="border border-slate-200 px-2.5 py-3 text-navy-900">{profileName(c.sale_id)}</td>}
                   {hien('trao_doi') && (
-                    <td className="border border-slate-200 px-4 py-3" style={{ minWidth: 300, maxWidth: doRong.trao_doi || 360 }}>
+                    <td className="border border-slate-200 px-2.5 py-3" style={{ minWidth: 170, maxWidth: doRong.trao_doi || 240 }}>
                       {!td ? <span className="text-ink-400">—</span> : (
                         <div>
                           <div className="flex items-baseline justify-between gap-3">
@@ -542,8 +542,8 @@ export default function CustomerList({ currentProfile }) {
                     </td>
                   )}
                   {hien('cham_soc') && (
-                    <td className="border border-slate-200 px-4 py-3" style={{ minWidth: 150 }}>
-                      <Badge className={`whitespace-nowrap ${classTrangThai(c.trang_thai_cham_soc)}`}>{tenTrangThai(c.trang_thai_cham_soc)}</Badge>
+                    <td className="border border-slate-200 px-2.5 py-3" style={{ minWidth: 130 }}>
+                      <Badge className={`${classTrangThai(c.trang_thai_cham_soc)}`}>{tenTrangThai(c.trang_thai_cham_soc)}</Badge>
                       <p className="mt-1 whitespace-nowrap text-xs text-ink-600">
                         {hen
                           ? <span className={hen < homNay ? 'font-medium text-rose-600' : hen === homNay ? 'font-medium text-coral-600' : ''}>
@@ -553,9 +553,9 @@ export default function CustomerList({ currentProfile }) {
                       </p>
                     </td>
                   )}
-                  {hien('khu_vuc') && <td className="border border-slate-200 px-4 py-3 text-navy-900">{c.khu_vuc || '—'}</td>}
+                  {hien('khu_vuc') && <td className="border border-slate-200 px-2.5 py-3 text-navy-900">{c.khu_vuc || '—'}</td>}
                   {hien('nen_tang') && (
-                  <td className="border border-slate-200 px-4 py-3">
+                  <td className="border border-slate-200 px-2.5 py-3">
                     <div className="flex flex-wrap gap-1">
                       {(c.nen_tang || []).map((nt) => (
                         <Badge key={nt} className={classOf(NEN_TANG_OPTIONS, nt)}>{labelOf(NEN_TANG_OPTIONS, nt)}</Badge>
@@ -563,20 +563,20 @@ export default function CustomerList({ currentProfile }) {
                     </div>
                   </td>)}
                   {hien('loai') && (
-                  <td className="border border-slate-200 px-4 py-3">
+                  <td className="border border-slate-200 px-2.5 py-3">
                     <Badge className={c.loai_khach === 'moi' ? 'bg-coral-50 text-coral-600' : 'bg-slate-100 text-slate-600'}>
                       {labelOf(LOAI_KHACH_OPTIONS, c.loai_khach)}
                     </Badge>
                   </td>)}
-                  {hien('ngay_tao') && <td className="border border-slate-200 px-4 py-3 text-ink-600">{ngayLocal(c.created_at) || '—'}</td>}
-                  {hien('lien_he') && <td className="border border-slate-200 px-4 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>}
+                  {hien('ngay_tao') && <td className="border border-slate-200 px-2.5 py-3 text-ink-600">{ngayLocal(c.created_at) || '—'}</td>}
+                  {hien('lien_he') && <td className="border border-slate-200 px-2.5 py-3 text-ink-600">{c.ngay_lien_he_gan_nhat || '—'}</td>}
                   {hien('giai_phap') && (
-                    <td className="border border-slate-200 px-4 py-3 text-ink-600" style={{ maxWidth: doRong.giai_phap || 220 }}>
+                    <td className="border border-slate-200 px-2.5 py-3 text-ink-600" style={{ maxWidth: doRong.giai_phap || 220 }}>
                       <p className="line-clamp-2 whitespace-pre-wrap">{c.giai_phap || '—'}</p>
                     </td>
                   )}
                   {hien('nhat_ky') && (
-                    <td className="border border-slate-200 px-4 py-3 text-ink-600">
+                    <td className="border border-slate-200 px-2.5 py-3 text-ink-600">
                       {(() => {
                         const l = nhatKyGanNhat[c.id]
                         if (!l) return <span className="text-ink-400">—</span>
@@ -591,7 +591,7 @@ export default function CustomerList({ currentProfile }) {
                       })()}
                     </td>
                   )}
-                  <td className="border border-slate-200 whitespace-nowrap px-4 py-3 text-right">
+                  <td className="border border-slate-200 whitespace-nowrap px-2.5 py-3 text-right">
                     {(isAdmin || cuaMinh) && (
                       <button onClick={(e) => { e.stopPropagation(); xoaKhach(c) }}
                         className="text-ink-400 hover:text-rose-500" title="Xoá khách hàng">
@@ -688,7 +688,7 @@ function ThResize({ colKey, doRong, onResize, children, sapXep, dangSapXep, onSa
   }
   const Mui = dangSapXep === 'asc' ? ArrowUp : dangSapXep === 'desc' ? ArrowDown : ArrowUpDown
   return (
-    <th className="border border-slate-200 relative select-none px-4 py-3"
+    <th className="border border-slate-200 relative select-none px-2.5 py-3"
       style={rong ? { width: rong, maxWidth: rong } : undefined}
       title={tieuDeNho}>
       {sapXep ? (
