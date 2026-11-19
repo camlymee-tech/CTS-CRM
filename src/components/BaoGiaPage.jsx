@@ -351,7 +351,7 @@ function OrderFlow({ st, up }) {
         <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-ink-600">
           Nhập số <b className="text-navy-900">KG</b> và <b className="text-navy-900">M3</b> cùng đơn giá ở hai dòng cước vận chuyển bên dưới.
         </p>
-        <BangXNK st={st} up={up} loai={st.dichVu} order phang tieuDe="Báo giá vận chuyển" />
+        <BangXNK st={st} up={up} loai={st.dichVu} order phang tieuDe={`Báo giá ${st.dichVu === 'uy_thac' ? 'dịch vụ uỷ thác xuất nhập khẩu' : st.dichVu === 'mua_ban' ? 'dịch vụ mua bán' : 'vận chuyển'}`} />
       </Buoc>
 
       {/* BƯỚC 4 */}
