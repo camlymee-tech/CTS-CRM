@@ -31,6 +31,7 @@ function khoangKy(ky, tu, den) {
   const hom = ymd(d)
   if (ky === 'tat_ca') return ['0000-01-01', hom]
   if (ky === 'hom_nay') return [hom, hom]
+  if (ky === 'hom_qua') { const x = new Date(); x.setDate(x.getDate() - 1); return [ymd(x), ymd(x)] }
   if (ky === '7') { const x = new Date(); x.setDate(x.getDate() - 6); return [ymd(x), hom] }
   if (ky === 'thang_nay') return [`${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`, hom]
   return [tu || hom, den || tu || hom]
@@ -241,7 +242,7 @@ export default function BaoCaoPage({ currentProfile }) {
   }, [dongHienThi])
   const tatCa = useMemo(() => gopNhom('Toàn công ty', dongHienThi), [dongHienThi])
 
-  const tenKy = ky === 'tat_ca' ? 'Tất cả thời gian' : ky === 'hom_nay' ? `Hôm nay (${dmy(tuNgay)})` : `${dmy(tuNgay)} – ${dmy(denNgay)}`
+  const tenKy = ky === 'tat_ca' ? 'Tất cả thời gian' : ky === 'hom_nay' ? `Hôm nay (${dmy(tuNgay)})` : ky === 'hom_qua' ? `Hôm qua (${dmy(tuNgay)})` : `${dmy(tuNgay)} – ${dmy(denNgay)}`
   const tenSaleXem = laAdmin ? (xemChuaChia ? 'Data chưa chia' : locSale ? dsSale[0]?.full_name : locPhong ? `Phòng ${locPhong}` : (currentProfile?.role === 'leader' ? `Phòng ${currentProfile.phong_ban || ''}` : 'Tất cả sale')) : `Phòng ${currentProfile?.phong_ban || ''}`
   const phuDe = `Kỳ: ${tenKy} · ${tenSaleXem || ''}`
 
@@ -326,6 +327,7 @@ export default function BaoCaoPage({ currentProfile }) {
           <Select label="Kỳ báo cáo" value={ky} onChange={(e) => setKy(e.target.value)} className="w-44">
             {tab === 'tong_quan' && <option value="tat_ca">Tất cả thời gian</option>}
             <option value="hom_nay">Hôm nay</option>
+            <option value="hom_qua">Hôm qua</option>
             <option value="7">7 ngày qua</option>
             <option value="thang_nay">Tháng này</option>
             <option value="tuy_chon">Chọn ngày...</option>
