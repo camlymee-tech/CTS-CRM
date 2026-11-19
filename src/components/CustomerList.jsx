@@ -45,7 +45,6 @@ export default function CustomerList({ currentProfile }) {
     { key: 'sale', label: 'Tên sale', sapXep: 'sale' },
     { key: 'trao_doi', label: 'Trao đổi gần nhất', sapXep: 'trao_doi' },
     { key: 'cham_soc', label: 'Trạng thái' },
-    { key: 'van_de', label: 'Vấn đề KH', sapXep: 'van_de' },
     { key: 'khu_vuc', label: 'Khu vực', macDinh: false },
     { key: 'nen_tang', label: 'Nền tảng', macDinh: false },
     { key: 'loai', label: 'Loại', macDinh: false },
@@ -260,7 +259,6 @@ export default function CustomerList({ currentProfile }) {
         'Hẹn chăm sóc tiếp': c.ngay_cham_soc_tiep_theo || '',
         'Số lượt chăm sóc': luotCS[c.id] || 0,
         'Trao đổi gần nhất': td ? `${profileName(td.nguoi)} (${gioNgay(td.thoiGian)}): ${td.noiDung}` : '',
-        'Vấn đề KH': c.van_de || '',
         'Nguồn khách hàng': labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '',
         'Ngày tạo': ngayLocal(c.created_at),
         'Tổng doanh thu (chưa VAT)': doanhThu[c.id] || 0,
@@ -553,11 +551,6 @@ export default function CustomerList({ currentProfile }) {
                             </span>
                           : <span className="text-ink-400">Chưa đặt lịch hẹn</span>}
                       </p>
-                    </td>
-                  )}
-                  {hien('van_de') && (
-                    <td className="border border-slate-200 px-4 py-3 text-navy-900" style={{ minWidth: 200, maxWidth: doRong.van_de || 280 }}>
-                      <p className="line-clamp-3 whitespace-pre-wrap">{c.van_de || <span className="text-ink-400">—</span>}</p>
                     </td>
                   )}
                   {hien('khu_vuc') && <td className="border border-slate-200 px-4 py-3 text-navy-900">{c.khu_vuc || '—'}</td>}
