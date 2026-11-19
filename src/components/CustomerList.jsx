@@ -483,7 +483,7 @@ export default function CustomerList({ currentProfile }) {
                       className="h-4 w-4 rounded border-slate-300" />
                   </td>
                   {hien('stt') && <td className="border border-slate-200 px-2.5 py-3 text-ink-600">{idx + 1}</td>}
-                  <td className="border border-slate-200 px-2.5 py-3" style={{ maxWidth: doRong.ten || 230 }}>
+                  <td className="border border-slate-200 px-2.5 py-3" style={{ maxWidth: doRong.ten || 170 }}>
                     <div className="flex items-center gap-3">
                       <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-300">
                         <User size={20} fill="currentColor" />
@@ -524,7 +524,7 @@ export default function CustomerList({ currentProfile }) {
                   {hien('sdt') && <td className="border border-slate-200 px-2.5 py-3 font-medium text-indigo-800">{c.sdt || <span className="text-ink-400">—</span>}</td>}
                   {hien('sale') && <td className="border border-slate-200 px-2.5 py-3 text-navy-900">{profileName(c.sale_id)}</td>}
                   {hien('trao_doi') && (
-                    <td className="border border-slate-200 px-2.5 py-3" style={{ minWidth: 170, maxWidth: doRong.trao_doi || 240 }}>
+                    <td className="border border-slate-200 px-2.5 py-3" style={{ minWidth: 260, maxWidth: doRong.trao_doi || 420 }}>
                       {!td ? <span className="text-ink-400">—</span> : (
                         <div>
                           <div className="flex items-baseline justify-between gap-3">
