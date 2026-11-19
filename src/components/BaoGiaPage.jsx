@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FileDown, Plus, Trash2, RotateCcw, Save, X, Search } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import DanhSachBaoGia from './DanhSachBaoGia'
 import { Button } from './ui'
 import {
   so, tinhThue, tinhXNK, tinhOrder, TEN_DV, khungXNK, ORDER_MAC_DINH, SP_ORDER,
   MUA_BAN_MAC_DINH, VAN_CHUYEN_MAC_DINH, UY_THAC_MAC_DINH, SP_THUE,
 } from '../lib/baoGia'
 import { xuatBaoGia } from '../lib/baoGiaXlsx'
+import { xuatBaoGiaPdf } from '../lib/baoGiaPdf'
 
 const vnd = (n) => (n === null || n === undefined || n === '' ? '' : Math.round(Number(n) || 0).toLocaleString('vi-VN'))
 const pt2 = (n) => (Number(n) || 0).toFixed(2).replace('.', ',') + '%'
@@ -134,9 +134,11 @@ function BangThue({ st, up, khoa = false, phang = false, tieuDe }) {
 function BangXNK({ st, up, loai, order = false, phang = false, tieuDe }) {
   const kq = useMemo(() => tinhXNK(st, loai, order), [st, loai, order])
   const khung = useMemo(() => khungXNK(st, kq, loai, order), [st, kq, loai, order])
+  // Cột có tiền cước cao hơn (KG hay M3) là cột chi phí được tính theo
+  const cao = kq.kg.cuoc > kq.m3.cuoc ? 'kg' : kq.m3.cuoc > kq.kg.cuoc ? 'm3' : null
   const KHUNG = phang ? 'overflow-x-auto rounded-xl border border-slate-200 p-4' : 'overflow-x-auto rounded-2xl bg-white p-4 shadow-sm'
   const nhapO = (x) => <O v={st[x.k]} set={(v) => up({ [x.k]: v })} tp={!!x.tp} />
-  const hienO = (x) => (x && typeof x === 'object' ? nhapO(x) : x === undefined || x === null ? '' : vnd(x))
+  const hienO = (x) => (x && typeof x === 'object' ? (x.fix !== undefined ? <span className="block px-1.5 py-1 text-right">{x.money ? vnd(x.fix) : x.fix ? String(x.fix).replace('.', ',') : ''}</span> : nhapO(x)) : x === undefined || x === null ? '' : vnd(x))
 
   return (
     <div className="space-y-5">
@@ -148,12 +150,15 @@ function BangXNK({ st, up, loai, order = false, phang = false, tieuDe }) {
         </div>
         <table className="w-full min-w-[900px] border-collapse">
           <thead><tr>
-            {['STT', 'Nội dung', 'ĐVT', 'Số lượng', 'Đơn giá', 'Thành tiền theo KG', 'Thành tiền theo M3'].map((h) => <th key={h} className={TH}>{h}</th>)}
+            {['STT', 'Nội dung', 'ĐVT', 'Số lượng', 'Đơn giá'].map((h) => <th key={h} className={TH}>{h}</th>)}
+            {[['kg', 'Thành tiền theo KG'], ['m3', 'Thành tiền theo M3']].map(([k, h]) => (
+              <th key={k} className={TH}>{h}{cao === k && <span className="mx-auto mt-1 block w-fit rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-semibold text-white">✓ Tính theo cột này</span>}</th>
+            ))}
           </tr></thead>
           <tbody>
             {khung.map((r, i) => {
-              const nen = r.loai === 'tong' ? (r.lon ? 'bg-orange-100' : 'bg-slate-100') : r.loai === 'nhom' ? 'bg-slate-100' : ''
-              const dam = r.loai !== 'dong' || r.dam ? 'font-semibold' : ''
+              const nen = r.loai === 'tong' ? (r.lon ? 'bg-navy-900 text-white' : r.cong ? 'bg-white' : 'bg-slate-50') : r.loai === 'nhom' ? (r.nhan ? 'bg-amber-100 text-amber-900' : 'bg-slate-100') : ''
+              const dam = r.nhan ? 'font-extrabold text-[15px]' : r.loai !== 'dong' || r.dam ? 'font-semibold' : ''
               return (
                 <tr key={i} className={`${nen} ${dam}`}>
                   <td className={`${TD} w-14 text-center`}>{r.stt}</td>
@@ -165,32 +170,11 @@ function BangXNK({ st, up, loai, order = false, phang = false, tieuDe }) {
                   <td className={`${TD} w-16 text-center`}>{r.dvt}</td>
                   <td className={`${TD} w-32 text-right`}>{r.loai === 'dong' ? hienO(r.sl) : ''}</td>
                   <td className={`${TD} w-36 text-right`}>{r.loai === 'dong' ? hienO(r.dg) : ''}</td>
-                  <td className={`${TD} w-44 text-right ${r.lon ? 'text-base font-bold text-navy-900' : ''}`}>{vnd(r.t.kg)}</td>
-                  <td className={`${TD} w-44 text-right ${r.lon ? 'text-base font-bold text-navy-900' : ''}`}>{vnd(r.t.m3)}</td>
+                  <td className={`${TD} w-44 text-right ${r.lon ? 'text-base font-bold text-white' : ''}`}>{vnd(r.t.kg)}</td>
+                  <td className={`${TD} w-44 text-right ${r.lon ? 'text-base font-bold text-white' : ''}`}>{vnd(r.t.m3)}</td>
                 </tr>
               )
             })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className={KHUNG}>
-        <p className="mb-3 font-display font-semibold text-navy-900">Tổng hợp so sánh: theo KG và theo M3</p>
-        <table className="w-full min-w-[640px] border-collapse">
-          <thead><tr>{['Nội dung', 'Theo KG', 'Theo M3'].map((h) => <th key={h} className={TH}>{h}</th>)}</tr></thead>
-          <tbody>
-            {[
-              ['Số lượng (KG / M3)', so(st.kg).toLocaleString('vi-VN'), so(st.m3).toLocaleString('vi-VN')],
-              [(loai === 'mua_ban' ? 'Giá bán dự kiến (thành tiền) = cước + phí mua hàng + thuế + CP nội địa VN + CP nội địa TQ' : 'Giá bán dự kiến (thành tiền) = cước + phí tách tờ khai + thuế + CP nội địa VN + CP nội địa TQ'), vnd(kq.kg.duKien), vnd(kq.m3.duKien), true],
-              ['Giá bán dự kiến (đơn giá)', vnd(kq.kg.duKienDg), vnd(kq.m3.duKienDg)],
-              ['Giá bán chốt (đơn giá, sale nhập)', <O key="a" v={st.chotKg} set={(v) => up({ chotKg: v })} />, <O key="b" v={st.chotM3} set={(v) => up({ chotM3: v })} />],
-              ['Giá bán chốt (thành tiền)', so(st.chotKg) ? vnd(kq.kg.chotTT) : '', so(st.chotM3) ? vnd(kq.m3.chotTT) : ''],
-              ['Chênh lệch chốt - dự kiến', kq.kg.cl === null ? '' : vnd(kq.kg.cl), kq.m3.cl === null ? '' : vnd(kq.m3.cl), true],
-            ].map(([nd, a, b, dam], i) => (
-              <tr key={i} className={dam ? 'bg-slate-50 font-semibold' : ''}>
-                <td className={TD}>{nd}</td><td className={`${TD} w-52 text-right`}>{a}</td><td className={`${TD} w-52 text-right`}>{b}</td>
-              </tr>
-            ))}
           </tbody>
         </table>
       </div>
@@ -472,7 +456,8 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
           {daLuu && <span className="text-sm font-medium text-emerald-600">✓ Đã lưu vào hồ sơ khách</span>}
           <Button variant="secondary" onClick={() => { setDaLuu(false); setIdLuu(null); setData((d) => ({ ...d, [tab]: MAC_DINH[tab]() })) }}><RotateCcw size={16} />Làm lại</Button>
           <Button variant="secondary" onClick={xuat} disabled={dang}><FileDown size={16} />{dang ? 'Đang xuất...' : 'Xuất Excel'}</Button>
-          <Button onClick={luu} disabled={dangLuu}><Save size={16} />{dangLuu ? 'Đang lưu...' : idLuu ? 'Cập nhật báo giá' : 'Lưu báo giá'}</Button>
+          <Button variant="secondary" onClick={() => xuatBaoGiaPdf({ loai: tab, st })}><FileDown size={16} />Xuất PDF</Button>
+          {khachCo && <Button onClick={luu} disabled={dangLuu}><Save size={16} />{dangLuu ? 'Đang lưu...' : idLuu ? 'Cập nhật báo giá' : 'Lưu báo giá'}</Button>}
           {onClose && <Button variant="ghost" onClick={onClose}><X size={16} />Đóng</Button>}
         </div>
       </header>
@@ -507,16 +492,9 @@ export default function BaoGiaPage({ currentProfile }) {
   const [mo, setMo] = useState(null)         // báo giá đang mở lại
   const [khoa, setKhoa] = useState(0)        // đổi để dựng lại editor
   const [lamMoi, setLamMoi] = useState(0)
-  const duoi = (
-    <div id="bao-gia-da-luu" className="rounded-2xl bg-white p-4 shadow-sm">
-      <p className="mb-3 font-display font-semibold text-navy-900">Báo giá đã lưu</p>
-      <DanhSachBaoGia currentProfile={currentProfile} lamMoi={lamMoi}
-        onMo={(b) => { setMo(b); setKhoa((n) => n + 1) }} />
-    </div>
-  )
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <BaoGiaEditor key={khoa} baoGiaMo={mo} currentProfile={currentProfile} onSaved={() => setLamMoi((n) => n + 1)} duoi={duoi} />
+      <BaoGiaEditor key={khoa} baoGiaMo={mo} currentProfile={currentProfile} onSaved={() => setLamMoi((n) => n + 1)} />
     </div>
   )
 }
