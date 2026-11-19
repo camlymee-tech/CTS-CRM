@@ -1,6 +1,6 @@
 import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
-import { Phone, CalendarCheck, CalendarClock, CircleAlert, CircleCheck, RefreshCw, BarChart3 } from 'lucide-react'
+import { Phone, CalendarCheck, CircleAlert, CircleCheck, RefreshCw, BarChart3 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
 import { Select, Badge } from './ui'
@@ -83,20 +83,6 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
     load()
   }
 
-  // Khách sắp tới hạn trong 3 ngày, để chuẩn bị trước
-  const sapToi = useMemo(() => {
-    const han = new Date(); han.setDate(han.getDate() + 3)
-    const h = han.toISOString().slice(0, 10)
-    return customers.filter((c) => {
-      if (!c.ngay_cham_soc_tiep_theo) return false
-      if (c.ngay_cham_soc_tiep_theo <= homNay || c.ngay_cham_soc_tiep_theo > h) return false
-      if (maDaChot.includes(c.trang_thai_cham_soc)) return false
-      if (uids ? !uids.has(c.sale_id) : false) return false
-      if (filterSale && c.sale_id !== filterSale) return false
-      return true
-    })
-  }, [customers, homNay, uids, currentProfile?.id, filterSale, maDaChot])
-
   return (
     <div className="flex-1 overflow-y-auto">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
@@ -144,16 +130,6 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
           {canGoiLai.length > 0 && (
             <KhachCanGoiLai ds={canGoiLai} tenSale={tenSale} onOpen={setXemKhach}
               tenTrangThai={tenTrangThai} classTrangThai={classTrangThai} />
-          )}
-
-          {sapToi.length > 0 && (
-            <Nhom
-              icon={CalendarClock} mau="slate"
-              tieuDe={`Sắp tới trong 3 ngày (${sapToi.length})`}
-              moTa="Chưa đến hạn, xem trước để chuẩn bị"
-              ds={sapToi} homNay={homNay} tenSale={tenSale} onOpen={setXemKhach}
-              tenTrangThai={tenTrangThai} classTrangThai={classTrangThai}
-            />
           )}
         </div>
       )}
