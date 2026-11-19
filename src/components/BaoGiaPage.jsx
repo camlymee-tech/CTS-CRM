@@ -157,7 +157,7 @@ function BangXNK({ st, up, loai, order = false, phang = false, tieuDe }) {
               return (
                 <tr key={i} className={`${nen} ${dam}`}>
                   <td className={`${TD} w-14 text-center`}>{r.stt}</td>
-                  <td className={`${TD} ${r.sub ? 'pl-6' : ''}`}>
+                  <td className={`${TD} ${r.sub === 2 ? 'pl-12' : r.sub ? 'pl-6' : ''}`}>
                     {r.nd}
                     {r.pct && <span className="ml-2 inline-block w-20 align-middle"><O v={st[r.pct.k]} set={(v) => up({ [r.pct.k]: v })} tp /></span>}
                     {r.pct && ' %'}

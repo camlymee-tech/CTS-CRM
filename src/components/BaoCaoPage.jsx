@@ -213,7 +213,14 @@ export default function BaoCaoPage({ currentProfile }) {
       sale: s,
       phuTrach: customers.filter((c) => c.sale_id === s.id).length,
       moi: customers.filter((c) => c.sale_id === s.id && trongKy(ngayLocal(c.created_at))).length,
-      luot: logs.filter((l) => l.user_id === s.id && trongKy(ngayLocal(l.created_at)) && laChamSoc(l) && !lanLienHeDau.has(`${l.customer_id}|${ngayLocal(l.created_at)}`)).length,
+      luot: (() => {
+        // Lượt chăm sóc = khách/ngày có cập nhật chăm sóc mới HOẶC đổi trạng thái (trừ Chưa liên hệ → khác); mỗi khách chỉ tính 1 lần/ngày
+        const set = new Set()
+        for (const x of cs) { const d = ngayCs(x); if (x.sale_id === s.id && trongKy(d)) set.add(`${x.customer_id}|${d}`) }
+        for (const l of logs) { const d = ngayLocal(l.created_at); if (l.user_id === s.id && trongKy(d) && laChamSoc(l)) set.add(`${l.customer_id}|${d}`) }
+        for (const k of lanLienHeDau) set.delete(k)
+        return set.size
+      })(),
       nghe: logs.filter((l) => l.user_id === s.id && trongKy(ngayLocal(l.created_at)) && laNgheMay(l)).length,
       ht, mt, pt: mt ? ht / mt : null,
       ton: canGoiLai.filter((r) => r.saleId === s.id).length,
@@ -538,7 +545,7 @@ export default function BaoCaoPage({ currentProfile }) {
                 {/* Bảng chi tiết */}
                 <section className="rounded-2xl bg-white p-5 shadow-sm">
                   <h2 className="mb-1 font-display text-base font-semibold text-navy-900">Chi tiết từng phòng — từng sale</h2>
-                  <p className="mb-3 text-xs text-ink-400">Mục tiêu = số KH liên hệ được sale tự đặt + số khách cần gọi lại sale đã chọn. KH liên hệ được = khách đổi từ Chưa liên hệ sang trạng thái khác. Lượt chăm sóc = khách đổi từ trạng thái khác (không phải Chưa liên hệ) sang trạng thái mới; nếu cùng ngày khách vừa đổi từ Chưa liên hệ thì chỉ tính KH liên hệ được.</p>
+                  <p className="mb-3 text-xs text-ink-400">Mục tiêu = số KH liên hệ được sale tự đặt + số khách cần gọi lại sale đã chọn. KH liên hệ được = khách đổi từ Chưa liên hệ sang trạng thái khác. Lượt chăm sóc = số khách có cập nhật chăm sóc mới hoặc đổi trạng thái (trừ Chưa liên hệ → khác), mỗi khách tính 1 lần/ngày; ngày khách vừa đổi từ Chưa liên hệ thì chỉ tính KH liên hệ được.</p>
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-sm">
                       <thead>

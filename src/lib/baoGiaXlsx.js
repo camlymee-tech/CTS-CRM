@@ -68,7 +68,7 @@ export async function xuatBaoGia({ loai, st }) {
       const dam = row.loai !== 'dong' || row.dam
       const nen = row.loai === 'tong' ? (row.lon ? CAM : XAM) : row.loai === 'nhom' ? XAM : undefined
       o(ws, r, 1, row.stt, { canh: 'center', dam, nen })
-      o(ws, r, 2, row.nd + (row.pct ? ` (${pt(st[row.pct.k])})` : ''), { dam, nen })
+      o(ws, r, 2, (row.sub === 2 ? '      ' : '') + row.nd + (row.pct ? ` (${pt(st[row.pct.k])})` : ''), { dam, nen })
       o(ws, r, 3, row.dvt || '', { canh: 'center', nen })
       o(ws, r, 4, row.sl === undefined ? '' : giaTri(row.sl), { nen, fmt: '#,##0.##' })
       o(ws, r, 5, row.dg === undefined ? '' : giaTri(row.dg), { nen, fmt: row.dg && row.dg.pct ? '0.00"%"' : '#,##0.##' })

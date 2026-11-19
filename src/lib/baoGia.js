@@ -122,15 +122,17 @@ export function khungXNK(st, kq, loai, order = false) {
   nhom(n(3), 'Các chi phí nội địa Việt Nam', kq.kg.vn, kq.m3.vn)
   dong({ stt: n(3) + '.1', nd: 'Phí ship kho VN đến khách hàng', dvt: 'Lô', sl: 1, dg: dongTien('shipKho'), t: chung(kq.vnDong[0]), sub: 1 })
   if (muaBan) {
-    dong({ stt: n(3) + '.2', nd: 'Phí gửi tàu theo KG', dvt: 'KG', sl: { k: 'tauKgSl', tp: 1 }, dg: dongTien('tauKgDg'), t: { kg: kq.vnDong[5], m3: null }, sub: 1 })
-    dong({ stt: n(3) + '.3', nd: 'Phí gửi tàu theo M3', dvt: 'M3', sl: { k: 'tauSl', tp: 1 }, dg: dongTien('tauDg'), t: { kg: null, m3: kq.vnDong[1] }, sub: 1 })
+    // Phí gửi tàu: 1 mục, bên trong có 2 mục nhỏ theo KG / theo M3 (sale chỉ điền 1 trong 2)
+    dong({ stt: n(3) + '.2', nd: 'Phí gửi tàu', t: { kg: kq.vnDong[5], m3: kq.vnDong[1] }, sub: 1, dam: 1 })
+    dong({ stt: n(3) + '.2.1', nd: 'Theo KG', dvt: 'KG', sl: { k: 'tauKgSl', tp: 1 }, dg: dongTien('tauKgDg'), t: { kg: kq.vnDong[5], m3: null }, sub: 2 })
+    dong({ stt: n(3) + '.2.2', nd: 'Theo M3', dvt: 'M3', sl: { k: 'tauSl', tp: 1 }, dg: dongTien('tauDg'), t: { kg: null, m3: kq.vnDong[1] }, sub: 2 })
   } else {
     dong({ stt: n(3) + '.2', nd: 'Phí gửi tàu', dvt: 'M3', sl: { k: 'tauSl', tp: 1 }, dg: dongTien('tauDg'), t: chung(kq.vnDong[1]), sub: 1 })
   }
-  const k3 = muaBan ? 1 : 0
+  const k3 = 0
   dong({ stt: n(3) + '.' + (3 + k3), nd: 'Phí nâng hạ pallet cửa khẩu', dvt: 'Lô', sl: 1, dg: dongTien('pallet'), t: chung(kq.vnDong[2]), sub: 1 })
   if (!muaBan) dong({ stt: n(3) + '.4', nd: 'Phí hoàn tiền hợp đồng ngoại (SL = trị giá hợp đồng, đơn giá = tỉ lệ %)', dvt: 'HĐ', sl: dongTien('hoanGt'), dg: { k: 'hoanPct', tp: 1, pct: 1 }, t: chung(kq.vnDong[3]), sub: 1 })
-  dong({ stt: n(3) + '.' + (5 + k3 - (muaBan ? 1 : 0)), nd: 'Phí khác tại Việt Nam', dvt: 'Lô', sl: 1, dg: dongTien('khacVN'), t: chung(kq.vnDong[4]), sub: 1 })
+  dong({ stt: n(3) + (muaBan ? '.4' : '.5'), nd: 'Phí khác tại Việt Nam', dvt: 'Lô', sl: 1, dg: dongTien('khacVN'), t: chung(kq.vnDong[4]), sub: 1 })
   nhom(n(4), 'Các chi phí nội địa Trung Quốc (SL = số tệ, đơn giá = tỷ giá)', kq.tq, kq.tq)
   dong({ stt: n(4) + '.1', nd: 'Ứng / kéo / hạ hàng / cân TQ', dvt: 'Tệ', sl: { k: 'tq1Sl', tp: 1 }, dg: { k: 'tq1Dg' }, t: chung(kq.tqDong[0]), sub: 1 })
   dong({ stt: n(4) + '.2', nd: 'Phí kiểm dịch TQ', dvt: 'Tệ', sl: { k: 'tq2Sl', tp: 1 }, dg: { k: 'tq2Dg' }, t: chung(kq.tqDong[1]), sub: 1 })
