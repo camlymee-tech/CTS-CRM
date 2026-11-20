@@ -83,7 +83,7 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
     const sdtTrongFile = new Set()
     return rows.map((r, i) => {
       const ten = layCot(r, 'ten')
-      const sdt = layCot(r, 'sdt')
+      const sdt = String(layCot(r, 'sdt') || '').replace(/[\s.\-]/g, '')
       const so = chiSo(sdt)
       const canhBao = []
       let loiDong = ''

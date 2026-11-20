@@ -30,6 +30,14 @@ import {
 const chiSo = (s) => (s || '').replace(/\D/g, '')
 
 
+// Tìm khách: khớp chữ thường, hoặc khớp số điện thoại không phân biệt dấu cách / chấm / gạch
+const khopTim = (c, search) => {
+  const q = search.toLowerCase().trim()
+  if (`${c.ten_khach} ${c.ma_khach} ${c.sdt || ''} ${c.nganh_hang || ''}`.toLowerCase().includes(q)) return true
+  const so = q.replace(/\D/g, '')
+  return so.length >= 3 && String(c.sdt || '').replace(/\D/g, '').includes(so)
+}
+
 export default function CustomerList({ currentProfile }) {
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung, maHoanHuy } = useTrangThai()
   const [quanLyTT, setQuanLyTT] = useState(false)
@@ -198,7 +206,7 @@ export default function CustomerList({ currentProfile }) {
 
   const filtered = useMemo(() => {
     return nguon.filter((c) => {
-      if (search && !`${c.ten_khach} ${c.ma_khach} ${c.sdt || ''} ${c.nganh_hang || ''}`.toLowerCase().includes(search.toLowerCase())) {
+      if (search && !khopTim(c, search)) {
         if (!c._tuTraCuu) return false
       }
       if (filterLoai && c.loai_khach !== filterLoai) return false
@@ -217,7 +225,7 @@ export default function CustomerList({ currentProfile }) {
   // để mỗi thẻ trạng thái vẫn hiện đúng số khi đang chọn một trạng thái
   const nenDem = useMemo(() => nguon.filter((c) => {
     if (!xemDuoc(c.sale_id)) return false
-    if (search && !`${c.ten_khach} ${c.ma_khach} ${c.sdt || ''} ${c.nganh_hang || ''}`.toLowerCase().includes(search.toLowerCase())) {
+    if (search && !khopTim(c, search)) {
       if (!c._tuTraCuu) return false
     }
     if (filterLoai && c.loai_khach !== filterLoai) return false

@@ -325,7 +325,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                         {TINH_THANH.map((t) => <option key={t} value={t}>{t}</option>)}
                       </Select>
                       <Input label="Số điện thoại" value={formTT.sdt}
-                        onChange={(e) => setFormTT({ ...formTT, sdt: e.target.value })} />
+                        onChange={(e) => setFormTT({ ...formTT, sdt: e.target.value.replace(/[\s.\-]/g, '') })} />
                       <Input label="Ngành hàng" value={formTT.nganh_hang}
                         onChange={(e) => setFormTT({ ...formTT, nganh_hang: e.target.value })} />
                       <Select label="Sale phụ trách" value={formTT.sale_id}

@@ -127,7 +127,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
           onChange={(e) => setForm({ ...form, ten_khach: e.target.value })} />
         <div>
           <Input label="Số điện thoại" value={form.sdt}
-            onChange={(e) => setForm({ ...form, sdt: e.target.value })}
+            onChange={(e) => setForm({ ...form, sdt: e.target.value.replace(/[\s.\-]/g, '') })}
             className={khachTrung ? 'border-amber-400 bg-amber-50' : ''} />
           {dangKiemTra && <p className="mt-1 text-xs text-ink-400">Đang kiểm tra trùng...</p>}
         </div>
