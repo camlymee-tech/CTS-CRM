@@ -33,6 +33,7 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
   const inputRef = useRef(null)
   const [tenFile, setTenFile] = useState('')
   const [rows, setRows] = useState(null)      // đã đọc từ file
+  const [trungSdt, setTrungSdt] = useState(new Map())   // số đã có trong hệ thống → có phải khách đã chốt không
   const [loi, setLoi] = useState('')
   const [dangLam, setDangLam] = useState(false)
   const [ketQua, setKetQua] = useState(null)
@@ -63,6 +64,14 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
       if (data.length === 0) { setLoi('File không có dòng dữ liệu nào.'); return }
       if (data.length > 20000) { setLoi('File quá lớn (tối đa 20.000 dòng mỗi lần). Chị chia nhỏ file rồi tải lại.'); return }
       setRows(data)
+      // Hỏi hệ thống những số nào đã có (không lộ thông tin khách của người khác)
+      const so = [...new Set(data.map((r) => chiSo(layCot(r, 'sdt'))).filter((x) => x.length >= 8))]
+      const m = new Map()
+      for (let i = 0; i < so.length; i += 500) {
+        const { data: kq } = await supabase.rpc('sdt_da_co', { p_ds: so.slice(i, i + 500) })
+        for (const x of kq || []) m.set(String(x.so), !!x.da_chot)
+      }
+      setTrungSdt(m)
     } catch {
       setLoi('Không đọc được file. Chị dùng file Excel (.xlsx) hoặc CSV theo file mẫu.')
     }
@@ -71,7 +80,6 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
   // Kiểm tra từng dòng
   const kiemTra = useMemo(() => {
     if (!rows) return []
-    const sdtCo = new Set(customers.map((c) => chiSo(c.sdt)).filter((s) => s.length >= 8))
     const sdtTrongFile = new Set()
     return rows.map((r, i) => {
       const ten = layCot(r, 'ten')
@@ -80,9 +88,10 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
       const canhBao = []
       let loiDong = ''
       if (!ten) loiDong = 'Thiếu tên khách hàng'
-      else if (so.length >= 8 && sdtCo.has(so)) loiDong = 'SĐT đã có trong hệ thống'
-      else if (so.length >= 8 && sdtTrongFile.has(so)) loiDong = 'SĐT bị lặp trong file'
+      else if (so.length >= 8 && trungSdt.get(so) === true) loiDong = 'SĐT trùng khách ĐÃ CHỐT'
+      if (!loiDong && so.length >= 8 && sdtTrongFile.has(so)) canhBao.push('SĐT bị lặp trong file → vẫn tải lên')
       if (so.length >= 8) sdtTrongFile.add(so)
+      if (!loiDong && so.length >= 8 && trungSdt.has(so)) canhBao.push('SĐT trùng khách đã có trong hệ thống → vẫn tải lên (leader và admin sẽ thấy cả hai hồ sơ)')
 
       const ttTen = layCot(r, 'tt')
       const tt = ttTen ? ttHoatDong.find((s) => boDau(s.ten) === boDau(ttTen)) : null
@@ -115,7 +124,7 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
         },
       }
     })
-  }, [rows, customers, profiles, statuses])
+  }, [rows, customers, profiles, statuses, trungSdt])
 
   const hopLe = kiemTra.filter((r) => !r.loi)
   const biLoai = kiemTra.filter((r) => r.loi)
@@ -124,14 +133,15 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
     setDangLam(true)
     let them = 0
     const loiThem = []
-    for (let i = 0; i < hopLe.length; i += 50) {
-      const nhom = hopLe.slice(i, i + 50)
+    const conLai = hopLe
+    for (let i = 0; i < conLai.length; i += 50) {
+      const nhom = conLai.slice(i, i + 50)
       const { error } = await supabase.from('customers').insert(nhom.map((r) => r.payload))
       if (!error) { them += nhom.length; continue }
       // Lỗi cả nhóm → thử từng dòng để biết dòng nào lỗi
       for (const r of nhom) {
         const { error: e1 } = await supabase.from('customers').insert(r.payload)
-        if (e1) loiThem.push({ stt: r.stt, ten: r.ten, loi: e1.message.includes('SDT_TRUNG') ? 'SĐT đã có trong hệ thống' : e1.message })
+        if (e1) loiThem.push({ stt: r.stt, ten: r.ten, loi: e1.message.includes('SDT_TRUNG') ? 'SĐT trùng khách ĐÃ CHỐT' : e1.message })
         else them += 1
       }
     }

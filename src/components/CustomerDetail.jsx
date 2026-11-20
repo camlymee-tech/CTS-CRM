@@ -308,6 +308,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? <p className="text-sm text-ink-400">Đang tải...</p> : (
             <>
+              {tab === 'thong_tin' && customer.sdt && <HoSoTrung customer={customer} />}
               {tab === 'thong_tin' && (
                 suaDuoc ? (
                   <form onSubmit={luuThongTin} className="space-y-5">
@@ -923,6 +924,54 @@ function NhatKyCuocGoi({ ds, tenNguoi }) {
           )
         })}
       </ul>
+    </div>
+  )
+}
+
+
+// Khung cảnh báo: số điện thoại này có nhiều hồ sơ (do nhiều sale điền)
+function HoSoTrung({ customer }) {
+  const [ds, setDs] = useState([])
+  useEffect(() => {
+    let huy = false
+    supabase.rpc('ho_so_trung_sdt', { p_sdt: customer.sdt }).then(({ data }) => { if (!huy) setDs(data || []) })
+    return () => { huy = true }
+  }, [customer.id, customer.sdt])
+  if (ds.length < 2) return null
+  const hien = ds.filter((r) => r.xem_duoc || r.da_chot)
+  const an = ds.length - hien.length
+  const th = 'border border-amber-200 bg-amber-100/60 px-2 py-1.5 text-left font-medium text-amber-900'
+  const td = 'border border-amber-200 px-2 py-1.5'
+  const ngay = (v) => (v ? new Date(v).toLocaleDateString('vi-VN') : 'Chưa có')
+  return (
+    <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
+      <p className="mb-2 text-sm font-medium text-amber-900">Số {customer.sdt} có {ds.length} hồ sơ trong hệ thống</p>
+      <table className="w-full border-collapse bg-white text-xs">
+        <thead><tr>
+          <th className={th}>Sale</th><th className={th}>Phòng</th><th className={th}>Trạng thái</th>
+          <th className={th}>Liên hệ gần nhất</th><th className={th}>Ngày tạo</th><th className={th}></th>
+        </tr></thead>
+        <tbody>
+          {hien.map((r) => {
+            const dangXem = r.id === customer.id
+            return (
+              <tr key={r.id} className={dangXem ? 'bg-sky-50' : r.da_chot ? 'bg-emerald-50' : ''}>
+                <td className={`${td} font-medium`}>{r.sale_ten || '—'}</td>
+                <td className={td}>{r.phong_ban || '—'}</td>
+                <td className={`${td} ${r.da_chot ? 'font-medium text-emerald-700' : ''}`}>{r.trang_thai || '—'}</td>
+                <td className={td}>{ngay(r.lien_he_gan_nhat)}</td>
+                <td className={td}>{ngay(r.ngay_tao)}</td>
+                <td className={td}>
+                  {dangXem ? <span className="text-sky-700">Đang xem</span>
+                    : r.xem_duoc ? <button type="button" className="text-sky-700 hover:underline" onClick={() => window.dispatchEvent(new CustomEvent('mo-ho-so', { detail: r.id }))}>Mở hồ sơ</button>
+                    : null}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      {an > 0 && <p className="mt-2 text-xs text-amber-800">+ {an} hồ sơ khác (không hiển thị)</p>}
     </div>
   )
 }

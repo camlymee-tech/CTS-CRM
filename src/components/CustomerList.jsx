@@ -130,7 +130,8 @@ export default function CustomerList({ currentProfile }) {
     if (so.length < 8) { setPhoneHits([]); return }
     const t = setTimeout(async () => {
       const { data } = await supabase.rpc('tim_khach_theo_sdt', { p_sdt: search })
-      setPhoneHits(data || [])
+      // Chỉ nhận hồ sơ được phép xem (hoặc khách đã chốt); hồ sơ của người khác bị ẩn thông tin
+      setPhoneHits((data || []).map((r) => r.thong_tin).filter(Boolean))
     }, 400)
     return () => clearTimeout(t)
   }, [search])
@@ -167,6 +168,26 @@ export default function CustomerList({ currentProfile }) {
   const uids = useMemo(() => nhanSuXemDuoc(currentProfile, profiles), [currentProfile, profiles])   // null = xem tất cả
   const dsSale = useMemo(() => locNhanSu(currentProfile, profiles), [currentProfile, profiles])   // admin: tất cả · leader: team · sale: chính mình
   const xemDuoc = (id) => uids === null || (!!id && uids.has(id))
+
+  // Đếm số hồ sơ cùng số điện thoại (trong danh sách người xem được) để gắn nhãn "Trùng SĐT"
+  const demTrung = useMemo(() => {
+    const m = new Map()
+    for (const c of customers) {
+      const so = String(c.sdt || '').replace(/\D/g, '')
+      if (so.length >= 8) m.set(so, (m.get(so) || 0) + 1)
+    }
+    return m
+  }, [customers])
+
+  // Bấm "Mở hồ sơ" trong khung hồ sơ trùng → mở hồ sơ kia
+  useEffect(() => {
+    const mo = (e) => {
+      const k = customers.find((c) => c.id === e.detail)
+      if (k) setViewingCustomer(k)
+    }
+    window.addEventListener('mo-ho-so', mo)
+    return () => window.removeEventListener('mo-ho-so', mo)
+  }, [customers])
 
   // Gộp kết quả tra cứu SĐT vào danh sách, không trùng lặp
   const nguon = useMemo(() => {
@@ -521,7 +542,18 @@ export default function CustomerList({ currentProfile }) {
                       </div>
                     </div>
                   </td>
-                  {hien('sdt') && <td className="border border-slate-200 px-2.5 py-3 font-medium text-indigo-800">{c.sdt || <span className="text-ink-400">—</span>}</td>}
+                  {hien('sdt') && (
+                    <td className="border border-slate-200 px-2.5 py-3 font-medium text-indigo-800">
+                      {c.sdt || <span className="text-ink-400">—</span>}
+                      {(demTrung.get(String(c.sdt || '').replace(/\D/g, '')) || 0) > 1 && (
+                        <button type="button" title="Lọc các hồ sơ cùng số này"
+                          onClick={(e) => { e.stopPropagation(); setSearch(c.sdt) }}
+                          className="mt-1 block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-200">
+                          Trùng SĐT · {demTrung.get(String(c.sdt || '').replace(/\D/g, ''))} hồ sơ
+                        </button>
+                      )}
+                    </td>
+                  )}
                   {hien('sale') && <td className="border border-slate-200 px-2.5 py-3 text-navy-900">{profileName(c.sale_id)}</td>}
                   {hien('trao_doi') && (
                     <td className="border border-slate-200 px-2.5 py-3" style={{ minWidth: 260, maxWidth: doRong.trao_doi || 420 }}>
@@ -638,6 +670,7 @@ export default function CustomerList({ currentProfile }) {
 
       {viewingCustomer && (
         <CustomerDetail
+          key={viewingCustomer.id}
           customer={viewingCustomer}
           currentProfile={currentProfile}
           onClose={() => setViewingCustomer(null)}

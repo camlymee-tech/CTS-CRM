@@ -46,7 +46,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
   const [dangKiemTra, setDangKiemTra] = useState(false)
   const [saleList, setSaleList] = useState({})
 
-  const daChot = !!khachTrung && maDaChot.includes(khachTrung.trang_thai_cham_soc)
+  const daChot = !!khachTrung?.daChot   // chỉ khách đã CHỐT mới chặn lưu
   const chiSo = (v) => (v || '').replace(/\D/g, '')
 
   // Kiểm tra trùng số điện thoại ngay khi gõ
@@ -56,10 +56,14 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
     setDangKiemTra(true)
     const t = setTimeout(async () => {
       const { data } = await supabase.rpc('tim_khach_theo_sdt', { p_sdt: form.sdt })
-      const trung = (data || []).find((k) => k.id !== customer?.id)
-      setKhachTrung(trung || null)
-      if (trung?.sale_id && !saleList[trung.sale_id]) {
-        const { data: p } = await supabase.from('profiles').select('id, full_name').eq('id', trung.sale_id).single()
+      const ds = (data || []).filter((k) => k.id !== customer?.id)
+      // Ưu tiên báo khách đã chốt; không thì lấy hồ sơ trùng đầu tiên
+      const trung = ds.find((k) => k.da_chot) || ds[0] || null
+      // Gộp thông tin (nếu được phép xem) với cờ: đã chốt / có xem được hồ sơ không
+      setKhachTrung(trung ? { ...(trung.thong_tin || {}), id: trung.id, daChot: trung.da_chot, xemDuoc: trung.xem_duoc, soHoSo: ds.length } : null)
+      const sid = trung?.thong_tin?.sale_id
+      if (sid && !saleList[sid]) {
+        const { data: p } = await supabase.from('profiles').select('id, full_name').eq('id', sid).single()
         if (p) setSaleList((old) => ({ ...old, [p.id]: p.full_name }))
       }
       setDangKiemTra(false)
@@ -76,8 +80,8 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (khachTrung) {
-      setError('Số điện thoại này đã có trong hệ thống. Vui lòng dùng số khác hoặc cập nhật vào khách hàng đã có.')
+    if (daChot) {
+      setError('Số điện thoại này thuộc về khách đã chốt. Vui lòng dùng số khác hoặc liên hệ quản lý.')
       return
     }
     setSaving(true)
@@ -149,27 +153,33 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
               <p className="text-sm font-semibold">
                 {daChot
                   ? `⚠ Khách hàng này ĐÃ CHỐT rồi — của ${saleList[khachTrung.sale_id] || 'sale khác'} (${tenTrangThai(khachTrung.trang_thai_cham_soc)})`
-                  : 'Số điện thoại này đã có trong hệ thống'}
+                  : 'Số điện thoại này đã có trong hệ thống (trùng data), bạn vẫn lưu được'}
               </p>
             </div>
-            <div className="mt-3 rounded-lg bg-white/70 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-display font-semibold text-navy-900">{khachTrung.ten_khach}</p>
-                  <p className="text-xs text-ink-400">{khachTrung.ma_khach} · {khachTrung.sdt}</p>
+            {(daChot || khachTrung.xemDuoc) ? (
+              <div className="mt-3 rounded-lg bg-white/70 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-display font-semibold text-navy-900">{khachTrung.ten_khach}</p>
+                    <p className="text-xs text-ink-400">{khachTrung.ma_khach} · {khachTrung.sdt}</p>
+                  </div>
+                  <Badge className={classTrangThai(khachTrung.trang_thai_cham_soc)}>
+                    {tenTrangThai(khachTrung.trang_thai_cham_soc)}
+                  </Badge>
                 </div>
-                <Badge className={classTrangThai(khachTrung.trang_thai_cham_soc)}>
-                  {tenTrangThai(khachTrung.trang_thai_cham_soc)}
-                </Badge>
+                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink-600">
+                  <span>Sale phụ trách: <b className="text-navy-900">{saleList[khachTrung.sale_id] || 'Chưa gán'}</b></span>
+                  <span>Ngành hàng: <b className="text-navy-900">{khachTrung.nganh_hang || '—'}</b></span>
+                  <span>Liên hệ gần nhất: <b className="text-navy-900">{khachTrung.ngay_lien_he_gan_nhat || '—'}</b></span>
+                </div>
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink-600">
-                <span>Sale phụ trách: <b className="text-navy-900">{saleList[khachTrung.sale_id] || 'Chưa gán'}</b></span>
-                <span>Ngành hàng: <b className="text-navy-900">{khachTrung.nganh_hang || '—'}</b></span>
-                <span>Liên hệ gần nhất: <b className="text-navy-900">{khachTrung.ngay_lien_he_gan_nhat || '—'}</b></span>
-              </div>
-            </div>
-            <p className="mt-3 text-xs text-amber-800">
-              Không thể tạo trùng số. Hãy dùng số khác, hoặc đóng form này và cập nhật trực tiếp vào khách hàng ở trên.
+            ) : (
+              <p className="mt-2 text-sm text-amber-900">Số này đã có trong hệ thống ({khachTrung.soHoSo} hồ sơ). Hồ sơ khác không hiển thị cho bạn.</p>
+            )}
+            <p className={`mt-3 text-xs ${daChot ? 'text-rose-700' : 'text-amber-800'}`}>
+              {daChot
+                ? 'Khách đã chốt nên không thể tạo trùng số. Hãy dùng số khác hoặc liên hệ quản lý.'
+                : 'Bạn vẫn có thể lưu. Hồ sơ của bạn tách riêng, chỉ bạn, leader trong team và admin xem được.'}
             </p>
           </div>
         )}
@@ -197,8 +207,8 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
 
         <div className="col-span-2 mt-2 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>Hủy</Button>
-          <Button type="submit" disabled={saving || !!khachTrung}>
-            {saving ? 'Đang lưu...' : khachTrung ? 'Số điện thoại bị trùng' : 'Lưu khách hàng'}
+          <Button type="submit" disabled={saving || daChot}>
+            {saving ? 'Đang lưu...' : daChot ? 'Khách đã chốt, không lưu được' : 'Lưu khách hàng'}
           </Button>
         </div>
 
