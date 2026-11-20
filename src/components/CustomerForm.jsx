@@ -47,7 +47,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
   const [saleList, setSaleList] = useState({})
 
   const daChot = !!khachTrung?.daChot   // chỉ khách đã CHỐT mới chặn lưu
-  const chiSo = (v) => (v || '').replace(/\D/g, '')
+  const chiSo = (v) => { const d = (v || '').replace(/\D/g, ''); return /^84\d{9,10}$/.test(d) ? '0' + d.slice(2) : d }
 
   // Kiểm tra trùng số điện thoại ngay khi gõ
   useEffect(() => {

@@ -27,7 +27,8 @@ import {
 // Khách "chung" — cả team đều xem được (khớp với hàm la_khach_chung trong database)
 
 
-const chiSo = (s) => (s || '').replace(/\D/g, '')
+const chuanSo = (v) => { const d = String(v || '').replace(/\D/g, ''); return /^84\d{9,10}$/.test(d) ? '0' + d.slice(2) : d }
+const chiSo = chuanSo
 
 
 // Tìm khách: khớp chữ thường, hoặc khớp số điện thoại không phân biệt dấu cách / chấm / gạch
@@ -35,7 +36,9 @@ const khopTim = (c, search) => {
   const q = search.toLowerCase().trim()
   if (`${c.ten_khach} ${c.ma_khach} ${c.sdt || ''} ${c.nganh_hang || ''}`.toLowerCase().includes(q)) return true
   const so = q.replace(/\D/g, '')
-  return so.length >= 3 && String(c.sdt || '').replace(/\D/g, '').includes(so)
+  if (so.length < 3) return false
+  const cs = chuanSo(c.sdt)
+  return cs.includes(so) || cs.includes(chuanSo(q)) || chuanSo(c.sdt).includes(so)
 }
 
 export default function CustomerList({ currentProfile }) {
@@ -181,7 +184,7 @@ export default function CustomerList({ currentProfile }) {
   const demTrung = useMemo(() => {
     const m = new Map()
     for (const c of customers) {
-      const so = String(c.sdt || '').replace(/\D/g, '')
+      const so = chuanSo(c.sdt)
       if (so.length >= 8) m.set(so, (m.get(so) || 0) + 1)
     }
     return m
@@ -553,11 +556,11 @@ export default function CustomerList({ currentProfile }) {
                   {hien('sdt') && (
                     <td className="border border-slate-200 px-2.5 py-3 font-medium text-indigo-800">
                       {c.sdt || <span className="text-ink-400">—</span>}
-                      {(demTrung.get(String(c.sdt || '').replace(/\D/g, '')) || 0) > 1 && (
+                      {(demTrung.get(chuanSo(c.sdt)) || 0) > 1 && (
                         <button type="button" title="Lọc các hồ sơ cùng số này"
                           onClick={(e) => { e.stopPropagation(); setSearch(c.sdt) }}
                           className="mt-1 block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-200">
-                          Trùng SĐT · {demTrung.get(String(c.sdt || '').replace(/\D/g, ''))} hồ sơ
+                          Trùng SĐT · {demTrung.get(chuanSo(c.sdt))} hồ sơ
                         </button>
                       )}
                     </td>

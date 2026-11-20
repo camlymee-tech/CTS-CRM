@@ -8,7 +8,7 @@ import { maChuaLienHe } from '../lib/nhacViec'
 import { laQuanLy } from '../lib/quyen'
 
 const boDau = (t = '') => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim()
-const chiSo = (v) => String(v || '').replace(/\D/g, '')
+const chiSo = (v) => { const d = String(v || '').replace(/\D/g, ''); return /^84\d{9,10}$/.test(d) ? '0' + d.slice(2) : d }
 const chuan = (v) => String(v ?? '').trim()
 
 // Tên cột trong file (so khớp không dấu, không phân biệt hoa thường)
