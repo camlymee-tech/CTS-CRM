@@ -10,6 +10,7 @@ import DocumentsPage from './components/DocumentsPage'
 import NotificationsPage from './components/NotificationsPage'
 import BaoCaoPage from './components/BaoCaoPage'
 import ChecklistPage from './components/ChecklistPage'
+import DaoTaoPage from './components/DaoTaoPage'
 import { demNhacViec } from './lib/nhacViec'
 import { useDanhMuc } from './lib/danhMuc'
 import BaoGiaPage from './components/BaoGiaPage'
@@ -112,6 +113,7 @@ export default function App() {
       {page === 'baocao' && <BaoCaoPage currentProfile={profile} />}
       {page === 'team' && <TeamPage currentProfile={profile} />}
       {page === 'pricing' && <BaoGiaPage currentProfile={profile} />}
+      {page === 'daotao' && <DaoTaoPage currentProfile={profile} />}
       {page === 'documents' && <DocumentsPage currentProfile={profile} />}
       {page === 'notifications' && profile && (
         <NotificationsPage currentProfile={profile} onRead={loadUnread} />

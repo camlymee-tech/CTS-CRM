@@ -1,4 +1,4 @@
-import { Users, LogOut, UserCog, KeyRound, BookOpen, Bell, PieChart, ListChecks, Calculator } from 'lucide-react'
+import { Users, LogOut, UserCog, KeyRound, BookOpen, Bell, PieChart, ListChecks, Calculator, GraduationCap } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { laQuanLy, tenVaiTro } from '../lib/quyen'
 import logoCts from '../assets/cts-logo-trang.png'
@@ -9,6 +9,7 @@ const NAV = [
   { key: 'baocao', label: 'Báo cáo', icon: PieChart, ready: true },
   { key: 'pricing', label: 'Tính giá bán', icon: Calculator, ready: true },
   { key: 'documents', label: 'Tài liệu', icon: BookOpen, ready: true },
+  { key: 'daotao', label: 'Đào tạo', icon: GraduationCap, ready: true },
   { key: 'notifications', label: 'Thông báo', icon: Bell, ready: true },
   { key: 'team', label: 'Nhân sự', icon: UserCog, ready: true, adminOnly: true },
 ]
