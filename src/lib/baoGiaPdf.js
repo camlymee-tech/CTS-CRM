@@ -1,4 +1,4 @@
-// Xuất báo giá dịch vụ CTS ra PDF: mở hộp thoại in của trình duyệt → chọn "Lưu dưới dạng PDF"
+// Xuất báo giá dịch vụ CTS ra file PDF: bấm là tải thẳng về máy (không qua hộp thoại in)
 import { so, tinhXNK, tinhOrder, khungXNK, TEN_DV } from './baoGia'
 import logoUrl from '../assets/cts-logo.png'
 
@@ -98,12 +98,56 @@ export async function xuatBaoGiaPdf({ loai, st }) {
   const html = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${esc(tieu)}${st.khach ? ' - ' + esc(st.khach) : ''}</title><style>${CSS}</style></head><body>${body}</body></html>`
 
   const f = document.createElement('iframe')
-  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'
+  const RONG_PX = 703 // 186mm = A4 trừ lề 12mm hai bên
+  f.style.cssText = `position:fixed;left:-10000px;top:0;width:${RONG_PX}px;height:1200px;border:0;background:#fff`
   document.body.appendChild(f)
-  const w = f.contentWindow
-  w.document.open(); w.document.write(html); w.document.close()
-  await new Promise((ok) => { const img = w.document.images[0]; if (!img || img.complete) ok(); else { img.onload = ok; img.onerror = ok } })
-  await new Promise((ok) => setTimeout(ok, 150))
-  w.focus(); w.print()
-  setTimeout(() => f.remove(), 60000)
+  try {
+    const w = f.contentWindow
+    w.document.open(); w.document.write(html.replace('@page { size: A4; margin: 14mm 12mm 16mm 12mm; }', '')); w.document.close()
+    w.document.body.style.cssText = `width:${RONG_PX}px;margin:0;background:#fff`
+    await new Promise((ok) => { const img = w.document.images[0]; if (!img || img.complete) ok(); else { img.onload = ok; img.onerror = ok } })
+    try { await w.document.fonts.ready } catch { /* bỏ qua */ }
+    await new Promise((ok) => setTimeout(ok, 200))
+
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
+    const body = w.document.body
+    const cv = await html2canvas(body, { scale: 2.5, backgroundColor: '#ffffff', useCORS: true, width: RONG_PX, windowWidth: RONG_PX })
+    const heSo = cv.width / RONG_PX
+    const A4_RONG = 186, A4_CAO = 267                       // vùng nội dung (mm)
+    const trangPx = Math.floor((A4_CAO / A4_RONG) * RONG_PX) // chiều cao 1 trang theo px màn hình
+
+    // Điểm có thể ngắt trang: đáy các dòng bảng, tiêu đề, chân trang (không cắt đôi chữ)
+    const goc = body.getBoundingClientRect().top
+    const diem = [...body.querySelectorAll('tr, h2, .info, .top, .tt, .ft')].map((e) => Math.ceil(e.getBoundingClientRect().bottom - goc)).sort((a, b) => a - b)
+    const tong = Math.ceil(cv.height / heSo)
+    const moc = [0]
+    while (tong - moc[moc.length - 1] > trangPx) {
+      const dau = moc[moc.length - 1]
+      const han = dau + trangPx
+      const chon = [...diem].reverse().find((y) => y <= han && y > dau + trangPx * 0.4)
+      moc.push(chon || han)
+    }
+    moc.push(tong)
+
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
+    for (let i = 0; i < moc.length - 1; i++) {
+      const y = Math.round(moc[i] * heSo), h = Math.max(1, Math.round(moc[i + 1] * heSo) - y)
+      const phan = document.createElement('canvas')
+      phan.width = cv.width; phan.height = h
+      const ctx = phan.getContext('2d')
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, phan.width, phan.height)
+      ctx.drawImage(cv, 0, y, cv.width, h, 0, 0, cv.width, h)
+      if (i > 0) pdf.addPage()
+      pdf.addImage(phan.toDataURL('image/jpeg', 0.95), 'JPEG', 12, 14, A4_RONG, (h / cv.width) * A4_RONG)
+    }
+    const ten = `${order ? 'BaoGia_Order' : 'BaoGia_' + loai}${st.khach ? '_' + st.khach : ''}`
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/[^A-Za-z0-9_.-]+/g, '-')
+    const url = URL.createObjectURL(pdf.output('blob'))
+    const a = document.createElement('a')
+    a.href = url; a.download = `${ten}.pdf`
+    document.body.appendChild(a); a.click(); a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
+  } finally {
+    f.remove()
+  }
 }
