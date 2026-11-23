@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { GraduationCap, CircleCheck, Circle, Lock, ClipboardCheck, ExternalLink, Plus, Pencil, Trash2 } from 'lucide-react'
+import { GraduationCap, CircleCheck, Circle, Lock, ClipboardCheck, ExternalLink, Plus, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { laAdmin, laQuanLy, locNhanSu } from '../lib/quyen'
 import { Button, Input, Select, Textarea, Modal } from './ui'
@@ -168,6 +168,7 @@ export default function DaoTaoPage({ currentProfile }) {
       {mo && (
         <Modal title={mo.tieu_de} onClose={() => setMo(null)} wide>
           <p className="mb-3 text-xs text-ink-400">Ngày {mo.ngay} · {LOAI[mo.loai]} · {mo.phut} phút</p>
+          <SlideBai bai={mo} />
           {mo.noi_dung ? <div className="whitespace-pre-wrap text-sm text-navy-900">{mo.noi_dung}</div>
             : <p className="rounded-lg bg-slate-50 p-4 text-sm text-ink-400">Nội dung bài này sẽ được bổ sung.</p>}
           {mo.link && (
@@ -187,6 +188,39 @@ export default function DaoTaoPage({ currentProfile }) {
         </Modal>
       )}
       {sua && <SuaBai bai={sua} onClose={() => setSua(null)} onLuu={luuBai} />}
+    </div>
+  )
+}
+
+// Slide của từng bài (ảnh nằm trong public/dao-tao)
+const SLIDE_BAI = {
+  '1-1': ['b11-cts', 'b11-khach', 'b11-kenh'], '1-2': ['b12-dv', 'b12-ly'], '1-3': ['b13-qt', 'b13-nhan', 'b13-tra', 'b13-denbu'],
+  '1-4': ['b14-a', 'b14-b'], '1-5': ['b15-crm'],
+  '2-1': ['b21-3tt', 'b21-9', 'b21-kg', 'b21-m3', 'b21-ht', 'b21-tong'], '2-2': ['b22-ut', 'b22-rr'], '2-3': ['b23-mb'], '2-4': ['b24-or'],
+  '2-5': ['b25-nk'], '2-6': ['b26-ck', 'b26-4b', 'b26-mau', 'b26-mau2', 'b26-sau'],
+  '3-1': ['b31-ct', 'b31-th1', 'b31-th2', 'b31-th3', 'b31-5'], '3-2': ['b32-th', 'b32-xe', 'b32-gh'], '3-3': ['b33-sc', 'b33-bam'],
+  '3-4': ['b34-dv', 'b34-bang'], '3-5': ['b35-7', 'b35-12-1', 'b35-12-2', 'b35-tuduy', 'b35-cc'],
+}
+
+function SlideBai({ bai }) {
+  const ds = SLIDE_BAI[`${bai.ngay}-${bai.thu_tu}`] || []
+  const [i, setI] = useState(0)
+  useEffect(() => setI(0), [bai.id])
+  if (!ds.length) return null
+  return (
+    <div className="mb-4">
+      <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+        <img src={`/dao-tao/${ds[i]}.jpg`} alt={`Slide ${i + 1}`} className="block w-full" />
+        {ds.length > 1 && (
+          <>
+            <button type="button" disabled={i === 0} onClick={() => setI(i - 1)} aria-label="Slide trước"
+              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 shadow disabled:opacity-30"><ChevronLeft size={18} /></button>
+            <button type="button" disabled={i === ds.length - 1} onClick={() => setI(i + 1)} aria-label="Slide sau"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 shadow disabled:opacity-30"><ChevronRight size={18} /></button>
+          </>
+        )}
+      </div>
+      {ds.length > 1 && <p className="mt-1.5 text-center text-xs text-ink-400">Slide {i + 1}/{ds.length}</p>}
     </div>
   )
 }
