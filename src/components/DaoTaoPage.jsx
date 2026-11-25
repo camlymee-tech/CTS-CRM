@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { GraduationCap, CircleCheck, Circle, Lock, ClipboardCheck, ExternalLink, Plus, Pencil, Trash2 } from 'lucide-react'
+import { GraduationCap, CircleCheck, Circle, Lock, ClipboardCheck, ExternalLink, Plus, Pencil, Trash2, ChevronLeft } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { laAdmin, laQuanLy, locNhanSu } from '../lib/quyen'
 import { Button, Input, Select, Textarea, Modal } from './ui'
@@ -67,6 +67,47 @@ export default function DaoTaoPage({ currentProfile }) {
   }
 
   if (loading) return <div className="flex-1 p-8 text-sm text-ink-400">Đang tải...</div>
+
+  // Trang học riêng của từng bài (mở khi bấm vào bài trong danh sách)
+  if (mo) {
+    return (
+      <div className="flex-1 overflow-y-auto">
+        <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-8 py-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <button onClick={() => setMo(null)} className="flex flex-none items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-ink-600 hover:bg-slate-50">
+              <ChevronLeft size={16} /> Danh sách bài
+            </button>
+            <div className="min-w-0">
+              <h1 className="truncate font-display text-xl font-bold text-navy-900">{mo.tieu_de}</h1>
+              <p className="text-xs text-ink-400">Ngày {mo.ngay} · {LOAI[mo.loai]} · {mo.phut} phút</p>
+            </div>
+          </div>
+          <div className="flex flex-none items-center gap-2">
+            {admin && <Button variant="secondary" onClick={() => setSua(mo)}><Pencil size={14} /> Sửa bài</Button>}
+            {admin && <Button variant="danger" onClick={() => xoaBai(mo)}><Trash2 size={14} /> Xoá</Button>}
+            {xongCuaToi.has(mo.id)
+              ? <Button variant="secondary" onClick={() => danhDau(mo, false)}>Bỏ đánh dấu</Button>
+              : <Button onClick={() => danhDau(mo, true)}><CircleCheck size={15} /> Đã học xong</Button>}
+          </div>
+        </header>
+        <div className="space-y-6 px-8 py-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            {mo.noi_dung ? <div className="whitespace-pre-wrap text-sm leading-relaxed text-navy-900">{mo.noi_dung}</div>
+              : <p className="rounded-lg bg-slate-50 p-4 text-sm text-ink-400">Nội dung bài này sẽ được bổ sung.</p>}
+            {mo.link && (
+              <a href={mo.link} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm text-sky-700 hover:underline">
+                <ExternalLink size={14} /> Mở tài liệu / video
+              </a>
+            )}
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <DocumentFiles documentId={mo.id} isAdmin={admin} bang="dao_tao_file" cotKhoa="bai_id" thuMuc="dao-tao/" nhungPdf moTrangMoi />
+          </div>
+        </div>
+        {sua && <SuaBai bai={sua} onClose={() => setSua(null)} onLuu={luuBai} />}
+      </div>
+    )
+  }
 
   const th = 'border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-ink-600'
   const td = 'border border-slate-200 px-3 py-2 text-sm'
@@ -166,28 +207,6 @@ export default function DaoTaoPage({ currentProfile }) {
         )}
       </div>
 
-      {mo && (
-        <Modal title={mo.tieu_de} onClose={() => setMo(null)} wide>
-          <p className="mb-3 text-xs text-ink-400">Ngày {mo.ngay} · {LOAI[mo.loai]} · {mo.phut} phút</p>
-          {mo.noi_dung ? <div className="whitespace-pre-wrap text-sm text-navy-900">{mo.noi_dung}</div>
-            : <p className="rounded-lg bg-slate-50 p-4 text-sm text-ink-400">Nội dung bài này sẽ được bổ sung.</p>}
-          <div className="mt-5"><DocumentFiles documentId={mo.id} isAdmin={admin} bang="dao_tao_file" cotKhoa="bai_id" thuMuc="dao-tao/" nhungPdf /></div>
-          {mo.link && (
-            <a href={mo.link} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm text-sky-700 hover:underline">
-              <ExternalLink size={14} /> Mở tài liệu / video
-            </a>
-          )}
-          <div className="mt-6 flex items-center justify-between gap-2">
-            <div className="flex gap-2">
-              {admin && <Button variant="secondary" onClick={() => setSua(mo)}><Pencil size={14} /> Sửa bài</Button>}
-              {admin && <Button variant="danger" onClick={() => xoaBai(mo)}><Trash2 size={14} /> Xoá</Button>}
-            </div>
-            {xongCuaToi.has(mo.id)
-              ? <Button variant="secondary" onClick={() => danhDau(mo, false)}>Bỏ đánh dấu</Button>
-              : <Button onClick={() => danhDau(mo, true)}><CircleCheck size={15} /> Đã học xong</Button>}
-          </div>
-        </Modal>
-      )}
       {sua && <SuaBai bai={sua} onClose={() => setSua(null)} onLuu={luuBai} />}
     </div>
   )

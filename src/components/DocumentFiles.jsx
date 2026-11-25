@@ -38,7 +38,7 @@ async function layLink(duongDan, taiVe = false) {
   return data.signedUrl
 }
 
-export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = 'document_files', cotKhoa = 'document_id', thuMuc = '', nhungPdf = false }) {
+export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = 'document_files', cotKhoa = 'document_id', thuMuc = '', nhungPdf = false, moTrangMoi = false }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [dangTai, setDangTai] = useState(false)
@@ -108,10 +108,11 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = '
   }
 
   async function taiVe(f) {
+    const tab = window.open('', '_blank')
     try {
       const url = await layLink(f.duong_dan, true)
-      window.open(url, '_blank')
-    } catch (err) { setMsg('Không tải được: ' + err.message) }
+      if (tab) tab.location.href = url; else window.location.href = url
+    } catch (err) { tab?.close(); setMsg('Không tải được: ' + err.message) }
   }
 
   async function moXem(f) {
@@ -155,7 +156,9 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = '
               <div key={f.id} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5">
                 <Icon size={18} className={`flex-none ${k.mau}`} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-navy-900">{f.ten_file}</p>
+                  {moTrangMoi && (k.xemTrucTiep || k.xemOffice)
+                    ? <button type="button" onClick={() => moXem(f)} className="block max-w-full truncate text-left text-sm font-medium text-navy-900 hover:text-orange-600 hover:underline">{f.ten_file}</button>
+                    : <p className="truncate text-sm font-medium text-navy-900">{f.ten_file}</p>}
                   <p className="text-xs text-ink-400">{doLon(f.kich_thuoc)}</p>
                 </div>
 
@@ -184,22 +187,22 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = '
       {nhungPdf && pdfNhung.map((f) => (
         <div key={f.id} className="mt-4 overflow-hidden rounded-lg border border-slate-200">
           <p className="bg-slate-50 px-3 py-1.5 text-xs text-ink-600">{f.ten_file}</p>
-          <iframe src={f.url} title={f.ten_file} className="h-[560px] w-full" />
+          <iframe src={f.url} title={f.ten_file} className={moTrangMoi ? 'h-[85vh] w-full' : 'h-[560px] w-full'} />
         </div>
       ))}
 
-      {xemFile && <KhungXem file={xemFile} onClose={() => setXemFile(null)} onTaiVe={() => taiVe(xemFile)} />}
+      {xemFile && <KhungXem rong={moTrangMoi} file={xemFile} onClose={() => setXemFile(null)} onTaiVe={() => taiVe(xemFile)} />}
     </div>
   )
 }
 
-function KhungXem({ file, onClose, onTaiVe }) {
+function KhungXem({ file, onClose, onTaiVe, rong }) {
   const k = kieuFile(file.ten_file)
   const officeSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.url)}`
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-navy-950/80 p-4 backdrop-blur-sm">
-      <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white">
+    <div className={`fixed inset-0 z-[60] flex flex-col bg-navy-950/80 backdrop-blur-sm ${rong ? 'p-2' : 'p-4'}`}>
+      <div className={`mx-auto flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white ${rong ? 'max-w-[98vw]' : 'max-w-6xl'}`}>
         <div className="flex flex-none items-center justify-between border-b border-slate-100 px-5 py-3">
           <p className="truncate font-medium text-navy-900">{file.ten_file}</p>
           <div className="flex flex-none items-center gap-2">
