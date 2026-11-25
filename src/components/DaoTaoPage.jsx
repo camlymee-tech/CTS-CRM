@@ -3,6 +3,7 @@ import { GraduationCap, CircleCheck, Circle, Lock, ClipboardCheck, ExternalLink,
 import { supabase } from '../supabaseClient'
 import { laAdmin, laQuanLy, locNhanSu } from '../lib/quyen'
 import { Button, Input, Select, Textarea, Modal } from './ui'
+import DocumentFiles from './DocumentFiles'
 
 const TEN_NGAY = { 1: 'Hiểu công ty và dịch vụ', 2: 'Báo giá và chăm sóc', 3: 'Tình huống và ôn tập' }
 const LOAI = { doc: 'Đọc', video: 'Video', thuc_hanh: 'Thực hành' }
@@ -170,6 +171,7 @@ export default function DaoTaoPage({ currentProfile }) {
           <p className="mb-3 text-xs text-ink-400">Ngày {mo.ngay} · {LOAI[mo.loai]} · {mo.phut} phút</p>
           {mo.noi_dung ? <div className="whitespace-pre-wrap text-sm text-navy-900">{mo.noi_dung}</div>
             : <p className="rounded-lg bg-slate-50 p-4 text-sm text-ink-400">Nội dung bài này sẽ được bổ sung.</p>}
+          <div className="mt-5"><DocumentFiles documentId={mo.id} isAdmin={admin} bang="dao_tao_file" cotKhoa="bai_id" thuMuc="dao-tao/" nhungPdf /></div>
           {mo.link && (
             <a href={mo.link} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm text-sky-700 hover:underline">
               <ExternalLink size={14} /> Mở tài liệu / video

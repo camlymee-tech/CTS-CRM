@@ -38,21 +38,28 @@ async function layLink(duongDan, taiVe = false) {
   return data.signedUrl
 }
 
-export default function DocumentFiles({ documentId, isAdmin, onChanged }) {
+export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = 'document_files', cotKhoa = 'document_id', thuMuc = '', nhungPdf = false }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [dangTai, setDangTai] = useState(false)
   const [msg, setMsg] = useState('')
   const [xemFile, setXemFile] = useState(null)
+  const [pdfNhung, setPdfNhung] = useState([])   // PDF hiện thẳng trong trang (nếu bật nhungPdf)
   const inputRef = useRef(null)
 
   useEffect(() => { load() }, [documentId])
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase.from('document_files').select('*')
-      .eq('document_id', documentId).order('created_at')
+    const { data } = await supabase.from(bang).select('*')
+      .eq(cotKhoa, documentId).order('created_at')
     setFiles(data || [])
+    if (nhungPdf) {
+      const ds = (data || []).filter((f) => kieuFile(f.ten_file).nhom === 'pdf')
+      const kq = []
+      for (const f of ds) { try { kq.push({ ...f, url: await layLink(f.duong_dan) }) } catch { /* bỏ qua */ } }
+      setPdfNhung(kq)
+    }
     setLoading(false)
   }
 
@@ -69,15 +76,15 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged }) {
       }
       // Tên file trên kho đặt bằng ký tự an toàn, tên gốc lưu riêng trong database
       const duoi = (f.name.split('.').pop() || 'dat').toLowerCase()
-      const key = `${documentId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${duoi}`
+      const key = `${thuMuc}${documentId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${duoi}`
 
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(key, f, {
         cacheControl: '3600', upsert: false,
       })
       if (upErr) { setMsg('Lỗi tải lên: ' + upErr.message); continue }
 
-      const { error: dbErr } = await supabase.from('document_files').insert({
-        document_id: documentId,
+      const { error: dbErr } = await supabase.from(bang).insert({
+        [cotKhoa]: documentId,
         ten_file: f.name,
         duong_dan: key,
         loai: f.type || null,
@@ -95,7 +102,7 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged }) {
   async function xoa(f) {
     if (!window.confirm(`Xoá file "${f.ten_file}"?`)) return
     await supabase.storage.from(BUCKET).remove([f.duong_dan])
-    await supabase.from('document_files').delete().eq('id', f.id)
+    await supabase.from(bang).delete().eq('id', f.id)
     load()
     onChanged?.()
   }
@@ -173,6 +180,13 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged }) {
           })}
         </div>
       )}
+
+      {nhungPdf && pdfNhung.map((f) => (
+        <div key={f.id} className="mt-4 overflow-hidden rounded-lg border border-slate-200">
+          <p className="bg-slate-50 px-3 py-1.5 text-xs text-ink-600">{f.ten_file}</p>
+          <iframe src={f.url} title={f.ten_file} className="h-[560px] w-full" />
+        </div>
+      ))}
 
       {xemFile && <KhungXem file={xemFile} onClose={() => setXemFile(null)} onTaiVe={() => taiVe(xemFile)} />}
     </div>
