@@ -332,9 +332,12 @@ function CreateAccountForm({ me, dsPhongBan, onClose, onCreated }) {
     setSaving(true)
     setError('')
     if (leader && !me.phong_ban) { setSaving(false); setError('Hồ sơ của bạn chưa có phòng ban. Hãy nhờ quản trị viên cập nhật trước.'); return }
+    const ten = (form.full_name || '').trim().replace(/\s+/g, ' ')
+    if (ten.split(' ').length < 2) { setSaving(false); setError('Vui lòng nhập đầy đủ họ và tên (ít nhất 2 từ, ví dụ: Nguyễn Văn A).'); return }
+    if (canPhongBan && !(form.phong_ban || '').trim()) { setSaving(false); setError('Vui lòng chọn phòng ban cho sale này.'); return }
 
     const { data, error: fnError } = await supabase.functions.invoke('quan-ly-tai-khoa', {
-      body: { action: 'create', profile: { ...form, role: leader ? 'sale' : form.role, phong_ban: canPhongBan ? form.phong_ban : '' } },
+      body: { action: 'create', profile: { ...form, full_name: ten, role: leader ? 'sale' : form.role, phong_ban: canPhongBan ? form.phong_ban : '' } },
     })
     const msg = data?.error || fnError?.message
     if (msg) { setSaving(false); setError(msg); return }
@@ -412,8 +415,11 @@ function EditProfileForm({ profile, isMe, me, dsPhongBan, onClose, onSaved }) {
     e.preventDefault()
     setSaving(true)
     setError('')
+    const ten = (form.full_name || '').trim().replace(/\s+/g, ' ')
+    if (ten.split(' ').length < 2) { setSaving(false); setError('Vui lòng nhập đầy đủ họ và tên (ít nhất 2 từ, ví dụ: Nguyễn Văn A).'); return }
+    if (!leader && canPhongBan && !(form.phong_ban || '').trim()) { setSaving(false); setError('Vui lòng chọn phòng ban cho sale này.'); return }
     const patch = {
-      full_name: form.full_name,
+      full_name: ten,
       ma_sale: form.ma_sale || null,
       sdt: form.sdt || null,
       sdt_lam_viec: form.sdt_lam_viec || null,

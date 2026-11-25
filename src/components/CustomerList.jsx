@@ -54,6 +54,7 @@ export default function CustomerList({ currentProfile }) {
     { key: 'stt', label: '#' },
     { key: 'sdt', label: 'Điện thoại', sapXep: 'sdt' },
     { key: 'sale', label: 'Tên sale', sapXep: 'sale' },
+    { key: 'phong_ban', label: 'Phòng ban' },
     { key: 'trao_doi', label: 'Trao đổi gần nhất', sapXep: 'trao_doi' },
     { key: 'cham_soc', label: 'Trạng thái' },
     { key: 'khu_vuc', label: 'Khu vực', macDinh: false },
@@ -64,7 +65,7 @@ export default function CustomerList({ currentProfile }) {
     { key: 'giai_phap', label: 'Giải pháp', macDinh: false },
     { key: 'nhat_ky', label: 'Cập nhật gần nhất', macDinh: false },
   ]
-  const KHOA_LUU_COT = 'tuki_cot_khach_v3'   // đổi khoá để áp bộ cột mặc định mới 1 lần
+  const KHOA_LUU_COT = 'tuki_cot_khach_v4'   // đổi khoá để áp bộ cột mặc định mới 1 lần
   const [cotHien, setCotHien] = useState(() => {
     try {
       const luu = JSON.parse(localStorage.getItem(KHOA_LUU_COT) || 'null')
@@ -104,6 +105,8 @@ export default function CustomerList({ currentProfile }) {
   const [filterLoai, setFilterLoai] = useState('')
   const [filterTrangThai, setFilterTrangThai] = useState('')
   const [filterSale, setFilterSale] = useState('')
+  const [filterPhong, setFilterPhong] = useState('')
+  const phongBanCua = (id) => profiles.find((p) => p.id === id)?.phong_ban || ''
   const [filterDichVu, setFilterDichVu] = useState('')
   const [filterNguon, setFilterNguon] = useState('')
   const [tuNgay, setTuNgay] = useState('')
@@ -215,6 +218,7 @@ export default function CustomerList({ currentProfile }) {
       if (filterLoai && c.loai_khach !== filterLoai) return false
       if (filterTrangThai && c.trang_thai_cham_soc !== filterTrangThai) return false
       if (filterSale && c.sale_id !== filterSale) return false
+      if (filterPhong && phongBanCua(c.sale_id) !== filterPhong) return false
       if (filterDichVu && !(c.dich_vu || []).includes(filterDichVu)) return false
       if (filterNguon && c.nguon_khach !== filterNguon) return false
       const ngayTao = ngayLocal(c.created_at)
@@ -222,7 +226,7 @@ export default function CustomerList({ currentProfile }) {
       if (denNgay && (!ngayTao || ngayTao > denNgay)) return false
       return true
     })
-  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay, isAdmin, currentProfile?.id])
+  }, [nguon, search, filterLoai, filterTrangThai, filterSale, filterPhong, profiles, filterDichVu, filterNguon, tuNgay, denNgay, isAdmin, currentProfile?.id])
 
   // Danh sách áp dụng mọi bộ lọc TRỪ bộ lọc trạng thái,
   // để mỗi thẻ trạng thái vẫn hiện đúng số khi đang chọn một trạng thái
@@ -233,13 +237,14 @@ export default function CustomerList({ currentProfile }) {
     }
     if (filterLoai && c.loai_khach !== filterLoai) return false
     if (filterSale && c.sale_id !== filterSale) return false
+    if (filterPhong && phongBanCua(c.sale_id) !== filterPhong) return false
     if (filterDichVu && !(c.dich_vu || []).includes(filterDichVu)) return false
     if (filterNguon && c.nguon_khach !== filterNguon) return false
     const ngayTao = ngayLocal(c.created_at)
     if (tuNgay && (!ngayTao || ngayTao < tuNgay)) return false
     if (denNgay && (!ngayTao || ngayTao > denNgay)) return false
     return true
-  }), [nguon, uids, currentProfile?.id, search, filterLoai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay])
+  }), [nguon, uids, currentProfile?.id, search, filterLoai, filterSale, filterPhong, profiles, filterDichVu, filterNguon, tuNgay, denNgay])
 
   const demTheoTrangThai = useMemo(() => {
     const m = {}
@@ -249,6 +254,7 @@ export default function CustomerList({ currentProfile }) {
   }, [nenDem, TRANG_THAI])
 
 
+  const dsPhongBan = useMemo(() => [...new Set((laQuanLy(currentProfile) ? dsSale : profiles).map((p) => p.phong_ban).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi')), [dsSale, profiles, currentProfile])
   const profileName = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
   const traoDoi = useMemo(() => traoDoiGanNhat(interactions), [interactions])
@@ -272,7 +278,7 @@ export default function CustomerList({ currentProfile }) {
   }
 
   const [trang, setTrang] = useState(1)
-  useEffect(() => { setTrang(1) }, [search, filterLoai, filterTrangThai, filterSale, filterDichVu, filterNguon, tuNgay, denNgay, sapXep])
+  useEffect(() => { setTrang(1) }, [search, filterLoai, filterTrangThai, filterSale, filterPhong, filterDichVu, filterNguon, tuNgay, denNgay, sapXep])
   const phanTrang = useMemo(() => daSapXep.slice((trang - 1) * 20, trang * 20), [daSapXep, trang])
 
   // Tải Excel: các khách đã tích chọn, hoặc toàn bộ kết quả đang lọc nếu chưa chọn khách nào
@@ -287,6 +293,7 @@ export default function CustomerList({ currentProfile }) {
         'Tên khách hàng': c.ten_khach,
         'Điện thoại': c.sdt || '',
         'Tên sale': profileName(c.sale_id),
+        'Phòng ban': phongBanCua(c.sale_id),
         'Trạng thái': tenTrangThai(c.trang_thai_cham_soc),
         'Hẹn chăm sóc tiếp': c.ngay_cham_soc_tiep_theo || '',
         'Số lượt chăm sóc': luotCS[c.id] || 0,
@@ -394,6 +401,10 @@ export default function CustomerList({ currentProfile }) {
             <option value="">Tất cả dịch vụ</option>
             {DICH_VU_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </Select>
+          <Select value={filterPhong} onChange={(e) => setFilterPhong(e.target.value)} className="w-48">
+            <option value="">Tất cả phòng ban</option>
+            {dsPhongBan.map((pb) => <option key={pb} value={pb}>{pb}</option>)}
+          </Select>
           <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-44">
             <option value="">Tất cả sale</option>
             {(laQuanLy(currentProfile) ? dsSale : profiles).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
@@ -405,9 +416,9 @@ export default function CustomerList({ currentProfile }) {
             <span>đến</span>
             <Input type="date" value={denNgay} onChange={(e) => setDenNgay(e.target.value)} className="w-40" />
           </div>
-          {(search || filterLoai || filterTrangThai || filterSale || filterDichVu || filterNguon || tuNgay || denNgay) && (
+          {(search || filterLoai || filterTrangThai || filterSale || filterPhong || filterDichVu || filterNguon || tuNgay || denNgay) && (
             <button
-              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterDichVu(''); setFilterNguon(''); setTuNgay(''); setDenNgay('') }}
+              onClick={() => { setSearch(''); setFilterLoai(''); setFilterTrangThai(''); setFilterSale(''); setFilterPhong(''); setFilterDichVu(''); setFilterNguon(''); setTuNgay(''); setDenNgay('') }}
               className="text-sm text-ink-600 hover:text-coral-500">
               Xoá bộ lọc
             </button>
@@ -566,6 +577,7 @@ export default function CustomerList({ currentProfile }) {
                     </td>
                   )}
                   {hien('sale') && <td className="border border-slate-200 px-2.5 py-3 text-navy-900">{profileName(c.sale_id)}</td>}
+                  {hien('phong_ban') && <td className="border border-slate-200 px-2.5 py-3 text-navy-900">{phongBanCua(c.sale_id) || '—'}</td>}
                   {hien('trao_doi') && (
                     <td className="border border-slate-200 px-2.5 py-3" style={{ minWidth: 260, maxWidth: doRong.trao_doi || 420 }}>
                       {!td ? <span className="text-ink-400">—</span> : (
