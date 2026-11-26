@@ -150,7 +150,12 @@ export default function BaoCaoPage({ currentProfile }) {
   const tb1 = (x) => (Math.round(x * 10) / 10).toLocaleString('vi-VN')
 
   // ===== Tab 1: Tổng quan — khách theo trạng thái, lọc theo ngày thêm khách =====
-  const khachKy = useMemo(() => khach.filter((c) => trongKy(ngayLocal(c.created_at))), [khach, tuNgay, denNgay])
+  // Tổng quan = (data mới chia/tìm trong kỳ mà vẫn chưa gọi) + (khách sale đã liên hệ được trong kỳ), mỗi khách 1 lần, theo trạng thái hiện tại
+  const khachKy = useMemo(() => {
+    const daLienHe = new Set()
+    for (const l of logLoc) if (laNgheMay(l) && trongKy(ngayLocal(l.created_at))) daLienHe.add(l.customer_id)
+    return khach.filter((c) => daLienHe.has(c.id) || (trongKy(ngayLocal(c.created_at)) && maChua.includes(c.trang_thai_cham_soc)))
+  }, [khach, logLoc, tuNgay, denNgay, maChua.join()])
   const demTT = useMemo(() => TRANG_THAI.map((b) => ({ ...b, so: khachKy.filter((c) => c.trang_thai_cham_soc === b.ma).length })), [khachKy, TRANG_THAI])
 
   // Admin: chia theo từng phòng (thêm dòng "Chưa chia sale" cho khách chưa có sale)
@@ -447,7 +452,8 @@ export default function BaoCaoPage({ currentProfile }) {
 
                   {!xemChuaChia && (
                   <section className="rounded-2xl bg-white p-5 shadow-sm">
-                    <h2 className="mb-3 font-display text-base font-semibold text-navy-900">Chi tiết từng phòng — từng sale</h2>
+                    <h2 className="mb-1 font-display text-base font-semibold text-navy-900">Chi tiết từng phòng — từng sale</h2>
+                    <p className="mb-3 text-sm text-ink-400">Tổng khách = data mới chia/tìm trong kỳ mà chưa gọi (cột Chưa liên hệ) + khách sale đã liên hệ được trong kỳ, theo trạng thái hiện tại. Mỗi khách tính 1 lần. Tỷ lệ chốt = KH chốt / KH đã liên hệ được.</p>
                     <BangChiTietPhong chiTiet={chiTiet} trangThai={TRANG_THAI} tiLeChotRow={tiLeChotRow} />
                   </section>
                   )}
