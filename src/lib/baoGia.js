@@ -61,7 +61,7 @@ export function tinhXNK(st, loai, order = false) {
   const coPhiMua = !order && (loai === 'mua_ban' || loai === 'uy_thac')
   const thueTuNop = loai === 'van_chuyen' && !order   // Vận chuyển: thuế khách tự nộp, CTS chỉ thu tiền dịch vụ
   const nenHoan = th.dong.reduce((a, d) => a + d.T, 0)   // giá trị tính thuế: có giá khai USD thì giá trị khai (VND), không thì tiền hàng theo tệ
-  const phiMua = coPhiMua ? lam(tienHang * so(st.phiMuaPct) / 100) : 0
+  const phiMua = coPhiMua ? lam(nenHoan * so(st.phiMuaPct) / 100) : 0   // tính trên giá trị khai (có giá khai USD) hoặc tiền hàng theo tệ nếu chưa nhập giá khai
 
   const phiTach = mb ? 0 : lam(so(st.phiTach))   // Mua bán không có phí tách tờ khai
   const tauM3 = lam(so(st.m3) * so(st.tauDg))   // Cả 3 dịch vụ: số khối lấy tự động từ dòng cước M3
@@ -121,7 +121,7 @@ export function khungXNK(st, kq, loai, order = false) {
   dong({ stt: '', nd: `Cước vận chuyển ${tuyen} theo M3`, dvt: 'M3', sl: { k: 'm3', tp: 1 }, dg: dongTien('dgM3'), t: { kg: null, m3: kq.m3.cuoc }, dam: 1 })
   nhom('II', 'Các khoản chi phí', null, null)
   if (!mb) dong({ stt: '1', nd: 'Phí tách tờ khai', dvt: 'TK', sl: 1, dg: dongTien('phiTach'), t: chung(kq.phiTach) })
-  if (coPhiMua) dong({ stt: muaBan ? '1' : '2', nd: muaBan ? 'Phí mua hàng (% × tiền hàng)' : 'Phí mua hàng uỷ thác (% × tiền hàng)', pct: { k: 'phiMuaPct' }, dvt: 'Lô', sl: 1, dg: kq.phiMua, t: chung(kq.phiMua) })
+  if (coPhiMua) dong({ stt: muaBan ? '1' : '2', nd: muaBan ? 'Phí mua hàng (% × giá trị khai)' : 'Phí mua hàng uỷ thác (% × giá trị khai)', pct: { k: 'phiMuaPct' }, dvt: 'Lô', sl: 1, dg: { fix: kq.nenHoan, money: 1 }, t: chung(kq.phiMua) })
   if (!thueTuNop) {
     nhom(n(2), thueTuNop ? 'Các khoản tiền thuế (khách tự nộp, không tính vào tổng thanh toán)' : 'Các khoản tiền thuế', kq.thue.tong, kq.thue.tong)
     dong({ stt: n(2) + '.1', nd: 'Thuế nhập khẩu', dvt: 'Lô', sl: 1, dg: kq.thue.nk, t: chung(kq.thue.nk), sub: 1 })
