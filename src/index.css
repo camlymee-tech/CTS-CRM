@@ -33,5 +33,19 @@ h1, h2, h3, .font-display {
   font-family: var(--font-display);
 }
 
+/* Extension Callio tự gắn nút gọi tròn (cố định, nằm trên mọi lớp) vào trang.
+   Vị trí chỉnh trong popup extension có thể đè lên tab/nút của web → luôn ép nó về góc dưới phải,
+   nơi các cửa sổ của web không đặt nút. Dùng #id để thắng CSS của extension. */
+#callio-widget-icon {
+  top: auto !important;
+  left: auto !important;
+  right: 8px !important;
+  bottom: 8px !important;
+}
+/* Khung bàn phím gọi của Callio: đẩy lên trên nút tròn (nút cao 60px, cách đáy 8px) để không bị lẹm */
+#callio-widget-call {
+  bottom: 64px !important;
+}
+
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #d7dce2; border-radius: 8px; }

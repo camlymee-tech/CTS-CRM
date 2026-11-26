@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   X, Phone, MessageCircle, Users as UsersIcon, MoreHorizontal, Plus,
   Link2, Store, HandHeart, CircleAlert, CircleCheck, History, Check, Trash2, CalendarClock, FileText, ShoppingBag,
-  FileDown, Eye, PhoneOutgoing, PhoneIncoming, PhoneOff, Clock, Play,
+  FileDown, Eye, PhoneCall, PhoneOutgoing, PhoneIncoming, PhoneOff, Clock, Play,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { locNhanSu } from '../lib/quyen'
@@ -15,6 +15,7 @@ import DanhSachBaoGia from './DanhSachBaoGia'
 import { BaoGiaEditor } from './BaoGiaPage'
 import BenBModal from './BenBModal'
 import { useBenB } from '../lib/benB'
+import { goiQuaCallio } from '../lib/callioExtension'
 import { nhacChoHopDong, hanDichVu, dinhDangNgay, moTaConLai } from '../lib/taiKy'
 import { baoCaoKeTiep, moTaHanBaoCao } from '../lib/baoCaoAds'
 import BaoCaoAdsModal from './BaoCaoAdsModal'
@@ -41,7 +42,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   }, [khachBanDau.id, lamMoiBG])
   const [interactions, setInteractions] = useState([])
   const [logs, setLogs] = useState([])
-  // Nhật ký cuộc gọi lấy thẳng từ Callio (qua hàm máy chủ "callio"), chỉ tải khi mở tab Cuộc gọi
+  // Nhật ký cuộc gọi lấy thẳng từ Callio (qua hàm máy chủ "callio"), tải ngay khi mở hồ sơ để tab hiện số cuộc
   const [cuocGoi, setCuocGoi] = useState(null)   // null = chưa tải
   const [loiGoi, setLoiGoi] = useState(null)     // { text, code }
   const [dangTaiGoi, setDangTaiGoi] = useState(false)
@@ -71,6 +72,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const isAdmin = currentProfile?.role === 'admin'
   const { benB, taiLai: taiLaiBenB } = useBenB()
   const [moBenB, setMoBenB] = useState(false)
+  const [hoiGoi, setHoiGoi] = useState(false)   // hộp xác nhận trước khi gọi qua Callio
   // Leader sửa được khách của sale cùng phòng ban
   const cuaTeam = currentProfile?.role === 'leader' && !!currentProfile.phong_ban &&
     profiles.find((p) => p.id === customer.sale_id)?.phong_ban === currentProfile.phong_ban
@@ -78,9 +80,12 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   useEffect(() => { load() }, [customer.id])
   useEffect(() => { setCuocGoi(null) }, [customer.id, customer.sdt])   // đổi số điện thoại thì tải lại
+  // Tải luôn khi mở hồ sơ (không chờ bấm tab) để tab hiện ngay số cuộc gọi
   useEffect(() => {
-    if (tab === 'cuoc_goi' && cuocGoi === null && !dangTaiGoi) taiCuocGoi()
-  }, [tab, cuocGoi])
+    if (cuocGoi !== null || dangTaiGoi) return
+    if (!customer.sdt) { setCuocGoi([]); return }
+    taiCuocGoi()
+  }, [cuocGoi])
 
   async function load() {
     setLoading(true)
@@ -220,14 +225,27 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const TABS = [
     { key: 'thong_tin', label: 'Thông tin' },
     { key: 'cham_soc', label: `Chăm sóc (${interactions.length})` },
-    { key: 'cuoc_goi', label: cuocGoi && !loiGoi ? `Cuộc gọi (${cuocGoi.length})` : 'Cuộc gọi' },
+    { key: 'cuoc_goi', label: dangTaiGoi ? 'Cuộc gọi (…)' : cuocGoi && !loiGoi ? `Cuộc gọi (${cuocGoi.length})` : 'Cuộc gọi' },
     { key: 'bao_gia', label: `Báo giá (${demBG})` },
     { key: 'nhat_ky', label: 'Nhật ký' },
   ]
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-navy-950/30 p-4 backdrop-blur-sm">
-      <div className="grid h-full max-h-[920px] w-full max-w-6xl grid-cols-1 overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl sm:grid-cols-[280px_1fr] sm:overflow-hidden">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-navy-950/45 p-4">
+      {hoiGoi && (
+        <XacNhanGoi ten={customer.ten_khach} sdt={customer.sdt}
+          onHuy={() => setHoiGoi(false)}
+          onGoi={() => {
+            setHoiGoi(false)
+            if (!goiQuaCallio(customer.sdt)) window.location.href = `tel:${customer.sdt}`
+          }} />
+      )}
+      <div className="relative grid h-full max-h-[920px] w-full max-w-6xl grid-cols-1 overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl sm:grid-cols-[280px_1fr] sm:overflow-hidden">
+        {/* Nút đóng: luôn ở góc phải trên của popup */}
+        <button type="button" onClick={onClose} title="Đóng"
+          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-ink-600 transition hover:bg-rose-100 hover:text-rose-600">
+          <X size={20} />
+        </button>
 
         {/* CỘT TRÁI — tóm tắt khách hàng */}
         <div className="flex flex-col overflow-y-auto border-r border-slate-100 bg-slate-50/60 p-5">
@@ -235,9 +253,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
             <div className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-coral-100 font-display text-lg font-bold text-coral-600">
               {(customer.ten_khach || '?').trim().charAt(0).toUpperCase()}
             </div>
-            <button onClick={onClose} className="rounded-lg p-1.5 text-ink-400 hover:bg-slate-100 hover:text-navy-900">
-              <X size={18} />
-            </button>
           </div>
 
           <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink-400">{customer.ma_khach}</p>
@@ -245,9 +260,14 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
           <div className="mt-2 flex flex-col gap-1.5 text-sm">
             {customer.sdt && (
-              <span className="inline-flex items-center gap-1.5 text-ink-600">
-                <Phone size={13} className="text-ink-400" /> {customer.sdt}
-              </span>
+              <button type="button" title="Bấm để gọi cho khách"
+                onClick={() => setHoiGoi(true)}
+                className="inline-flex items-center gap-2 self-start rounded-lg border border-teal-200 bg-teal-50 py-1 pl-1 pr-2.5 font-semibold text-teal-700 transition hover:border-teal-300 hover:bg-teal-100">
+                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-teal-500 text-white">
+                  <Phone size={13} />
+                </span>
+                {customer.sdt}
+              </button>
             )}
             {customer.link_fb && (
               <a href={customer.link_fb} target="_blank" rel="noreferrer"
@@ -306,7 +326,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
         {/* CỘT PHẢI — tab nội dung */}
         <div className="flex min-w-0 flex-col overflow-hidden">
-          <div className="flex gap-1 border-b border-slate-100 px-6 pt-4">
+          <div className="flex gap-1 border-b border-slate-100 pl-6 pr-14 pt-4">
             {TABS.map((t) => (
               <button key={t.key} onClick={() => setTab(t.key)}
                 className={`-mb-px border-b-2 px-3 py-2 text-sm transition ${
@@ -635,7 +655,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
       </div>
 
       {baoGiaMo && (
-        <div className="fixed inset-0 z-50 flex bg-navy-950/40 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex bg-navy-950/50 p-4">
           <div className="flex w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <BaoGiaEditor khachCo={customer} baoGiaMo={baoGiaMo.id ? baoGiaMo : null} currentProfile={currentProfile}
               onSaved={() => setLamMoiBG((n) => n + 1)} onClose={() => setBaoGiaMo(null)} />
@@ -691,6 +711,44 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
           onClose={() => setXemHD(null)}
         />
       )}
+    </div>
+  )
+}
+
+// Hộp xác nhận trước khi gọi — Callio nhận số là tự quay luôn, nên phải hỏi để tránh gọi nhầm.
+// Enter = Gọi (nút được focus sẵn), Esc hoặc bấm ra ngoài = Huỷ.
+function XacNhanGoi({ ten, sdt, onHuy, onGoi }) {
+  const coCallio = !!document.getElementById('callio-extension')
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/50 p-4"
+      onClick={onHuy} onKeyDown={(e) => { if (e.key === 'Escape') onHuy() }}>
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white text-center shadow-2xl"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="bg-gradient-to-b from-teal-50 to-white px-6 pb-2 pt-7">
+          <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
+            <span className="absolute -inset-2 rounded-full bg-teal-400/15" />
+            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-teal-500 text-white shadow-lg shadow-teal-500/30">
+              <PhoneCall size={28} />
+            </span>
+          </div>
+          <p className="mt-4 text-sm text-ink-400">Gọi cho khách hàng</p>
+          <p className="mt-0.5 font-display text-lg font-bold leading-tight text-navy-900">{ten}</p>
+          <p className="mt-2 font-display text-2xl font-bold tracking-wide text-teal-600">{sdt}</p>
+        </div>
+        <p className="px-6 pt-2 text-xs text-ink-400">
+          {coCallio ? 'Callio sẽ quay số ngay khi bạn bấm Gọi.' : 'Không thấy Callio — sẽ gọi bằng ứng dụng gọi của máy.'}
+        </p>
+        <div className="flex gap-3 p-6">
+          <button type="button" onClick={onHuy}
+            className="flex-1 rounded-xl border border-slate-200 py-2.5 font-medium text-ink-600 transition hover:bg-slate-50">
+            Huỷ
+          </button>
+          <button type="button" onClick={onGoi} autoFocus
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-teal-500 py-2.5 font-semibold text-white shadow-md shadow-teal-500/30 transition hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-300">
+            <Phone size={16} /> Gọi
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

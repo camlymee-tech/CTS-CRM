@@ -201,7 +201,7 @@ function KhungXem({ file, onClose, onTaiVe, rong }) {
   const officeSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.url)}`
 
   return (
-    <div className={`fixed inset-0 z-[60] flex flex-col bg-navy-950/80 backdrop-blur-sm ${rong ? 'p-2' : 'p-4'}`}>
+    <div className={`fixed inset-0 z-[60] flex flex-col bg-navy-950/85 ${rong ? 'p-2' : 'p-4'}`}>
       <div className={`mx-auto flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white ${rong ? 'max-w-[98vw]' : 'max-w-6xl'}`}>
         <div className="flex flex-none items-center justify-between border-b border-slate-100 px-5 py-3">
           <p className="truncate font-medium text-navy-900">{file.ten_file}</p>

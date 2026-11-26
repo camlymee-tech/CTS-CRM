@@ -103,8 +103,22 @@ function doiCuocGoi(c: any, sdtKhach: string) {
     thoi_luong_giay: thoiLuong,
     so_dien_thoai: huong === 'di' ? c.toNumber : c.fromNumber,
     nguoi_callio: huong === 'di' ? (c.fromUser || c.toUser) : (c.toUser || c.fromUser),
-    co_ghi_am: ngheMay,
+    // Callio có cờ recording=true khi có ghi âm (đã soát 2026-11-26); thiếu cờ thì đoán theo việc nghe máy
+    co_ghi_am: c.recording !== undefined ? c.recording === true : ngheMay,
   }
+}
+
+// fromUser/toUser trong /call là object { _id, email, name, ext } (đã soát 2026-11-26), phòng khi chỉ là mã _id
+function docNguoiCallio(v: any, ds: Map<string, { email: string; name: string }>) {
+  if (!v) return undefined
+  if (typeof v === 'object') {
+    const tuDs = v._id ? ds.get(String(v._id)) : undefined
+    return {
+      email: String(v.email || tuDs?.email || '').trim().toLowerCase(),
+      name: String(v.name || tuDs?.name || '').trim(),
+    }
+  }
+  return ds.get(String(v))
 }
 
 Deno.serve(async (req) => {
@@ -151,7 +165,7 @@ Deno.serve(async (req) => {
       const { data: pf } = await admin.from('profiles').select('id, email')
       const saleTheoEmail = new Map((pf || []).map((p: any) => [String(p.email || '').trim().toLowerCase(), p.id]))
       const calls = ds.map(({ nguoi_callio, ...c }) => {
-        const u = nguoi_callio ? userCallio.get(String(nguoi_callio)) : undefined
+        const u = docNguoiCallio(nguoi_callio, userCallio)
         return { ...c, sale_id: (u?.email && saleTheoEmail.get(u.email)) || null, ten_sale: u?.name || null }
       })
       return reply({ calls })
