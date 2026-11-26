@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   X, Phone, MessageCircle, Users as UsersIcon, MoreHorizontal, Plus,
   Link2, Store, HandHeart, CircleAlert, CircleCheck, History, Check, Trash2, CalendarClock, FileText, ShoppingBag,
-  FileDown, Eye, PhoneOutgoing, PhoneIncoming, PhoneOff, Clock,
+  FileDown, Eye, PhoneOutgoing, PhoneIncoming, PhoneOff, Clock, Play,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { locNhanSu } from '../lib/quyen'
@@ -41,7 +41,17 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   }, [khachBanDau.id, lamMoiBG])
   const [interactions, setInteractions] = useState([])
   const [logs, setLogs] = useState([])
-  const [cuocGoi, setCuocGoi] = useState([])   // nhật ký cuộc gọi + ghi âm
+  // Nhật ký cuộc gọi lấy thẳng từ Callio (qua hàm máy chủ "callio"), chỉ tải khi mở tab Cuộc gọi
+  const [cuocGoi, setCuocGoi] = useState(null)   // null = chưa tải
+  const [loiGoi, setLoiGoi] = useState(null)     // { text, code }
+  const [dangTaiGoi, setDangTaiGoi] = useState(false)
+  async function taiCuocGoi() {
+    setDangTaiGoi(true); setLoiGoi(null)
+    const { data, error } = await goiHamCallio({ action: 'list', customer_id: khachBanDau.id })
+    setDangTaiGoi(false)
+    if (error) { setLoiGoi(error); setCuocGoi([]); return }
+    setCuocGoi(data.calls || [])
+  }
   const [donHang, setDonHang] = useState([])
   const [hopDong, setHopDong] = useState([])
   const [dvTheoDon, setDvTheoDon] = useState({})
@@ -67,10 +77,14 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const suaDuoc = cuaMinh || cuaTeam || isAdmin || chung || !customer.sale_id
 
   useEffect(() => { load() }, [customer.id])
+  useEffect(() => { setCuocGoi(null) }, [customer.id, customer.sdt])   // đổi số điện thoại thì tải lại
+  useEffect(() => {
+    if (tab === 'cuoc_goi' && cuocGoi === null && !dangTaiGoi) taiCuocGoi()
+  }, [tab, cuocGoi])
 
   async function load() {
     setLoading(true)
-    const [{ data: it }, { data: lg }, { data: pf }, { data: od }, { data: ct }, { data: pk }, { data: bcAds }, { data: cg }] = await Promise.all([
+    const [{ data: it }, { data: lg }, { data: pf }, { data: od }, { data: ct }, { data: pk }, { data: bcAds }] = await Promise.all([
       supabase.from('customer_interactions').select('*').eq('customer_id', customer.id)
         .order('ngay_thuc_hien', { ascending: false }),
       supabase.from('customer_logs').select('*').eq('customer_id', customer.id)
@@ -80,9 +94,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
       supabase.from('contracts').select('*').eq('customer_id', customer.id).order('ngay_ky', { ascending: false }),
       supabase.from('service_packages').select('*'),
       supabase.from('ads_bao_cao').select('*').eq('customer_id', customer.id).order('ngay_bao_cao', { ascending: false }),
-      supabase.from('cuoc_goi').select('*').eq('customer_id', customer.id).order('bat_dau', { ascending: false }),
     ])
-    setCuocGoi(cg || [])
     setBaoCaoAds(bcAds || [])
     setInteractions(it || []); setLogs(lg || []); setProfiles(pf || [])
     setDonHang(od || []); setHopDong(ct || [])
@@ -208,7 +220,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const TABS = [
     { key: 'thong_tin', label: 'Thông tin' },
     { key: 'cham_soc', label: `Chăm sóc (${interactions.length})` },
-    { key: 'cuoc_goi', label: `Cuộc gọi (${cuocGoi.length})` },
+    { key: 'cuoc_goi', label: cuocGoi && !loiGoi ? `Cuộc gọi (${cuocGoi.length})` : 'Cuộc gọi' },
     { key: 'bao_gia', label: `Báo giá (${demBG})` },
     { key: 'nhat_ky', label: 'Nhật ký' },
   ]
@@ -581,7 +593,8 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
               )}
 
               {tab === 'cuoc_goi' && (
-                <NhatKyCuocGoi ds={cuocGoi} tenNguoi={tenNguoi} />
+                <NhatKyCuocGoi ds={cuocGoi || []} dangTai={dangTaiGoi || cuocGoi === null} loi={loiGoi}
+                  onTaiLai={taiCuocGoi} customerId={customer.id} tenNguoi={tenNguoi} />
               )}
 
               {tab === 'nhat_ky' && (
@@ -847,27 +860,69 @@ function AddInteraction({ customerId, currentProfile, ngayHen, onAdded }) {
 }
 
 
-// ============ NHẬT KÝ CUỘC GỌI + GHI ÂM ============
+// ============ NHẬT KÝ CUỘC GỌI + GHI ÂM (lấy từ Callio) ============
+// Gọi hàm máy chủ "callio"; trả { data } hoặc { error: { text, code } } với câu báo lỗi dễ hiểu
+async function goiHamCallio(body) {
+  try {
+    const { data, error } = await supabase.functions.invoke('callio', { body })
+    if (error) {
+      let text = ''
+      try { text = (await error.context?.json())?.error || '' } catch { /* không đọc được nội dung lỗi */ }
+      return { error: { text: text || 'Chưa gọi được chức năng Callio trên máy chủ.', code: text ? 'loi' : 'chua_trien_khai' } }
+    }
+    if (data?.error) return { error: { text: data.error, code: data.code || 'loi' } }
+    return { data }
+  } catch (e) {
+    return { error: { text: 'Lỗi kết nối: ' + e.message, code: 'loi' } }
+  }
+}
+
 const TT_GOI = {
   nghe_may: { ten: 'Nghe máy', cls: 'bg-emerald-50 text-emerald-700' },
   khong_nghe: { ten: 'Không nghe máy', cls: 'bg-rose-50 text-rose-600' },
   ban: { ten: 'Máy bận', cls: 'bg-amber-50 text-amber-700' },
   tu_choi: { ten: 'Từ chối', cls: 'bg-rose-50 text-rose-600' },
 }
-const ngayGoi = (t) => { const d = new Date(t); const p2 = (n) => String(n).padStart(2, '0'); return `${p2(d.getDate())}/${p2(d.getMonth() + 1)} ${p2(d.getHours())}:${p2(d.getMinutes())}` }
+const ngayGoi = (t) => { if (!t) return 'Không rõ giờ'; const d = new Date(t); const p2 = (n) => String(n).padStart(2, '0'); return `${p2(d.getDate())}/${p2(d.getMonth() + 1)} ${p2(d.getHours())}:${p2(d.getMinutes())}` }
 const phutGiay = (s) => `${Math.floor((s || 0) / 60)}:${String((s || 0) % 60).padStart(2, '0')}`
 const tongThoiLuong = (s) => {
   const p = Math.round((s || 0) / 60)
   return p >= 60 ? `${Math.floor(p / 60)} giờ ${p % 60} phút` : `${p} phút`
 }
 
-function NhatKyCuocGoi({ ds, tenNguoi }) {
+function NhatKyCuocGoi({ ds, dangTai, loi, onTaiLai, customerId, tenNguoi }) {
+  const [ghiAm, setGhiAm] = useState({})   // { [id cuộc gọi]: { dangTai, url, loi } }
+
+  // Link ghi âm Callio chỉ sống 6 giờ → mỗi lần bấm nghe xin link mới, không lưu lại
+  async function nghe(id) {
+    setGhiAm((g) => ({ ...g, [id]: { dangTai: true } }))
+    const { data, error } = await goiHamCallio({ action: 'recording', customer_id: customerId, call_id: id })
+    setGhiAm((g) => ({ ...g, [id]: error ? { loi: error.text } : { url: data.url } }))
+  }
+
+  if (dangTai) {
+    return <p className="py-10 text-center text-sm text-ink-400">Đang tải cuộc gọi từ Callio...</p>
+  }
+  if (loi) {
+    const chuaKetNoi = loi.code === 'chua_ket_noi' || loi.code === 'chua_trien_khai'
+    return (
+      <div className={`rounded-xl border px-4 py-8 text-center ${chuaKetNoi ? 'border-dashed border-slate-200' : 'border-rose-200 bg-rose-50'}`}>
+        <PhoneOff size={28} className={`mx-auto ${chuaKetNoi ? 'text-ink-400' : 'text-rose-500'}`} />
+        <p className="mt-2 font-medium text-navy-900">{chuaKetNoi ? 'Chưa kết nối Callio' : 'Không tải được cuộc gọi'}</p>
+        <p className="mt-1 text-sm text-ink-600">
+          {chuaKetNoi ? 'Quản trị viên cần cài đặt kết nối Callio thì lịch sử cuộc gọi mới hiện ở đây.' : loi.text}
+        </p>
+        <button type="button" onClick={onTaiLai} className="mt-3 text-sm font-medium text-coral-500 hover:underline">Thử lại</button>
+      </div>
+    )
+  }
   if (ds.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
         <Phone size={28} className="mx-auto text-ink-400" />
         <p className="mt-2 font-medium text-navy-900">Chưa có cuộc gọi nào với khách này</p>
-        <p className="mt-1 text-sm text-ink-600">Cuộc gọi từ CRM sẽ tự hiện ở đây kèm ghi âm.</p>
+        <p className="mt-1 text-sm text-ink-600">Cuộc gọi qua Callio với số này sẽ tự hiện ở đây kèm ghi âm.</p>
+        <button type="button" onClick={onTaiLai} className="mt-3 text-sm font-medium text-coral-500 hover:underline">Tải lại</button>
       </div>
     )
   }
@@ -907,18 +962,30 @@ function NhatKyCuocGoi({ ds, tenNguoi }) {
                   <p className="text-sm font-medium text-navy-900">
                     {c.huong === 'den' ? 'Gọi đến' : 'Gọi đi'} · {ngayGoi(c.bat_dau)}
                   </p>
-                  <p className="text-xs text-ink-400">{tenNguoi(c.sale_id)}{c.so_dien_thoai ? ` · ${c.so_dien_thoai}` : ''}</p>
+                  <p className="text-xs text-ink-400">{(c.sale_id && tenNguoi(c.sale_id)) || c.ten_sale || 'Không rõ'}{c.so_dien_thoai ? ` · ${c.so_dien_thoai}` : ''}</p>
                 </div>
                 <Badge className={tt.cls}>{tt.ten}</Badge>
                 <span className="w-12 flex-none text-right text-sm tabular-nums text-ink-600">{phutGiay(c.thoi_luong_giay)}</span>
               </div>
-              {c.link_ghi_am && c.trang_thai === 'nghe_may' && (
-                <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5">
-                  <audio controls preload="none" src={c.link_ghi_am} className="h-8 w-full" />
-                  <a href={c.link_ghi_am} download target="_blank" rel="noreferrer"
-                    className="flex-none text-ink-400 hover:text-coral-500" title="Tải ghi âm"><FileDown size={15} /></a>
-                </div>
-              )}
+              {c.co_ghi_am && (() => {
+                const g = ghiAm[c.id]
+                if (g?.url) return (
+                  <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5">
+                    <audio controls autoPlay src={g.url} className="h-8 w-full" />
+                    <a href={g.url} download target="_blank" rel="noreferrer"
+                      className="flex-none text-ink-400 hover:text-coral-500" title="Tải ghi âm"><FileDown size={15} /></a>
+                  </div>
+                )
+                return (
+                  <div className="mt-2 flex items-center gap-3">
+                    <button type="button" onClick={() => nghe(c.id)} disabled={g?.dangTai}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-navy-900 hover:bg-slate-100 disabled:opacity-60">
+                      <Play size={13} /> {g?.dangTai ? 'Đang lấy ghi âm...' : 'Nghe ghi âm'}
+                    </button>
+                    {g?.loi && <span className="text-xs text-rose-500">{g.loi}</span>}
+                  </div>
+                )
+              })()}
               {c.ghi_chu && <p className="mt-2 text-xs text-ink-600">Ghi chú: {c.ghi_chu}</p>}
             </li>
           )
