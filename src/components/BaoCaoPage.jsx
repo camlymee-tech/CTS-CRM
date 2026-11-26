@@ -272,7 +272,7 @@ export default function BaoCaoPage({ currentProfile }) {
     if (nhomPhong.length > 1) { rows.push(hang('TỔNG TOÀN CÔNG TY', tatCa, false)); rows.push(hang('Trung bình / sale toàn công ty', tatCa, true)) }
     return xuatBangXlsx({
       tieuDe: 'Báo cáo mục tiêu', phuDe,
-      heads: ['Sale', 'Số khách phụ trách', 'Khách mới', 'Lượt chăm sóc', 'KH liên hệ được', 'Hoàn thành / mục tiêu', '% hoàn thành', `Khách tồn quá ${SO_NGAY_GOI_LAI} ngày`],
+      heads: ['Sale', 'Số data phụ trách', 'Data sale tìm kiếm', 'Lượt chăm sóc', 'KH liên hệ được', 'Hoàn thành / mục tiêu', '% hoàn thành', `Khách tồn quá ${SO_NGAY_GOI_LAI} ngày`],
       rows, tenFile: `bao-cao-muc-tieu-${tuNgay}.xlsx`,
     })
   }
@@ -470,7 +470,7 @@ export default function BaoCaoPage({ currentProfile }) {
                   </div>
                   <TheKpi tieuDe="KH liên hệ được" so={tatCa.sum.nghe.toLocaleString('vi-VN')} phu={`TB ${tb1(tatCa.n ? tatCa.sum.nghe / tatCa.n : 0)} / sale`} tone="sky" icon={PhoneCall} nho />
                   <TheKpi tieuDe="Lượt chăm sóc" so={tatCa.sum.luot.toLocaleString('vi-VN')} phu={`TB ${tb1(tatCa.n ? tatCa.sum.luot / tatCa.n : 0)} / sale`} tone="emerald" icon={MessageCircle} nho />
-                  <TheKpi tieuDe="Khách mới" so={tatCa.sum.moi.toLocaleString('vi-VN')} phu={`TB ${tb1(tatCa.n ? tatCa.sum.moi / tatCa.n : 0)} / sale`} tone="violet" icon={UserPlus} nho />
+                  <TheKpi tieuDe="Data sale tìm kiếm" so={tatCa.sum.moi.toLocaleString('vi-VN')} phu={`TB ${tb1(tatCa.n ? tatCa.sum.moi / tatCa.n : 0)} / sale`} tone="violet" icon={UserPlus} nho />
                   <TheKpi tieuDe={`Tồn quá ${SO_NGAY_GOI_LAI} ngày`} so={tatCa.sum.ton.toLocaleString('vi-VN')} phu="khách cần gọi lại" tone="rose" icon={AlertTriangle} nho />
                 </div>
 
@@ -687,8 +687,8 @@ function BangMucTieuPhong({ nhomPhong, tatCa, soNgay, tb1 }) {
           <thead>
             <tr className="bg-slate-100 text-xs font-semibold text-ink-600">
               <th className={`${o} text-left`}>Sale</th>
-              <th className={`${o} text-center`}>Số khách phụ trách</th>
-              <th className={`${o} text-center`}>Khách mới</th>
+              <th className={`${o} text-center`}>Số data phụ trách</th>
+              <th className={`${o} text-center`}>Data sale tìm kiếm</th>
               <th className={`${o} text-center`}>Lượt chăm sóc</th>
               <th className={`${o} text-center`}>KH liên hệ được</th>
               <th className={`${o} text-center`}>Hoàn thành / mục tiêu</th>
