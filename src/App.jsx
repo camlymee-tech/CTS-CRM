@@ -111,7 +111,7 @@ export default function App() {
       {page === 'checklist' && <ChecklistPage currentProfile={profile} onDoiViec={loadViecCan} />}
       {page === 'customers' && <CustomerList currentProfile={profile} />}
       {page === 'baocao' && <BaoCaoPage currentProfile={profile} />}
-      {page === 'team' && <TeamPage currentProfile={profile} />}
+      {page === 'team' && profile?.role !== 'sale' && <TeamPage currentProfile={profile} />}
       {page === 'pricing' && <BaoGiaPage currentProfile={profile} />}
       {page === 'daotao' && <DaoTaoPage currentProfile={profile} />}
       {page === 'documents' && <DocumentsPage currentProfile={profile} />}

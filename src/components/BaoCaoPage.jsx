@@ -37,15 +37,6 @@ function khoangKy(ky, tu, den) {
   return [tu || hom, den || tu || hom]
 }
 
-// Liệt kê các ngày trong khoảng (tối đa 62 ngày)
-function cacNgay(tu, den) {
-  const out = []
-  const d = new Date(`${tu}T00:00:00`)
-  const cuoi = new Date(`${den}T00:00:00`)
-  while (d <= cuoi && out.length < 62) { out.push(ymd(d)); d.setDate(d.getDate() + 1) }
-  return out
-}
-
 export default function BaoCaoPage({ currentProfile }) {
   const laAdmin = laQuanLy(currentProfile)   // admin hoặc leader: có ô lọc Sale (leader chỉ thấy team mình)
   const { options: TRANG_THAI, statuses } = useTrangThai()
@@ -134,7 +125,8 @@ export default function BaoCaoPage({ currentProfile }) {
 
   // Mục tiêu theo (ngày, sale)
   const dongMucTieu = useMemo(() => {
-    const ngays = cacNgay(tuNgay, denNgay)
+    // Chỉ xét những ngày thực sự có mục tiêu trong kỳ (không giới hạn số ngày, khoảng dài không bị cắt)
+    const ngays = [...new Set([...soMt.map((x) => x.ngay), ...chonMt.map((x) => x.ngay)])].filter((n) => n >= tuNgay && n <= denNgay).sort()
     const out = []
     for (const ngay of ngays) {
       for (const s of dsSale) {
@@ -145,8 +137,8 @@ export default function BaoCaoPage({ currentProfile }) {
         const xong = chon.filter((x) =>
           cs.some((i) => i.customer_id === x.customer_id && ngayCs(i) === ngay) ||
           logs.some((l) => l.customer_id === x.customer_id && ngayLocal(l.created_at) === ngay)).length
-        const mt = (mtNghe || 0) + chon.length
-        const ht = Math.min(nghe, mtNghe || 0) + xong
+        const mt = mtNghe || 0   // % hoàn thành chỉ tính KH liên hệ được; khách gọi lại thuộc chăm sóc, không cộng vào
+        const ht = nghe   // liên hệ được có thể vượt mục tiêu
         out.push({ ngay, sale: s, mtNghe: mtNghe ?? null, nghe, mtLai: chon.length, xong, mt, ht, pt: mt ? ht / mt : null })
       }
     }
