@@ -197,10 +197,7 @@ function dauTrang(tenCongTy, ngayKy) {
 function hopDongAds(hd) {
   const b = { ...BEN_B_MAC_DINH.ads, ...(hd.ben_b || {}) }
   const tong = Math.round(Number(hd.gia_tri) || 0)   // giá trị đơn đã bao gồm VAT
-  const giaTri = Math.round(tong / 1.08)              // tách ngược ra giá trước VAT để hiển thị
-  const vat = tong - giaTri
   const noiDung = hd.rows_noi_dung || []
-  const soSP = hd.so_san_pham || 30
 
   return [
     ...dauTrang(b.ten, hd.ngay_ky),

@@ -4,7 +4,7 @@ import logoUrl from '../assets/cts-logo.png'
 
 let LOGO = null   // dữ liệu ảnh logo CTS, nạp 1 lần khi xuất file
 
-const NAVY = 'FF0A2463', CAM = 'FFFFEDD5', CAM2 = 'FFFFF7ED', XAM = 'FFF1F5F9', TRANG = 'FFFFFFFF'
+const NAVY = 'FF0A2463', CAM = 'FFFFEDD5', XAM = 'FFF1F5F9', TRANG = 'FFFFFFFF'
 const mau = { argb: 'FFCBD5E1' }
 const vien = { top: { style: 'thin', color: mau }, left: { style: 'thin', color: mau }, bottom: { style: 'thin', color: mau }, right: { style: 'thin', color: mau } }
 const TIEN = '#,##0'
@@ -138,7 +138,6 @@ function sheetOrder(wb, st) {
     })
     r++
   }
-  const t = (s, v) => [s, v.te, v.vnd]
   khoi('1. GIÁ XƯỞNG', ['STT', 'Nội dung', 'Số tiền (¥ - RMB)', 'Quy đổi VND'], [
     { v: ['1', 'Giá trị đơn hàng', kq.gt1.te, kq.gt1.vnd] },
     { v: ['2', 'Tổng tiền ship nội địa', kq.ship.te, kq.ship.vnd] },

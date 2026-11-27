@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Modal, Input, Select, Textarea, Button } from './ui'
 import { formatVnd } from '../lib/constants'
+import { homNayLocal } from '../lib/taiKy'
 
 // Đơn có thể gồm nhiều dịch vụ; hợp đồng chỉ có 1 loại (ads/xay_shop), nên ưu
 // tiên dịch vụ "Xây shop"/"Tối ưu sản phẩm" làm dịch vụ chính, còn lại là "Chạy quảng cáo"
@@ -30,7 +31,7 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
   const [form, setForm] = useState({
     customer_id: order?.customer_id || customer?.id || '',
     sale_id: order?.sale_id || customer?.sale_id || currentProfile?.id || '',
-    ngay_chot: order?.ngay_chot || new Date().toISOString().slice(0, 10),
+    ngay_chot: order?.ngay_chot || homNayLocal(),
     so_thang: order?.so_thang || '',
     ghi_chu: order?.ghi_chu || '',
     loai_don: order?.loai_don || loaiBanDau || 'moi',
@@ -123,10 +124,13 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
     }
 
     let orderId = order?.id
+    let idDongCu = []   // dòng dịch vụ cũ của đơn đang sửa — chỉ xoá SAU KHI đã ghi xong dòng mới
     if (isEdit) {
+      const { data: cu, error: loiCu } = await supabase.from('order_items').select('id').eq('order_id', order.id)
+      if (loiCu) { setSaving(false); setError(loiCu.message); return }
+      idDongCu = (cu || []).map((x) => x.id)
       const { error } = await supabase.from('orders').update(payload).eq('id', order.id)
       if (error) { setSaving(false); setError(error.message); return }
-      await supabase.from('order_items').delete().eq('order_id', order.id)
     } else {
       const { data, error } = await supabase.from('orders').insert(payload).select().single()
       if (error) { setSaving(false); setError(error.message); return }
@@ -144,26 +148,39 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
         gia: Number(it.gia) || 0,
       }))
     )
-    if (itemErr) { setSaving(false); setError(itemErr.message); return }
+    if (itemErr) {
+      setSaving(false)
+      if (isEdit) { setError(itemErr.message); return }   // dịch vụ cũ vẫn còn nguyên, bấm Lưu lại được
+      // Đơn mới: gỡ đơn rỗng vừa tạo để bấm Lưu lại không sinh đơn trùng
+      const { error: loiGo } = await supabase.from('orders').delete().eq('id', orderId)
+      setError(loiGo
+        ? `Lưu dịch vụ bị lỗi: ${itemErr.message}. Đơn đã được tạo nhưng CHƯA có dịch vụ — đừng bấm Lưu lại (sẽ trùng đơn), hãy mở đơn đó để sửa.`
+        : `Lưu dịch vụ bị lỗi: ${itemErr.message}. Đơn chưa được tạo, bấm Lưu để thử lại.`)
+      return
+    }
+
+    // Ghi dòng mới xong mới xoá dòng cũ. Nếu bước này lỗi, bấm Lưu lại sẽ dọn đúng (lấy lại danh sách dòng cũ)
+    if (idDongCu.length) {
+      const { error: loiXoa } = await supabase.from('order_items').delete().in('id', idDongCu)
+      if (loiXoa) { setSaving(false); setError('Đã lưu dịch vụ mới nhưng chưa xoá được dịch vụ cũ, bấm Lưu lại: ' + loiXoa.message); return }
+    }
 
     // Đẩy tên gói, số sản phẩm, nội dung triển khai sang hợp đồng tự sinh của đơn —
     // chỉ áp dụng cho đơn MỚI (đơn tái ký dùng lại hợp đồng đã có, không tự tạo hợp đồng)
     if (form.loai_don !== 'tai_ky') {
       const goiChinh = goiChinhCuaDon(hopLe, packages)
-      if (goiChinh) {
-        await supabase.from('contracts').update(goiChinh).eq('order_id', orderId)
-      } else {
-        // Đơn chỉ gồm Dịch vụ bổ sung (không phải Seller hay ADS) -> không cần hợp đồng,
-        // xoá luôn hợp đồng trống mà trigger đã tự sinh khi tạo đơn
-        await supabase.from('contracts').delete().eq('order_id', orderId)
-      }
+      // Đơn chỉ gồm Dịch vụ bổ sung (không phải Seller hay ADS) -> không cần hợp đồng,
+      // xoá luôn hợp đồng trống mà trigger đã tự sinh khi tạo đơn
+      const { error: loiHd } = goiChinh
+        ? await supabase.from('contracts').update(goiChinh).eq('order_id', orderId)
+        : await supabase.from('contracts').delete().eq('order_id', orderId)
+      if (loiHd) window.alert('Đã lưu đơn nhưng chưa cập nhật được hợp đồng của đơn: ' + loiHd.message)
     }
 
     setSaving(false)
     onSaved()
   }
 
-  const tenKhach = customer?.ten_khach || customers.find((c) => c.id === form.customer_id)?.ten_khach
 
   return (
     <Modal title={isEdit ? `Sửa đơn ${order.ma_don || ''}` : (loaiBanDau === 'tai_ky' ? 'Tạo đơn tái ký' : 'Tạo đơn dịch vụ')} onClose={onClose} wide>

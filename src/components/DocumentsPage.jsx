@@ -48,7 +48,8 @@ export default function DocumentsPage({ currentProfile }) {
 
   async function remove(doc) {
     if (!window.confirm(`Xoá tài liệu "${doc.tieu_de}"? Thao tác này không hoàn tác được.`)) return
-    await supabase.from('documents').delete().eq('id', doc.id)
+    const { error } = await supabase.from('documents').delete().eq('id', doc.id)
+    if (error) { window.alert('Không xoá được tài liệu: ' + error.message); return }
     load()
   }
 

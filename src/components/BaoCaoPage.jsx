@@ -1,5 +1,5 @@
 import { layHet } from '../lib/layHet'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Download, Users, Trophy, PhoneCall, Hourglass, MessageCircle, UserPlus, AlertTriangle } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Select, Input } from './ui'
@@ -9,7 +9,7 @@ import { ngayLocal } from '../lib/danhSachKhach'
 import { maChuaLienHe, maKhNgheMay, tinhCanGoiLai, SO_NGAY_GOI_LAI } from '../lib/nhacViec'
 import { hienPt2 } from '../lib/dashboardXlsx'
 import { xuatBangXlsx } from '../lib/baoCaoXlsx'
-import { laQuanLy, locNhanSu } from '../lib/quyen'
+import { laQuanLy } from '../lib/quyen'
 
 const TABS = [
   { key: 'tong_quan', label: 'Tổng quan' },
@@ -92,7 +92,6 @@ export default function BaoCaoPage({ currentProfile }) {
     if (currentProfile?.phong_ban) return khongAdmin.filter((p) => p.phong_ban === currentProfile.phong_ban)
     return khongAdmin.filter((p) => p.id === currentProfile?.id)
   }, [profiles, currentProfile])
-  const CHUA_CHIA = '__chua_chia'
   const xemChuaChia = false   // chỉ xem data chưa chia cho sale nào
   const dsPhong = useMemo(() => [...new Set(thanhVien.map((p) => p.phong_ban).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi')), [thanhVien])
   const thanhVienLoc = useMemo(() => (locPhong ? thanhVien.filter((p) => p.phong_ban === locPhong) : thanhVien), [thanhVien, locPhong])
@@ -101,7 +100,6 @@ export default function BaoCaoPage({ currentProfile }) {
     if (xemChuaChia) return []
     return saleDangXem ? thanhVienLoc.filter((p) => p.id === saleDangXem) : thanhVienLoc
   }, [thanhVienLoc, saleDangXem, xemChuaChia])
-  const soChuaChia = useMemo(() => customers.filter((c) => !c.sale_id).length, [customers])
   const idSale = useMemo(() => new Set(dsSale.map((s) => s.id)), [dsSale])
 
   const maChua = maChuaLienHe(statuses)
@@ -114,7 +112,6 @@ export default function BaoCaoPage({ currentProfile }) {
 
   // Dữ liệu đã lọc theo sale
   const khach = useMemo(() => (xemChuaChia ? customers.filter((c) => !c.sale_id) : customers.filter((c) => idSale.has(c.sale_id))), [customers, idSale, xemChuaChia])
-  const csLoc = useMemo(() => cs.filter((x) => idSale.has(x.sale_id)), [cs, idSale])
   const logLoc = useMemo(() => logs.filter((l) => idSale.has(l.user_id)), [logs, idSale])
   const ngayCs = (x) => ngayLocal(x.ngay_thuc_hien || x.created_at)
 
@@ -166,14 +163,7 @@ export default function BaoCaoPage({ currentProfile }) {
     const phongCua = new Map()
     for (const s of dsSale) { phongCua.set(s.id, tenPB(s)); lay(tenPB(s)).soSale += 1 }
     for (const c of khachKy) { if (!c.sale_id) continue; const o = lay(phongCua.get(c.sale_id) || 'Chưa có phòng ban'); o.dem[c.trang_thai_cham_soc] = (o.dem[c.trang_thai_cham_soc] || 0) + 1; o.tong += 1 }
-    if (false) {
-      const chua = customers.filter((c) => !c.sale_id && trongKy(ngayLocal(c.created_at)))
-      if (chua.length) {
-        const o = lay('Chưa chia sale'); o.chua = true
-        for (const c of chua) { o.dem[c.trang_thai_cham_soc] = (o.dem[c.trang_thai_cham_soc] || 0) + 1; o.tong += 1 }
-      }
-    }
-    return [...m.values()].sort((a, b) => (a.chua ? 1 : 0) - (b.chua ? 1 : 0) || a.ten.localeCompare(b.ten, 'vi'))
+    return [...m.values()].sort((a, b) => a.ten.localeCompare(b.ten, 'vi'))
   }, [laAdminHan, dsSale, khachKy, customers, locSale, locPhong, xemChuaChia, tuNgay, denNgay])
 
   // Ngày khách đã chuyển từ "Chưa liên hệ" → trong ngày đó các lần đổi tiếp theo chỉ tính là KH liên hệ được, không tính chăm sóc
@@ -282,29 +272,8 @@ export default function BaoCaoPage({ currentProfile }) {
     })
   }
 
-  const th = 'border border-slate-200 px-4 py-2.5'
   const thD = 'border border-navy-800 px-4 py-2.5'
   const td = 'border border-slate-200 px-4 py-2.5'
-  const pctCls = (p) => (p != null && p >= 1 ? 'text-emerald-600' : p != null && p < 0.5 ? 'text-rose-500' : 'text-navy-900')
-
-  // Hai dòng tóm tắt của một nhóm: Tổng + Trung bình / sale
-  const DongTomTat = ({ ten, o, tb, cls }) => {
-    const f = tb ? (x) => tb1(x / o.n) : (x) => x
-    const pt = tb ? o.ptTb : o.ptTong
-    const toi = cls.includes('bg-navy')   // dòng nền xanh đậm: giữ chữ trắng
-    return (
-      <tr className={`font-semibold ${cls}`}>
-        <td className={td}>{ten}</td>
-        <td className={`${td} text-center`}>{f(o.sum.phuTrach)}</td>
-        <td className={`${td} text-center`}>{f(o.sum.moi)}</td>
-        <td className={`${td} text-center`}>{f(o.sum.luot)}</td>
-        <td className={`${td} text-center`}>{f(o.sum.nghe)}</td>
-        <td className={`${td} text-center`}>{f(o.sum.ht)} / {f(o.sum.mt)}</td>
-        <td className={td}>{toi ? <p className="text-center">{pt == null ? '—' : hienPt2(pt)}</p> : <OPt pt={pt} />}</td>
-        <td className={`${td} text-center ${toi ? '' : o.sum.ton > 0 ? 'text-rose-500' : 'text-ink-400'}`}>{f(o.sum.ton)}</td>
-      </tr>
-    )
-  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

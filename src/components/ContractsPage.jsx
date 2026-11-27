@@ -1,11 +1,12 @@
 import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Pencil, ExternalLink, FileText, AlertTriangle, FileDown, Eye, Printer, Download, Trash2, Save } from 'lucide-react'
+import { Search, Pencil, ExternalLink, AlertTriangle, FileDown, Eye, Printer, Download, Trash2, Save } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Modal, Textarea } from './ui'
 import { TRANG_THAI_HD_OPTIONS, classOf, labelOf, formatVnd, giaTruocVat } from '../lib/constants'
 import { taoSoHopDong, vietTat } from '../lib/docSo'
 import ContractPreview from './ContractPreview'
+import { homNayLocal } from '../lib/taiKy'
 
 // Chuỗi "Tên | Chi tiết" mỗi dòng -> mảng [ [tên, chi tiết], ... ] cho bảng nội dung hợp đồng
 function parseNoiDung(text) {
@@ -105,8 +106,6 @@ export default function ContractsPage({ currentProfile }) {
     return true
   }), [contracts, customers, orders, items, search, filterTT, filterSale, tuNgay, denNgay])
 
-  const tongGiaTri = filtered.filter((c) => c.trang_thai !== 'da_huy')
-    .reduce((s, c) => s + (Number(c.gia_tri) || 0), 0)
   const tongGiaTriTruocVat = filtered.filter((c) => c.trang_thai !== 'da_huy')
     .reduce((s, c) => s + giaTruocVat(c.gia_tri), 0)
   const sapHetHan = contracts.filter((c) => c.trang_thai === 'hieu_luc' && c.ngay_het_han
@@ -339,7 +338,7 @@ export function XuatHopDongForm({ contract, khach, don, dichVu, packages, onClos
   const [vtat, setVtat] = useState(khach?.ten_viet_tat || vietTat(khach?.ten_khach))
   const goiKhop0 = timGoiKhop(loaiDV, dichVu, packages)
   const [form, setForm] = useState({
-    ngay_ky: contract.ngay_ky || new Date().toISOString().slice(0, 10),
+    ngay_ky: contract.ngay_ky || homNayLocal(),
     dia_chi: khach?.dia_chi || '',
     mst: khach?.mst || '',
     nguoi_dai_dien: khach?.nguoi_dai_dien || '',

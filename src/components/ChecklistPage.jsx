@@ -1,6 +1,6 @@
 import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
-import { Phone, CalendarCheck, CircleAlert, CircleCheck, RefreshCw, BarChart3 } from 'lucide-react'
+import { Phone, CalendarCheck, CircleCheck, BarChart3 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
 import { Select, Badge } from './ui'
@@ -8,9 +8,8 @@ import CustomerDetail from './CustomerDetail'
 import OrderForm from './OrderForm'
 import BaoCaoAdsModal from './BaoCaoAdsModal'
 import MucTieuNgay from './MucTieuNgay'
-import { DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, classOf, labelOf } from '../lib/constants'
 import { useTrangThai } from '../lib/StatusContext'
-import { homNayLocal, dinhDangNgay, moTaConLai, SO_NGAY_NHAC } from '../lib/taiKy'
+import { homNayLocal, dinhDangNgay } from '../lib/taiKy'
 import { moTaHanBaoCao, CHU_KY_BAO_CAO } from '../lib/baoCaoAds'
 import { tinhNhacViec, tinhCanGoiLai, tinhFollowUpHomNay, SO_NGAY_GOI_LAI } from '../lib/nhacViec'
 
@@ -29,7 +28,6 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   const [logsDoiTT, setLogsDoiTT] = useState([])
   const [ghiBaoCao, setGhiBaoCao] = useState(null)   // dòng nhắc báo cáo ADS đang mở cửa sổ ghi nhận
   const [taiKy, setTaiKy] = useState(null)   // { khach, muc } đang mở form tái ký
-  const [dangDong, setDangDong] = useState('')
 
   const isAdmin = laQuanLy(currentProfile)   // admin hoặc leader: xem được nhiều người
   const homNay = homNayLocal()
@@ -78,15 +76,6 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
     const loc = (ds) => ds.filter((x) => khopLoc(x.saleId))
     return { nhacBaoCao: loc(r.baoCaoAds) }
   }, [customers, hopDong, don, itemsDon, baoCao, uids, currentProfile?.id, filterSale, filterPhong, idsPhong])
-
-  async function khongTaiKy(r) {
-    if (!window.confirm(`Đánh dấu hợp đồng ${r.hd.so_hop_dong} của ${r.khach.ten_khach} là HẾT HẠN, khách không tái ký?\nNhắc tái ký sẽ biến mất.`)) return
-    setDangDong(r.hd.id)
-    const { error } = await supabase.from('contracts').update({ trang_thai: 'het_han' }).eq('id', r.hd.id)
-    setDangDong('')
-    if (error) { window.alert('Không cập nhật được: ' + error.message); return }
-    load()
-  }
 
   return (
     <div className="flex-1 overflow-y-auto">

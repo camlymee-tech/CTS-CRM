@@ -2,6 +2,7 @@ import { layHet } from './layHet'
 import { danhSachNhacTaiKy } from './taiKy'
 import { danhSachNhacBaoCao } from './baoCaoAds'
 import { homNayLocal } from './taiKy'
+import { ngayLocal } from './danhSachKhach'
 import { nhanSuXemDuoc } from './quyen'
 
 // Gộp các việc cần nhắc (tái ký hợp đồng ADS + báo cáo chỉ số ADS), áp quyền xem:
@@ -50,7 +51,7 @@ export function tinhCanGoiLai({ khach = [], logs = [], statuses = [], isAdmin = 
   return khach
     .filter((c) => ma.has(c.trang_thai_cham_soc) && (isAdmin || (uids ? uids.has(c.sale_id) : c.sale_id === userId)))
     .map((c) => {
-      const moc = [c.ngay_lien_he_gan_nhat, logMoiNhat.get(c.id), (c.created_at || '').slice(0, 10)]
+      const moc = [c.ngay_lien_he_gan_nhat, logMoiNhat.get(c.id), ngayLocal(c.created_at)]
         .filter(Boolean).sort().pop()
       return { khach: c, saleId: c.sale_id, moc, soNgay: moc ? chenhNgay(moc, homNay) : 0 }
     })

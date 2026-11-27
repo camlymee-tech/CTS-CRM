@@ -101,8 +101,12 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = '
 
   async function xoa(f) {
     if (!window.confirm(`Xoá file "${f.ten_file}"?`)) return
-    await supabase.storage.from(BUCKET).remove([f.duong_dan])
-    await supabase.from(bang).delete().eq('id', f.id)
+    // Xoá bản ghi trước rồi mới xoá file thật: nếu bị chặn quyền thì file vẫn còn nguyên, không thành link chết
+    const { data: daXoa, error } = await supabase.from(bang).delete().eq('id', f.id).select('id')
+    if (error || !daXoa?.length) { setMsg('Không xoá được file' + (error ? ': ' + error.message : ' (có thể bạn không có quyền xoá file này).')); return }
+    const { error: loiKho } = await supabase.storage.from(BUCKET).remove([f.duong_dan])
+    if (loiKho) console.warn('Đã xoá khỏi danh sách nhưng file trong kho chưa xoá được:', loiKho.message)
+    setMsg('')
     load()
     onChanged?.()
   }

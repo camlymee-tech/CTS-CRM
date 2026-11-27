@@ -1,6 +1,6 @@
 import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, ListPlus, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download, Upload, UserCog, UserRoundCheck } from 'lucide-react'
+import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, ListPlus, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download, UserRoundCheck } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Badge, Phantrang } from './ui'
 import CustomerForm from './CustomerForm'
@@ -21,7 +21,6 @@ import {
   LOAI_TUONG_TAC_OPTIONS,
   classOf,
   labelOf,
-  formatVnd,
 } from '../lib/constants'
 
 // Khách "chung" — cả team đều xem được (khớp với hàm la_khach_chung trong database)

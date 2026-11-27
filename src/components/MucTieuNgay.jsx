@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Phone, Plus, X, Target, CircleCheck, Lock, Clock } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { Button, Select, Input, Badge } from './ui'
+import { Button, Select, Badge } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
 import { homNayLocal } from '../lib/taiKy'
-import { maChuaLienHe, maKhNgheMay } from '../lib/nhacViec'
+import { maChuaLienHe } from '../lib/nhacViec'
 import { laQuanLy, locNhanSu } from '../lib/quyen'
 
 // Mục tiêu ngày: (1) số khách chuyển từ "Chưa liên hệ" sang trạng thái khác (KH liên hệ được) hôm nay,
@@ -96,7 +96,6 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
 
   // ---- Mục tiêu 1: KH liên hệ được ----
   const maChua = maChuaLienHe(statuses)
-  const maNghe = maKhNgheMay(statuses)
   const soNgheMay = logs.filter((l) => {
     if (l.user_id !== currentProfile.id) return false
     const [tu, den] = String(l.chi_tiet || '').split(' → ')
@@ -127,7 +126,8 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
     if (khoa) return
     const v = String(mucTieu[loai]).trim()
     if (v === '') {
-      await supabase.from('muc_tieu_so').delete().eq('user_id', currentProfile.id).eq('ngay', homNay).eq('loai', loai)
+      const { error } = await supabase.from('muc_tieu_so').delete().eq('user_id', currentProfile.id).eq('ngay', homNay).eq('loai', loai)
+      if (error) setLoi('Không bỏ được mục tiêu: ' + error.message)
       return
     }
     const so = Math.max(0, Math.round(Number(v) || 0))
@@ -157,8 +157,9 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
 
   async function bo(c) {
     if (khoa) return
-    await supabase.from('muc_tieu_ngay').delete()
+    const { error } = await supabase.from('muc_tieu_ngay').delete()
       .eq('user_id', currentProfile.id).eq('customer_id', c.id).eq('ngay', homNay)
+    if (error) { setLoi('Không bỏ được khách: ' + error.message); return }
     load()
   }
 
@@ -330,7 +331,6 @@ function BaoCaoMucTieu({ customers, currentProfile, phong = '' }) {
   }
 
   const maChua = maChuaLienHe(statuses)
-  const maNghe = maKhNgheMay(statuses)
   const khachTheoId = new Map(customers.map((c) => [c.id, c]))
 
   const dong = sales.filter((sl) => !phong || sl.phong_ban === phong).map((sl) => {

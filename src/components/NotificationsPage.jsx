@@ -53,7 +53,8 @@ export default function NotificationsPage({ currentProfile, onRead }) {
 
   async function markRead(id) {
     if (reads.has(id)) return
-    await supabase.from('notification_reads').insert({ notification_id: id, user_id: currentProfile.id })
+    const { error } = await supabase.from('notification_reads').insert({ notification_id: id, user_id: currentProfile.id })
+    if (error && error.code !== '23505') { window.alert('Không đánh dấu đã đọc được: ' + error.message); return }   // 23505 = đã đọc từ trước
     setReads(new Set([...reads, id]))
     onRead?.()
   }
@@ -61,16 +62,18 @@ export default function NotificationsPage({ currentProfile, onRead }) {
   async function markAllRead() {
     const chuaDoc = items.filter((i) => !reads.has(i.id))
     if (chuaDoc.length === 0) return
-    await supabase.from('notification_reads').insert(
+    const { error } = await supabase.from('notification_reads').insert(
       chuaDoc.map((i) => ({ notification_id: i.id, user_id: currentProfile.id }))
     )
+    if (error && error.code !== '23505') { window.alert('Không đánh dấu đã đọc được: ' + error.message); return }
     setReads(new Set(items.map((i) => i.id)))
     onRead?.()
   }
 
   async function remove(id) {
     if (!window.confirm('Xoá thông báo này?')) return
-    await supabase.from('notifications').delete().eq('id', id)
+    const { error } = await supabase.from('notifications').delete().eq('id', id)
+    if (error) { window.alert('Không xoá được: ' + error.message); return }
     load()
   }
 
@@ -84,9 +87,13 @@ export default function NotificationsPage({ currentProfile, onRead }) {
     } else {
       if (!window.confirm(`Xoá ${items.length} thông báo khỏi danh sách của bạn?`)) return
       const ids = items.map((i) => i.id)
-      await supabase.from('notification_dismissed').upsert(ids.map((id) => ({ notification_id: id, user_id: currentProfile.id })))
+      const { error } = await supabase.from('notification_dismissed').upsert(ids.map((id) => ({ notification_id: id, user_id: currentProfile.id })))
+      if (error) { window.alert('Không xoá được: ' + error.message); return }
       const chuaDoc = ids.filter((id) => !reads.has(id))
-      if (chuaDoc.length) await supabase.from('notification_reads').upsert(chuaDoc.map((id) => ({ notification_id: id, user_id: currentProfile.id })))
+      if (chuaDoc.length) {
+        const { error: loiDoc } = await supabase.from('notification_reads').upsert(chuaDoc.map((id) => ({ notification_id: id, user_id: currentProfile.id })))
+        if (loiDoc) console.warn('Đã ẩn thông báo nhưng chưa đánh dấu đã đọc được:', loiDoc.message)
+      }
     }
     load()
     onRead?.()

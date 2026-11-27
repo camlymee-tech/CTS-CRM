@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Plus, Trash2, Pencil, GripVertical } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Modal, Button, Input, Select, Badge } from './ui'
@@ -34,7 +34,8 @@ export default function StatusesModal({ onClose }) {
   }
 
   async function batTat(s) {
-    await supabase.from('customer_statuses').update({ active: !s.active }).eq('ma', s.ma)
+    const { error } = await supabase.from('customer_statuses').update({ active: !s.active }).eq('ma', s.ma)
+    if (error) { setMsg('Không đổi được trạng thái: ' + error.message); return }
     reload()
   }
 

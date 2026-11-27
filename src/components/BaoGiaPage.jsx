@@ -195,12 +195,6 @@ const MAC_DINH = { order: ORDER_MAC_DINH, mua_ban: MUA_BAN_MAC_DINH, van_chuyen:
 
 // ================= BÁO GIÁ ORDER: 4 bước =================
 const te2 = (n) => (Number(n) || 0).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const BUOC = [
-  { n: 1, ten: 'Giá xưởng', id: 'order-b1' },
-  { n: 2, ten: 'Khai thuế', id: 'order-b2' },
-  { n: 3, ten: 'Vận chuyển', id: 'order-b3' },
-  { n: 4, ten: 'Giá về tay', id: 'order-b4' },
-]
 const DICH_VU = [
   { k: 'van_chuyen', ten: 'Vận chuyển', mota: 'Khách tự mua hàng, CTS vận chuyển và làm thủ tục' },
   { k: 'uy_thac', ten: 'Uỷ thác XNK', mota: 'CTS đứng ra nhập khẩu uỷ thác cho khách' },

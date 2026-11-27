@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react'
 import { TriangleAlert, Upload } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { Modal, Input, Select, Textarea, Button, Badge } from './ui'
+import { Modal, Input, Select, Button, Badge } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
-import {
-  NEN_TANG_OPTIONS,
-  DICH_VU_OPTIONS,
-  LOAI_KHACH_OPTIONS,
-  NGUON_KHACH_OPTIONS,
-  labelOf,
-  TINH_THANH,
-} from '../lib/constants'
+import { TINH_THANH } from '../lib/constants'
 
 export default function CustomerForm({ customer, profiles, currentProfile, onClose, onSaved, onTaiFile }) {
-  const { options: TRANG_THAI, tenTrangThai, classTrangThai, maTaoDon, maDaChot } = useTrangThai()
+  const { options: TRANG_THAI, tenTrangThai, classTrangThai, maTaoDon } = useTrangThai()
   const isEdit = !!customer
   const trangThaiCu = customer?.trang_thai_cham_soc || null
   const [form, setForm] = useState({
@@ -70,13 +63,6 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
     }, 500)
     return () => clearTimeout(t)
   }, [form.sdt])
-
-  function toggleArray(field, value) {
-    setForm((f) => ({
-      ...f,
-      [field]: f[field].includes(value) ? f[field].filter((v) => v !== value) : [...f[field], value],
-    }))
-  }
 
   async function handleSubmit(e) {
     e.preventDefault()

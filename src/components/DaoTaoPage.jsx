@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { GraduationCap, CircleCheck, Circle, Lock, ClipboardCheck, ExternalLink, Plus, Pencil, Trash2, ChevronLeft } from 'lucide-react'
+import { CircleCheck, Circle, Lock, ClipboardCheck, ExternalLink, Plus, Pencil, Trash2, ChevronLeft } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { laAdmin, laQuanLy, locNhanSu } from '../lib/quyen'
 import { Button, Input, Select, Textarea, Modal } from './ui'
@@ -55,7 +55,8 @@ export default function DaoTaoPage({ currentProfile }) {
   }
   async function xoaBai(b) {
     if (!window.confirm(`Xoá bài "${b.tieu_de}"?`)) return
-    await supabase.from('dao_tao_bai').delete().eq('id', b.id)
+    const { error } = await supabase.from('dao_tao_bai').delete().eq('id', b.id)
+    if (error) { window.alert('Không xoá được bài: ' + error.message); return }
     await load(); setSua(null); setMo(null)
   }
 

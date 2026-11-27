@@ -55,7 +55,6 @@ export function tinhXNK(st, loai, order = false) {
   const thue = th.tong
   const tienHang = th.dong.reduce((a, d) => a + d.W, 0)
   // order = true: tiền hàng và phí mua hàng đã tính ở bước giá xưởng nên không tính lại ở phần vận chuyển
-  const muaBan = loai === 'mua_ban' && !order
   const coTienHang = (loai === 'mua_ban' || loai === 'uy_thac') && !order   // CTS thanh toán hộ tiền hàng cho khách
   const mb = loai === 'mua_ban'   // bố cục bảng mua bán (kể cả khi tính trong order)
   const coPhiMua = !order && (loai === 'mua_ban' || loai === 'uy_thac')
@@ -211,7 +210,6 @@ export function tinhOrder(st) {
   const ship = sps.map((_, i) => (gt1 > 0 ? shipTong * tri[i] / gt1 : 0))   // chia ship theo tỷ lệ giá trị hàng (để tính giá về tay từng sản phẩm)
   const gt3 = gt1 + shipTong
   const phi = gt3 * pct / 100
-  const tong = gt3 + phi
   const r = {
     gt1: { te: gt1, vnd: lam(gt1 * ty) },
     ship: { te: shipTong, vnd: lam(shipTong * ty) },

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   X, Phone, MessageCircle, Users as UsersIcon, MoreHorizontal, Plus,
-  Link2, Store, HandHeart, CircleAlert, CircleCheck, History, Check, Trash2, CalendarClock, FileText, ShoppingBag,
+  Link2, Store, HandHeart, CircleCheck, History, Trash2, CalendarClock, FileText, ShoppingBag,
   FileDown, Eye, PhoneCall, PhoneOutgoing, PhoneIncoming, PhoneOff, Clock, Play,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
@@ -16,12 +16,12 @@ import { BaoGiaEditor } from './BaoGiaPage'
 import BenBModal from './BenBModal'
 import { useBenB } from '../lib/benB'
 import { goiQuaCallio } from '../lib/callioExtension'
-import { nhacChoHopDong, hanDichVu, dinhDangNgay, moTaConLai } from '../lib/taiKy'
+import { nhacChoHopDong, hanDichVu, dinhDangNgay, moTaConLai, homNayLocal } from '../lib/taiKy'
+import { ngayLocal } from '../lib/danhSachKhach'
 import { baoCaoKeTiep, moTaHanBaoCao } from '../lib/baoCaoAds'
 import BaoCaoAdsModal from './BaoCaoAdsModal'
 import {
-  LOAI_TUONG_TAC_OPTIONS, NEN_TANG_OPTIONS,
-  DICH_VU_OPTIONS, NGUON_KHACH_OPTIONS, LOAI_KHACH_OPTIONS,
+  LOAI_TUONG_TAC_OPTIONS,
   TRANG_THAI_HD_OPTIONS, TINH_THANH,
   classOf, labelOf, formatVnd,
 } from '../lib/constants'
@@ -196,10 +196,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   const [dangLuuTT, setDangLuuTT] = useState(false)
   const [luuXongTT, setLuuXongTT] = useState('')
 
-  function toggleArrTT(field, val) {
-    setFormTT((f) => ({ ...f, [field]: f[field].includes(val) ? f[field].filter((v) => v !== val) : [...f[field], val] }))
-  }
-
   async function luuThongTin(e) {
     e.preventDefault()
     setDangLuuTT(true)
@@ -308,7 +304,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
           </div>
 
           <div className="mt-3 space-y-2 text-sm">
-            <Field label="Ngày tạo" value={(customer.created_at || '').slice(0, 10)} />
+            <Field label="Ngày tạo" value={ngayLocal(customer.created_at)} />
           </div>
 
           {chung && !cuaMinh && (
@@ -753,73 +749,6 @@ function XacNhanGoi({ ten, sdt, onHuy, onGoi }) {
   )
 }
 
-function VanDeGiaiPhap({ customer, suaDuoc, onSaved }) {
-  const [vanDe, setVanDe] = useState(customer.van_de || '')
-  const [giaiPhap, setGiaiPhap] = useState(customer.giai_phap || '')
-  const [goiTuVan, setGoiTuVan] = useState(customer.goi_tu_van || '')
-  const [luu, setLuu] = useState('')
-
-  async function ghi(patch) {
-    const { error } = await supabase.from('customers').update(patch).eq('id', customer.id)
-    if (!error) {
-      onSaved(patch)
-      setLuu('Đã lưu')
-      setTimeout(() => setLuu(''), 1500)
-    }
-  }
-
-  if (!suaDuoc) {
-    return (
-      <div className="space-y-3">
-        <O nhan="Vấn đề" giaTri={customer.van_de} />
-        <O nhan="Giải pháp" giaTri={customer.giai_phap} />
-        <O nhan="Gói tư vấn phù hợp" giaTri={customer.goi_tu_van} />
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="font-display font-semibold text-navy-900">Vấn đề &amp; giải pháp</p>
-        {luu && <span className="text-xs text-emerald-600">{luu}</span>}
-      </div>
-
-      <label className="block">
-        <span className="text-xs font-medium text-ink-400">VẤN ĐỀ</span>
-        <textarea rows={3} defaultValue={vanDe} placeholder="Vấn đề khách đang gặp..."
-          onBlur={(e) => { if (e.target.value !== (customer.van_de || '')) ghi({ van_de: e.target.value || null }) }}
-          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500" />
-      </label>
-
-      <label className="block">
-        <span className="text-xs font-medium text-ink-400">GIẢI PHÁP</span>
-        <textarea rows={5} defaultValue={giaiPhap} placeholder="Giải pháp tư vấn cho khách..."
-          onBlur={(e) => { if (e.target.value !== (customer.giai_phap || '')) ghi({ giai_phap: e.target.value || null }) }}
-          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500" />
-      </label>
-
-      <label className="block">
-        <span className="text-xs font-medium text-ink-400">GÓI TƯ VẤN PHÙ HỢP</span>
-        <textarea rows={2} defaultValue={goiTuVan} placeholder="VD: Gói Chạy quảng cáo Pro 3 tháng + Xây shop VIP 1..."
-          onBlur={(e) => { if (e.target.value !== (customer.goi_tu_van || '')) ghi({ goi_tu_van: e.target.value || null }) }}
-          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-coral-500" />
-      </label>
-
-      <p className="text-xs text-ink-400">Tự lưu khi bạn bấm ra ngoài ô.</p>
-    </div>
-  )
-}
-
-function O({ nhan, giaTri }) {
-  return (
-    <div>
-      <p className="text-xs font-medium text-ink-400">{nhan}</p>
-      <p className="mt-0.5 whitespace-pre-wrap text-sm text-navy-900">{giaTri || '—'}</p>
-    </div>
-  )
-}
-
 function StatTile({ label, value, small }) {
   return (
     <div className="rounded-xl border border-slate-100 bg-white px-1.5 py-2">
@@ -847,7 +776,7 @@ function AddInteraction({ customerId, currentProfile, ngayHen, onAdded }) {
   function congNgay(n) {
     const d = new Date()
     d.setDate(d.getDate() + n)
-    setNgayTiepTheo(d.toISOString().slice(0, 10))
+    setNgayTiepTheo(homNayLocal(d))
   }
 
   async function submit(e) {
@@ -857,11 +786,12 @@ function AddInteraction({ customerId, currentProfile, ngayHen, onAdded }) {
     const { error } = await supabase.from('customer_interactions').insert({
       customer_id: customerId, sale_id: currentProfile?.id, loai, noi_dung: noiDung.trim(),
     })
-    if (error) { setSaving(false); return }
+    if (error) { setSaving(false); window.alert('Không lưu được trao đổi: ' + error.message); return }
 
-    const patch = { ngay_lien_he_gan_nhat: new Date().toISOString().slice(0, 10) }
+    const patch = { ngay_lien_he_gan_nhat: homNayLocal() }
     if (ngayTiepTheo) patch.ngay_cham_soc_tiep_theo = ngayTiepTheo
-    await supabase.from('customers').update(patch).eq('id', customerId)
+    const { error: loiNgay } = await supabase.from('customers').update(patch).eq('id', customerId)
+    if (loiNgay) window.alert('Đã lưu trao đổi nhưng chưa cập nhật được ngày liên hệ / ngày chăm sóc tiếp: ' + loiNgay.message)
 
     setSaving(false)
     setNoiDung('')
