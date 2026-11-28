@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Button, Modal } from './ui'
 import { tenVaiTro } from '../lib/quyen'
+import { loiDeHieu } from '../lib/loi'
 
 // Chia khách cho sale. Hai cách dùng:
 //  - mode 'chon': chia các khách đang tích chọn
@@ -18,7 +19,7 @@ export default function ChiaKhachModal({ mode, customers, daChon, profiles, onCl
 
   const nguoiNhan = profiles.filter((p) => p.id !== saleNghi)
   const dem = (id) => customers.filter((c) => c.sale_id === id).length
-  const toggle = (id) => setNhan((s) => { const m = new Set(s); m.has(id) ? m.delete(id) : m.add(id); return m })
+  const toggle = (id) => setNhan((s) => { const m = new Set(s); if (m.has(id)) m.delete(id); else m.add(id); return m })
   const ids = [...nhan].filter((id) => id !== saleNghi)
   const moiNguoi = ids.length ? Math.ceil(dsKhach.length / ids.length) : 0
 
@@ -36,7 +37,7 @@ export default function ChiaKhachModal({ mode, customers, daChon, profiles, onCl
     for (const [saleId, list] of Object.entries(nhom)) {
       for (let i = 0; i < list.length; i += 100) {
         const { error } = await supabase.from('customers').update({ sale_id: saleId }).in('id', list.slice(i, i + 100))
-        if (error) { setDang(false); alert('Không chuyển được: ' + error.message); onDone(); return }
+        if (error) { setDang(false); alert('Không chuyển được: ' + loiDeHieu(error)); onDone(); return }
       }
     }
     setDang(false)

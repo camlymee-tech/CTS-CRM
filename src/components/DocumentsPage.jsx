@@ -4,8 +4,9 @@ import { supabase } from '../supabaseClient'
 import { Button, Input, Select, Textarea, Badge, Modal } from './ui'
 import DocumentFiles from './DocumentFiles'
 import { laAdmin, laLeader, laQuanLy } from '../lib/quyen'
+import { loiDeHieu } from '../lib/loi'
 
-export const DANH_MUC = [
+const DANH_MUC = [
   { value: 'tai_lieu_cong_viec', label: 'Tài liệu công việc', className: 'bg-slate-100 text-slate-600' },
   { value: 'dao_tao_sale', label: 'Đào tạo sale mới', className: 'bg-teal-50 text-teal-600' },
   { value: 'quy_dinh', label: 'Quy định công ty', className: 'bg-navy-900 text-white' },
@@ -49,7 +50,7 @@ export default function DocumentsPage({ currentProfile }) {
   async function remove(doc) {
     if (!window.confirm(`Xoá tài liệu "${doc.tieu_de}"? Thao tác này không hoàn tác được.`)) return
     const { error } = await supabase.from('documents').delete().eq('id', doc.id)
-    if (error) { window.alert('Không xoá được tài liệu: ' + error.message); return }
+    if (error) { window.alert('Không xoá được tài liệu: ' + loiDeHieu(error)); return }
     load()
   }
 
@@ -252,7 +253,7 @@ function DocumentForm({ doc, currentProfile, onClose, onSaved }) {
       ? await supabase.from('documents').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', doc.id)
       : await supabase.from('documents').insert({ ...payload, created_by: currentProfile.id })
     setSaving(false)
-    if (error) { setError(error.message); return }
+    if (error) { setError(loiDeHieu(error)); return }
     onSaved()
   }
 

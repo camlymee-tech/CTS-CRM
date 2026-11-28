@@ -1,16 +1,35 @@
-# React + Vite
+# CTS CRM
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+CRM nội bộ cho đội sale **CTS Logistics**: quản lý khách hàng, chia data, lịch sử chăm sóc, đơn dịch vụ,
+báo giá, checklist việc hằng ngày, báo cáo theo sale / team, tài liệu, đào tạo và gọi điện qua Callio.
 
-Currently, two official plugins are available:
+- **Giao diện:** React 19 + Vite + Tailwind CSS 4
+- **Máy chủ & dữ liệu:** Supabase (Postgres có phân quyền theo dòng, đăng nhập, lưu file, Edge Functions)
+- **Chạy web:** Vercel
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Phân quyền
+| Vai trò | Xem được |
+|---|---|
+| Quản trị (admin) | Toàn bộ |
+| Leader | Khách và số liệu của sale cùng phòng ban |
+| Sale | Khách của mình, khách chung và data chưa chia |
 
-## React Compiler
+## Chạy trên máy
+```
+npm install
+copy .env.example .env      # rồi điền VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY
+npm run dev                 # mở http://localhost:5173
+```
+Kiểm tra trước khi đẩy code: `npm run lint` và `npm run build`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tài liệu
+- [HUONG_DAN.md](HUONG_DAN.md) — cài đặt, deploy, cập nhật database, kết nối Callio.
+- [CLAUDE.md](CLAUDE.md) — quy ước code (dành cho AI và người sửa code).
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Thư mục
+```
+src/App.jsx            đăng nhập, chuyển trang (trang đang mở ghi trên địa chỉ web: …/#/khach-hang)
+src/components/        các màn hình và cửa sổ (trang lớn chia thư mục con: hoSoKhach/, khachHang/, baoCao/)
+src/lib/               logic dùng chung (quyền, ngày, SĐT, báo lỗi, tính giá, báo cáo, lọc khách, Excel…)
+supabase/              file SQL cập nhật database (migration_NN_*.sql) + Edge Functions
+```

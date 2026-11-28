@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Button, Input } from './ui'
 import logoCts from '../assets/cts-logo.png'
+import { loiDeHieu } from '../lib/loi'
 
 export default function Login() {
   const [mode, setMode] = useState('signin')
@@ -28,7 +29,7 @@ export default function Login() {
         setNotice('Đã gửi email đặt lại mật khẩu. Kiểm tra hộp thư (cả mục Spam) và bấm vào liên kết trong email.')
       }
     } catch (err) {
-      setError(err.message === 'Invalid login credentials' ? 'Sai email hoặc mật khẩu' : err.message)
+      setError(err.message === 'Invalid login credentials' ? 'Sai email hoặc mật khẩu' : loiDeHieu(err))
     } finally {
       setLoading(false)
     }

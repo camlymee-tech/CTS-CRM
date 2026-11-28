@@ -1,34 +1,24 @@
+// Hồ sơ khách (cửa sổ mở từ danh sách Khách hàng): cột trái tóm tắt khách, cột phải các tab.
+// Nội dung từng tab nằm trong thư mục hoSoKhach/.
 import { useEffect, useState } from 'react'
-import {
-  X, Phone, MessageCircle, Users as UsersIcon, MoreHorizontal, Plus,
-  Link2, Store, HandHeart, CircleCheck, History, Trash2, CalendarClock, FileText, ShoppingBag,
-  FileDown, Eye, PhoneCall, PhoneOutgoing, PhoneIncoming, PhoneOff, Clock, Play,
-} from 'lucide-react'
+import { X, Phone, Plus, Link2, Store, HandHeart } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { locNhanSu } from '../lib/quyen'
-import { Button, Textarea, Select, Badge, Input } from './ui'
+import { layNhanSu } from '../lib/nhanSu'
+import { loiDeHieu } from '../lib/loi'
+import { laAdmin, laLeader } from '../lib/quyen'
+import { Button, Select, Badge } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
-import { XuatHopDongForm, hdTuHopDongDaLuu } from './ContractsPage'
-import ContractPreview from './ContractPreview'
 import OrderForm from './OrderForm'
 import DanhSachBaoGia from './DanhSachBaoGia'
 import { BaoGiaEditor } from './BaoGiaPage'
-import BenBModal from './BenBModal'
-import { useBenB } from '../lib/benB'
 import { goiQuaCallio } from '../lib/callioExtension'
-import { nhacChoHopDong, hanDichVu, dinhDangNgay, moTaConLai, homNayLocal } from '../lib/taiKy'
-import { ngayLocal } from '../lib/danhSachKhach'
-import { baoCaoKeTiep, moTaHanBaoCao } from '../lib/baoCaoAds'
-import BaoCaoAdsModal from './BaoCaoAdsModal'
-import {
-  LOAI_TUONG_TAC_OPTIONS,
-  TRANG_THAI_HD_OPTIONS, TINH_THANH,
-  classOf, labelOf, formatVnd,
-} from '../lib/constants'
-
-const ICONS = { goi_dien: Phone, nhan_tin: MessageCircle, gap_mat: UsersIcon, khac: MoreHorizontal }
-
-
+import { ngayLocal } from '../lib/ngay'
+import { formatVnd } from '../lib/constants'
+import TabThongTin, { Field } from './hoSoKhach/TabThongTin'
+import { DanhSachChamSoc, AddInteraction } from './hoSoKhach/TabChamSoc'
+import NhatKyCuocGoi, { XacNhanGoi } from './hoSoKhach/TabCuocGoi'
+import { goiHamCallio } from '../lib/callio'
+import TabNhatKy from './hoSoKhach/TabNhatKy'
 
 export default function CustomerDetail({ customer: khachBanDau, currentProfile, onClose, onChanged }) {
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, laKhachChung, maTaoDon } = useTrangThai()
@@ -54,64 +44,43 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     setCuocGoi(data.calls || [])
   }
   const [donHang, setDonHang] = useState([])
-  const [hopDong, setHopDong] = useState([])
-  const [dvTheoDon, setDvTheoDon] = useState({})
   const [profiles, setProfiles] = useState([])
-  const [packages, setPackages] = useState([])
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState('')
-  const [xuatHD, setXuatHD] = useState(null)   // { hd, don }
-  const [xemHD, setXemHD] = useState(null)
   const [donMoi, setDonMoi] = useState(false)
-  const [baoCaoAds, setBaoCaoAds] = useState([])        // các lần đã báo cáo chỉ số ADS của khách
-  const [ghiBaoCao, setGhiBaoCao] = useState(null)       // { hd, lanThu } — mở cửa sổ ghi nhận đã báo cáo
-  const [taiKyPreset, setTaiKyPreset] = useState(null)   // { hd, donGanNhat } — mở form tái ký cho 1 hợp đồng
 
   const cuaMinh = customer.sale_id === currentProfile?.id
   const chung = laKhachChung(customer)
-  const isAdmin = currentProfile?.role === 'admin'
-  const { benB, taiLai: taiLaiBenB } = useBenB()
-  const [moBenB, setMoBenB] = useState(false)
+  const isAdmin = laAdmin(currentProfile)
   const [hoiGoi, setHoiGoi] = useState(false)   // hộp xác nhận trước khi gọi qua Callio
   // Leader sửa được khách của sale cùng phòng ban
-  const cuaTeam = currentProfile?.role === 'leader' && !!currentProfile.phong_ban &&
+  const cuaTeam = laLeader(currentProfile) && !!currentProfile.phong_ban &&
     profiles.find((p) => p.id === customer.sale_id)?.phong_ban === currentProfile.phong_ban
   const suaDuoc = cuaMinh || cuaTeam || isAdmin || chung || !customer.sale_id
 
+  // oxlint-disable-next-line react-hooks/exhaustive-deps, react/set-state-in-effect -- tải lại khi mở hồ sơ khác
   useEffect(() => { load() }, [customer.id])
-  useEffect(() => { setCuocGoi(null) }, [customer.id, customer.sdt])   // đổi số điện thoại thì tải lại
-  // Tải luôn khi mở hồ sơ (không chờ bấm tab) để tab hiện ngay số cuộc gọi
+  // Tải cuộc gọi luôn khi mở hồ sơ (không chờ bấm tab) để tab hiện ngay số cuộc; cuocGoi về null (đổi SĐT) thì tải lại
   useEffect(() => {
     if (cuocGoi !== null || dangTaiGoi) return
+    // oxlint-disable-next-line react/set-state-in-effect -- khách không có SĐT: ghi nhận "0 cuộc" ngay
     if (!customer.sdt) { setCuocGoi([]); return }
     taiCuocGoi()
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi cuocGoi đổi
   }, [cuocGoi])
 
   async function load() {
     setLoading(true)
-    const [{ data: it }, { data: lg }, { data: pf }, { data: od }, { data: ct }, { data: pk }, { data: bcAds }] = await Promise.all([
+    const [{ data: it }, { data: lg }, { data: pf }, { data: od }] = await Promise.all([
       supabase.from('customer_interactions').select('*').eq('customer_id', customer.id)
         .order('ngay_thuc_hien', { ascending: false }),
       supabase.from('customer_logs').select('*').eq('customer_id', customer.id)
         .order('created_at', { ascending: false }).limit(50),
-      supabase.from('profiles').select('id, full_name, role, phong_ban'),
+      layNhanSu(),
       supabase.from('orders').select('*').eq('customer_id', customer.id).order('ngay_chot', { ascending: false }),
-      supabase.from('contracts').select('*').eq('customer_id', customer.id).order('ngay_ky', { ascending: false }),
-      supabase.from('service_packages').select('*'),
-      supabase.from('ads_bao_cao').select('*').eq('customer_id', customer.id).order('ngay_bao_cao', { ascending: false }),
     ])
-    setBaoCaoAds(bcAds || [])
     setInteractions(it || []); setLogs(lg || []); setProfiles(pf || [])
-    setDonHang(od || []); setHopDong(ct || [])
-    setPackages(pk || [])
-
-    const ids = (od || []).map((o) => o.id)
-    if (ids.length) {
-      const { data: dv } = await supabase.from('order_items').select('*').in('order_id', ids)
-      const g = {}
-      for (const i of dv || []) g[i.order_id] = [...(g[i.order_id] || []), i]
-      setDvTheoDon(g)
-    } else setDvTheoDon({})
+    setDonHang(od || [])
     setLoading(false)
   }
 
@@ -121,7 +90,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     if (!window.confirm(`Nhận ${customer.ten_khach} về phụ trách? Sale cũ sẽ không còn thấy khách này trong danh sách riêng.`)) return
     const { error } = await supabase.from('customers')
       .update({ sale_id: currentProfile.id }).eq('id', customer.id)
-    if (error) { setMsg('Lỗi: ' + error.message); return }
+    if (error) { setMsg('Lỗi: ' + loiDeHieu(error)); return }
     setCustomer({ ...customer, sale_id: currentProfile.id })
     setMsg('')
     load(); onChanged?.()
@@ -130,7 +99,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   async function xoaTuongTac(it) {
     if (!window.confirm('Xoá dòng lịch sử chăm sóc này?')) return
     const { error } = await supabase.from('customer_interactions').delete().eq('id', it.id)
-    if (error) { setMsg('Không xoá được: ' + error.message); return }
+    if (error) { setMsg('Không xoá được: ' + loiDeHieu(error)); return }
     setMsg(''); load(); onChanged?.()
   }
 
@@ -138,7 +107,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     const truoc = customer.trang_thai_cham_soc
     const { error } = await supabase.from('customers')
       .update({ trang_thai_cham_soc: tt }).eq('id', customer.id)
-    if (error) { setMsg('Lỗi: ' + error.message); return }
+    if (error) { setMsg('Lỗi: ' + loiDeHieu(error)); return }
     const moi = { ...customer, trang_thai_cham_soc: tt }
     setCustomer(moi)
     load(); onChanged?.()
@@ -150,27 +119,6 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   }
 
   const tongGiaTriDon = donHang.reduce((s, o) => s + (Number(o.gia_tri) || 0), 0)
-
-  async function xoaDon(o) {
-    if (!window.confirm(`Xoá đơn ${o.ma_don}? Thao tác này không hoàn tác được, hợp đồng gắn với đơn (nếu có) cũng sẽ bị xoá theo.`)) return
-    const { error } = await supabase.from('orders').delete().eq('id', o.id)
-    if (error) { setMsg('Không xoá được: ' + error.message); return }
-    setMsg(''); load(); onChanged?.()
-  }
-
-  async function xoaBaoCaoAds(b) {
-    if (!window.confirm(`Xoá lần báo cáo ngày ${dinhDangNgay(b.ngay_bao_cao)}? Lịch nhắc báo cáo sẽ tính lại.`)) return
-    const { error } = await supabase.from('ads_bao_cao').delete().eq('id', b.id)
-    if (error) { setMsg('Không xoá được: ' + error.message); return }
-    setMsg(''); load()
-  }
-
-  async function xoaHopDong(hd) {
-    if (!window.confirm(`Xoá hợp đồng ${hd.so_hop_dong}? Thao tác này không hoàn tác được. Đơn dịch vụ liên quan vẫn được giữ nguyên.`)) return
-    const { error } = await supabase.from('contracts').delete().eq('id', hd.id)
-    if (error) { setMsg('Không xoá được: ' + error.message); return }
-    setMsg(''); load(); onChanged?.()
-  }
 
   // Form gộp toàn bộ thông tin khách hàng có thể sửa — 1 nút Lưu duy nhất, không cần mở form riêng
   const [formTT, setFormTT] = useState({
@@ -208,11 +156,12 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     if (error) {
       setMsg(error.message.includes('SDT_TRUNG')
         ? 'Số điện thoại này đã thuộc về một khách hàng khác trong hệ thống.'
-        : 'Không lưu được: ' + error.message)
+        : 'Không lưu được: ' + loiDeHieu(error))
       return
     }
     setMsg('')
     setCustomer((c) => ({ ...c, ...patch }))
+    if ('sdt' in patch && patch.sdt !== customer.sdt) setCuocGoi(null)   // đổi số điện thoại → tải lại cuộc gọi
     setLuuXongTT('Đã lưu')
     setTimeout(() => setLuuXongTT(''), 1500)
     onChanged?.()
@@ -336,52 +285,10 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? <p className="text-sm text-ink-400">Đang tải...</p> : (
             <>
-              {tab === 'thong_tin' && customer.sdt && <HoSoTrung customer={customer} />}
               {tab === 'thong_tin' && (
-                suaDuoc ? (
-                  <form onSubmit={luuThongTin} className="space-y-5">
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                      <Input label="Tên khách hàng" value={formTT.ten_khach}
-                        onChange={(e) => setFormTT({ ...formTT, ten_khach: e.target.value })} />
-                      <Input label="Link Facebook" value={formTT.link_fb}
-                        onChange={(e) => setFormTT({ ...formTT, link_fb: e.target.value })} />
-                      <Input label="Link shop" value={formTT.link_shop}
-                        onChange={(e) => setFormTT({ ...formTT, link_shop: e.target.value })} />
-                      <Select label="Khu vực khách ở" value={formTT.khu_vuc}
-                        onChange={(e) => setFormTT({ ...formTT, khu_vuc: e.target.value })}>
-                        <option value="">-- Chọn tỉnh / thành --</option>
-                        {TINH_THANH.map((t) => <option key={t} value={t}>{t}</option>)}
-                      </Select>
-                      <Input label="Số điện thoại" value={formTT.sdt}
-                        onChange={(e) => setFormTT({ ...formTT, sdt: e.target.value.replace(/[\s.\-]/g, '') })} />
-                      <Input label="Ngành hàng" value={formTT.nganh_hang}
-                        onChange={(e) => setFormTT({ ...formTT, nganh_hang: e.target.value })} />
-                      <Select label="Sale phụ trách" value={formTT.sale_id}
-                        onChange={(e) => setFormTT({ ...formTT, sale_id: e.target.value })}>
-                        <option value="">-- Chưa gán --</option>
-                        {(currentProfile?.role === 'leader' ? locNhanSu(currentProfile, profiles) : profiles).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                      </Select>
-                      <Input label="Chăm sóc tiếp theo" type="date" value={formTT.ngay_cham_soc_tiep_theo}
-                        onChange={(e) => setFormTT({ ...formTT, ngay_cham_soc_tiep_theo: e.target.value })} />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <Button type="submit" disabled={dangLuuTT}>
-                        {dangLuuTT ? 'Đang lưu...' : 'Lưu thông tin'}
-                      </Button>
-                      {luuXongTT && <span className="text-sm text-emerald-600">{luuXongTT}</span>}
-                    </div>
-                  </form>
-                ) : (
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                      <Field label="Số điện thoại" value={customer.sdt} />
-                      <Field label="Ngành hàng" value={customer.nganh_hang} />
-                      <Field label="Khu vực khách ở" value={customer.khu_vuc} />
-                      <Field label="Chăm sóc tiếp theo" value={customer.ngay_cham_soc_tiep_theo} />
-                    </div>
-                  </div>
-                )
+                <TabThongTin customer={customer} suaDuoc={suaDuoc} formTT={formTT} setFormTT={setFormTT}
+                  onLuu={luuThongTin} dangLuuTT={dangLuuTT} luuXongTT={luuXongTT}
+                  currentProfile={currentProfile} profiles={profiles} />
               )}
 
               {tab === 'bao_gia' && (
@@ -397,215 +304,9 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                 </div>
               )}
 
-              {tab === 'don_hang' && (
-                <div className="space-y-3">
-                  <button type="button" onClick={() => setDonMoi(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-coral-300 px-3 py-2 text-sm font-medium text-coral-600 hover:bg-coral-50">
-                    <Plus size={15} /> Tạo đơn dịch vụ {donHang.length > 0 ? 'khác' : 'mới'}
-                  </button>
-
-                  {donHang.length === 0 ? (
-                    <p className="text-sm text-ink-400">
-                      Khách chưa có đơn dịch vụ nào.
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {donHang.map((o) => (
-                        <div key={o.id} className="rounded-xl border border-slate-100 p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <ShoppingBag size={14} className="text-coral-500" />
-                                <p className="font-medium text-navy-900">{o.ma_don}</p>
-                                {o.loai_don === 'tai_ky'
-                                  ? <Badge className="bg-teal-50 text-teal-600">Tái ký</Badge>
-                                  : <Badge className="bg-coral-50 text-coral-600">Mới</Badge>}
-                              </div>
-                              <div className="mt-1.5 flex flex-wrap gap-1">
-                                {(dvTheoDon[o.id] || []).map((i) => (
-                                  <Badge key={i.id} className="bg-slate-100 text-slate-600">
-                                    {i.ten_dich_vu}{i.ten_goi ? ` · ${i.ten_goi}` : ''} · {formatVnd(i.gia)}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="flex flex-none flex-col items-end gap-1">
-                              <p className="font-display font-bold text-coral-500">{formatVnd(o.gia_tri)}</p>
-                              <button type="button" onClick={() => xoaDon(o)}
-                                className="inline-flex items-center gap-1 text-xs text-ink-400 hover:text-rose-500">
-                                <Trash2 size={12} /> Xoá
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-50 pt-3 text-xs text-ink-600">
-                            <span>Chốt: <b className="text-navy-900">{o.ngay_chot || '—'}</b></span>
-                            {o.so_thang && <span>Thời hạn: <b className="text-navy-900">{o.so_thang} tháng</b></span>}
-                          </div>
-                          {o.ghi_chu && <p className="mt-2 text-xs text-ink-600">{o.ghi_chu}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {tab === 'hop_dong' && (
-                <>
-                  {isAdmin && (
-                    <button type="button" onClick={() => setMoBenB(true)}
-                      className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-navy-700 hover:bg-slate-50">
-                      Sửa thông tin Bên B (bên cung cấp dịch vụ)
-                    </button>
-                  )}
-                {hopDong.length === 0 ? (
-                  <p className="text-sm text-ink-400">Khách chưa có hợp đồng nào.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {hopDong.map((hd) => {
-                      const donGoc = donHang.find((o) => o.id === hd.order_id)
-                      const itemsPhang = Object.values(dvTheoDon).flat()
-                      const nhac = nhacChoHopDong(hd, donHang, itemsPhang)
-                      const bc = baoCaoKeTiep(hd, donHang, baoCaoAds, (dvTheoDon[hd.order_id] || []))
-                      const lichSuBc = baoCaoAds.filter((b) => b.contract_id === hd.id)
-                      const hanHienTai = hanDichVu(hd, donHang) || hd.ngay_het_han
-                      const daTaiKy = !!hd.ngay_het_han && !!hanHienTai && hanHienTai !== String(hd.ngay_het_han).slice(0, 10)
-                      return (
-                        <div key={hd.id} className="rounded-xl border border-slate-100 p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <FileText size={14} className="text-teal-500" />
-                                <p className="font-medium text-navy-900">{hd.so_hop_dong}</p>
-                                <Badge className={classOf(TRANG_THAI_HD_OPTIONS, hd.trang_thai)}>
-                                  {labelOf(TRANG_THAI_HD_OPTIONS, hd.trang_thai)}
-                                </Badge>
-                                {nhac && (
-                                  <Badge className={nhac.muc === 'qua_han' ? 'bg-rose-100 text-rose-600'
-                                    : nhac.muc === 'hom_nay' ? 'bg-coral-50 text-coral-600' : 'bg-amber-100 text-amber-700'}>
-                                    Nhắc tái ký · {moTaConLai(nhac.conLai)}
-                                  </Badge>
-                                )}
-                              </div>
-                              {donGoc && <p className="mt-1 text-xs text-ink-400">Từ đơn {donGoc.ma_don}</p>}
-                            </div>
-                            <div className="flex flex-none flex-col items-end gap-1">
-                              <p className="font-display font-bold text-coral-500">{formatVnd(hd.gia_tri)}</p>
-                              <button type="button" onClick={() => xoaHopDong(hd)}
-                                className="inline-flex items-center gap-1 text-xs text-ink-400 hover:text-rose-500">
-                                <Trash2 size={12} /> Xoá
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-50 pt-3 text-xs text-ink-600">
-                            <span>Ký: <b className="text-navy-900">{hd.ngay_ky || '—'}</b></span>
-                            {hanHienTai && (
-                              <span>Hết hạn: <b className="text-navy-900">{dinhDangNgay(hanHienTai)}</b>
-                                {daTaiKy && <span className="text-teal-600"> (đã gia hạn theo các lần tái ký)</span>}
-                              </span>
-                            )}
-                            {hd.file_url && (
-                              <a href={hd.file_url} target="_blank" rel="noreferrer"
-                                className="text-teal-500 hover:underline">Mở file</a>
-                            )}
-                            {hd.loai_dich_vu && (
-                              <button type="button" onClick={() => setXemHD(hd)}
-                                className="inline-flex items-center gap-1 text-navy-700 hover:text-navy-900">
-                                <Eye size={12} /> Xem
-                              </button>
-                            )}
-                            {bc && (
-                              <button type="button" onClick={() => setGhiBaoCao({ hd, lanThu: bc.lanThu })}
-                                className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-2 py-1 font-medium text-white hover:bg-violet-700">
-                                Ghi nhận đã báo cáo ADS
-                              </button>
-                            )}
-                            {nhac && (
-                              <button type="button" onClick={() => setTaiKyPreset({ hd, donGanNhat: nhac.donGanNhat })}
-                                className="inline-flex items-center gap-1 rounded-md bg-coral-500 px-2 py-1 font-medium text-white hover:bg-coral-600">
-                                Tạo đơn tái ký
-                              </button>
-                            )}
-                            {donGoc && (
-                              <button type="button" onClick={() => setXuatHD({ hd, don: donGoc })}
-                                className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700">
-                                <FileDown size={12} /> Xuất hợp đồng
-                              </button>
-                            )}
-                          </div>
-
-                          {(bc || lichSuBc.length > 0) && (
-                            <div className="mt-3 rounded-lg bg-violet-50/60 px-3 py-2 text-xs text-ink-600">
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                                <span className="font-medium text-violet-700">Báo cáo chỉ số ADS (2 tuần/lần)</span>
-                                <span>Đã báo cáo: <b className="text-navy-900">{lichSuBc.length} lần</b></span>
-                                {bc && bc.canBaoCao && (
-                                  <span>
-                                    Lần kế tiếp: <b className="text-navy-900">{dinhDangNgay(bc.ngayDenHan)}</b>{' '}
-                                    <Badge className={bc.conLai < 0 ? 'bg-rose-100 text-rose-600' : bc.conLai <= 2 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}>
-                                      {moTaHanBaoCao(bc.conLai)}
-                                    </Badge>
-                                  </span>
-                                )}
-                                {bc && !bc.canBaoCao && <span className="text-ink-400">Không còn lần báo cáo nào trong thời gian hợp đồng</span>}
-                              </div>
-                              {lichSuBc.length > 0 && (
-                                <ul className="mt-1.5 space-y-1">
-                                  {lichSuBc.slice(0, 4).map((b) => (
-                                    <li key={b.id} className="flex items-start justify-between gap-2">
-                                      <span>
-                                        <b className="text-navy-900">{dinhDangNgay(b.ngay_bao_cao)}</b>
-                                        {b.ghi_chu ? ` — ${b.ghi_chu}` : ''}
-                                      </span>
-                                      <button type="button" onClick={() => xoaBaoCaoAds(b)}
-                                        className="flex-none text-ink-400 hover:text-rose-500" title="Xoá lần báo cáo này">
-                                        <Trash2 size={11} />
-                                      </button>
-                                    </li>
-                                  ))}
-                                  {lichSuBc.length > 4 && <li className="text-ink-400">... và {lichSuBc.length - 4} lần trước đó</li>}
-                                </ul>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-                </>
-              )}
-
               {tab === 'cham_soc' && (
-                interactions.length === 0
-                  ? <p className="text-sm text-ink-400">Chưa có lịch sử chăm sóc nào.</p>
-                  : (
-                    <ul className="space-y-3">
-                      {interactions.map((it) => {
-                        const Icon = ICONS[it.loai] || MoreHorizontal
-                        return (
-                          <li key={it.id} className="flex gap-3 rounded-xl border border-slate-100 p-3">
-                            <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-teal-50 text-teal-500">
-                              <Icon size={15} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm text-navy-900">{it.noi_dung}</p>
-                              <p className="mt-0.5 text-xs text-ink-400">
-                                {tenNguoi(it.sale_id)} · {new Date(it.ngay_thuc_hien).toLocaleString('vi-VN')}
-                              </p>
-                            </div>
-                            {(it.sale_id === currentProfile?.id || isAdmin || cuaTeam) && (
-                              <button onClick={() => xoaTuongTac(it)}
-                                className="flex-none text-ink-400 hover:text-rose-500" title="Xoá">
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )
+                <DanhSachChamSoc interactions={interactions} tenNguoi={tenNguoi} onXoa={xoaTuongTac}
+                  xoaDuoc={(it) => it.sale_id === currentProfile?.id || isAdmin || cuaTeam} />
               )}
 
               {tab === 'cuoc_goi' && (
@@ -613,28 +314,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                   onTaiLai={taiCuocGoi} customerId={customer.id} tenNguoi={tenNguoi} />
               )}
 
-              {tab === 'nhat_ky' && (
-                logs.length === 0
-                  ? <p className="text-sm text-ink-400">Chưa có thay đổi nào được ghi nhận.</p>
-                  : (
-                    <ul className="space-y-2">
-                      {logs.map((l) => (
-                        <li key={l.id} className="flex gap-3 rounded-xl border border-slate-100 px-3 py-2.5">
-                          <History size={14} className="mt-0.5 flex-none text-ink-400" />
-                          <div className="min-w-0">
-                            <p className="text-sm text-navy-900">
-                              <b>{l.hanh_dong}</b>
-                              {l.chi_tiet && <span className="text-ink-600"> — {l.chi_tiet}</span>}
-                            </p>
-                            <p className="text-xs text-ink-400">
-                              {tenNguoi(l.user_id)} · {new Date(l.created_at).toLocaleString('vi-VN')}
-                            </p>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )
-              )}
+              {tab === 'nhat_ky' && <TabNhatKy logs={logs} tenNguoi={tenNguoi} />}
             </>
           )}
         </div>
@@ -659,92 +339,15 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
         </div>
       )}
 
-      {ghiBaoCao && (
-        <BaoCaoAdsModal
-          hd={ghiBaoCao.hd}
-          khach={customer}
-          lanThu={ghiBaoCao.lanThu}
-          currentProfile={currentProfile}
-          onClose={() => setGhiBaoCao(null)}
-          onSaved={() => { setGhiBaoCao(null); load(); onChanged?.() }}
-        />
-      )}
-
-      {(donMoi || taiKyPreset) && (
+      {donMoi && (
         <OrderForm
           customer={customer}
           profiles={profiles}
           currentProfile={currentProfile}
-          {...(taiKyPreset ? {
-            loaiBanDau: 'tai_ky',
-            taiKyHopDongId: taiKyPreset.hd.id,
-            saoChepTuDonId: taiKyPreset.donGanNhat?.id,
-          } : {})}
-          onClose={() => { setDonMoi(false); setTaiKyPreset(null) }}
-          onSaved={() => { setDonMoi(false); setTaiKyPreset(null); load(); onChanged?.() }}
+          onClose={() => setDonMoi(false)}
+          onSaved={() => { setDonMoi(false); load(); onChanged?.() }}
         />
       )}
-
-      {moBenB && (
-        <BenBModal benB={benB} onClose={() => setMoBenB(false)} onSaved={taiLaiBenB} />
-      )}
-
-      {xuatHD && (
-        <XuatHopDongForm
-          contract={xuatHD.hd}
-          khach={customer}
-          don={xuatHD.don}
-          dichVu={dvTheoDon[xuatHD.don.id] || []}
-          packages={packages}
-          onClose={() => setXuatHD(null)}
-          onSaved={() => { setXuatHD(null); load() }}
-        />
-      )}
-
-      {xemHD && (
-        <ContractPreview
-          hd={hdTuHopDongDaLuu(xemHD, customer, benB)}
-          onClose={() => setXemHD(null)}
-        />
-      )}
-    </div>
-  )
-}
-
-// Hộp xác nhận trước khi gọi — Callio nhận số là tự quay luôn, nên phải hỏi để tránh gọi nhầm.
-// Enter = Gọi (nút được focus sẵn), Esc hoặc bấm ra ngoài = Huỷ.
-function XacNhanGoi({ ten, sdt, onHuy, onGoi }) {
-  const coCallio = !!document.getElementById('callio-extension')
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/50 p-4"
-      onClick={onHuy} onKeyDown={(e) => { if (e.key === 'Escape') onHuy() }}>
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white text-center shadow-2xl"
-        onClick={(e) => e.stopPropagation()}>
-        <div className="bg-gradient-to-b from-teal-50 to-white px-6 pb-2 pt-7">
-          <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
-            <span className="absolute -inset-2 rounded-full bg-teal-400/15" />
-            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-teal-500 text-white shadow-lg shadow-teal-500/30">
-              <PhoneCall size={28} />
-            </span>
-          </div>
-          <p className="mt-4 text-sm text-ink-400">Gọi cho khách hàng</p>
-          <p className="mt-0.5 font-display text-lg font-bold leading-tight text-navy-900">{ten}</p>
-          <p className="mt-2 font-display text-2xl font-bold tracking-wide text-teal-600">{sdt}</p>
-        </div>
-        <p className="px-6 pt-2 text-xs text-ink-400">
-          {coCallio ? 'Callio sẽ quay số ngay khi bạn bấm Gọi.' : 'Không thấy Callio — sẽ gọi bằng ứng dụng gọi của máy.'}
-        </p>
-        <div className="flex gap-3 p-6">
-          <button type="button" onClick={onHuy}
-            className="flex-1 rounded-xl border border-slate-200 py-2.5 font-medium text-ink-600 transition hover:bg-slate-50">
-            Huỷ
-          </button>
-          <button type="button" onClick={onGoi} autoFocus
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-teal-500 py-2.5 font-semibold text-white shadow-md shadow-teal-500/30 transition hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-300">
-            <Phone size={16} /> Gọi
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
@@ -754,279 +357,6 @@ function StatTile({ label, value, small }) {
     <div className="rounded-xl border border-slate-100 bg-white px-1.5 py-2">
       <p className={`font-display font-bold text-navy-900 ${small ? 'text-xs' : 'text-sm'}`}>{value}</p>
       <p className="mt-0.5 text-[10px] leading-tight text-ink-400">{label}</p>
-    </div>
-  )
-}
-
-function Field({ label, value }) {
-  return (
-    <div>
-      <p className="text-ink-400">{label}</p>
-      <p className="font-medium text-navy-900">{value || '—'}</p>
-    </div>
-  )
-}
-
-function AddInteraction({ customerId, currentProfile, ngayHen, onAdded }) {
-  const [noiDung, setNoiDung] = useState('')
-  const [loai, setLoai] = useState('goi_dien')
-  const [ngayTiepTheo, setNgayTiepTheo] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  function congNgay(n) {
-    const d = new Date()
-    d.setDate(d.getDate() + n)
-    setNgayTiepTheo(homNayLocal(d))
-  }
-
-  async function submit(e) {
-    e.preventDefault()
-    if (!noiDung.trim()) return
-    setSaving(true)
-    const { error } = await supabase.from('customer_interactions').insert({
-      customer_id: customerId, sale_id: currentProfile?.id, loai, noi_dung: noiDung.trim(),
-    })
-    if (error) { setSaving(false); window.alert('Không lưu được trao đổi: ' + error.message); return }
-
-    const patch = { ngay_lien_he_gan_nhat: homNayLocal() }
-    if (ngayTiepTheo) patch.ngay_cham_soc_tiep_theo = ngayTiepTheo
-    const { error: loiNgay } = await supabase.from('customers').update(patch).eq('id', customerId)
-    if (loiNgay) window.alert('Đã lưu trao đổi nhưng chưa cập nhật được ngày liên hệ / ngày chăm sóc tiếp: ' + loiNgay.message)
-
-    setSaving(false)
-    setNoiDung('')
-    setNgayTiepTheo('')
-    onAdded(ngayTiepTheo || undefined)
-  }
-
-  const NHANH = [
-    { label: 'Mai', ngay: 1 },
-    { label: '3 ngày', ngay: 3 },
-    { label: '1 tuần', ngay: 7 },
-    { label: '2 tuần', ngay: 14 },
-  ]
-
-  return (
-    <form onSubmit={submit} className="border-t border-slate-100 px-6 py-4">
-      <div className="mb-2">
-        <Select value={loai} onChange={(e) => setLoai(e.target.value)} className="w-40">
-          {LOAI_TUONG_TAC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </Select>
-      </div>
-      <Textarea rows={2} placeholder="Ghi lại nội dung đã trao đổi với khách..."
-        value={noiDung} onChange={(e) => setNoiDung(e.target.value)} />
-
-      <div className="mt-3 rounded-xl bg-slate-50 p-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-navy-900">
-          <CalendarClock size={15} className="text-coral-500" />
-          Hẹn chăm sóc lại
-          {ngayHen && !ngayTiepTheo && (
-            <span className="font-normal text-ink-400">· đang hẹn {ngayHen}</span>
-          )}
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {NHANH.map((n) => (
-            <button type="button" key={n.ngay} onClick={() => congNgay(n.ngay)}
-              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-ink-600 hover:border-coral-500 hover:text-coral-500">
-              {n.label}
-            </button>
-          ))}
-          <input type="date" value={ngayTiepTheo} onChange={(e) => setNgayTiepTheo(e.target.value)}
-            className="rounded-lg border border-slate-200 px-2 py-1 text-xs outline-none focus:border-coral-500" />
-          {ngayTiepTheo && (
-            <button type="button" onClick={() => setNgayTiepTheo('')}
-              className="text-xs text-ink-400 hover:text-rose-500">Bỏ chọn</button>
-          )}
-        </div>
-      </div>
-
-      <Button type="submit" disabled={saving} className="mt-3 w-full">
-        <Plus size={15} /> {saving ? 'Đang lưu...' : 'Lưu chăm sóc' + (ngayTiepTheo ? ' & đặt lịch hẹn' : '')}
-      </Button>
-    </form>
-  )
-}
-
-
-// ============ NHẬT KÝ CUỘC GỌI + GHI ÂM (lấy từ Callio) ============
-// Gọi hàm máy chủ "callio"; trả { data } hoặc { error: { text, code } } với câu báo lỗi dễ hiểu
-async function goiHamCallio(body) {
-  try {
-    const { data, error } = await supabase.functions.invoke('callio', { body })
-    if (error) {
-      let text = ''
-      try { text = (await error.context?.json())?.error || '' } catch { /* không đọc được nội dung lỗi */ }
-      return { error: { text: text || 'Chưa gọi được chức năng Callio trên máy chủ.', code: text ? 'loi' : 'chua_trien_khai' } }
-    }
-    if (data?.error) return { error: { text: data.error, code: data.code || 'loi' } }
-    return { data }
-  } catch (e) {
-    return { error: { text: 'Lỗi kết nối: ' + e.message, code: 'loi' } }
-  }
-}
-
-const TT_GOI = {
-  nghe_may: { ten: 'Nghe máy', cls: 'bg-emerald-50 text-emerald-700' },
-  khong_nghe: { ten: 'Không nghe máy', cls: 'bg-rose-50 text-rose-600' },
-  ban: { ten: 'Máy bận', cls: 'bg-amber-50 text-amber-700' },
-  tu_choi: { ten: 'Từ chối', cls: 'bg-rose-50 text-rose-600' },
-}
-const ngayGoi = (t) => { if (!t) return 'Không rõ giờ'; const d = new Date(t); const p2 = (n) => String(n).padStart(2, '0'); return `${p2(d.getDate())}/${p2(d.getMonth() + 1)} ${p2(d.getHours())}:${p2(d.getMinutes())}` }
-const phutGiay = (s) => `${Math.floor((s || 0) / 60)}:${String((s || 0) % 60).padStart(2, '0')}`
-const tongThoiLuong = (s) => {
-  const p = Math.round((s || 0) / 60)
-  return p >= 60 ? `${Math.floor(p / 60)} giờ ${p % 60} phút` : `${p} phút`
-}
-
-function NhatKyCuocGoi({ ds, dangTai, loi, onTaiLai, customerId, tenNguoi }) {
-  const [ghiAm, setGhiAm] = useState({})   // { [id cuộc gọi]: { dangTai, url, loi } }
-
-  // Link ghi âm Callio chỉ sống 6 giờ → mỗi lần bấm nghe xin link mới, không lưu lại
-  async function nghe(id) {
-    setGhiAm((g) => ({ ...g, [id]: { dangTai: true } }))
-    const { data, error } = await goiHamCallio({ action: 'recording', customer_id: customerId, call_id: id })
-    setGhiAm((g) => ({ ...g, [id]: error ? { loi: error.text } : { url: data.url } }))
-  }
-
-  if (dangTai) {
-    return <p className="py-10 text-center text-sm text-ink-400">Đang tải cuộc gọi từ Callio...</p>
-  }
-  if (loi) {
-    const chuaKetNoi = loi.code === 'chua_ket_noi' || loi.code === 'chua_trien_khai'
-    return (
-      <div className={`rounded-xl border px-4 py-8 text-center ${chuaKetNoi ? 'border-dashed border-slate-200' : 'border-rose-200 bg-rose-50'}`}>
-        <PhoneOff size={28} className={`mx-auto ${chuaKetNoi ? 'text-ink-400' : 'text-rose-500'}`} />
-        <p className="mt-2 font-medium text-navy-900">{chuaKetNoi ? 'Chưa kết nối Callio' : 'Không tải được cuộc gọi'}</p>
-        <p className="mt-1 text-sm text-ink-600">
-          {chuaKetNoi ? 'Quản trị viên cần cài đặt kết nối Callio thì lịch sử cuộc gọi mới hiện ở đây.' : loi.text}
-        </p>
-        <button type="button" onClick={onTaiLai} className="mt-3 text-sm font-medium text-coral-500 hover:underline">Thử lại</button>
-      </div>
-    )
-  }
-  if (ds.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
-        <Phone size={28} className="mx-auto text-ink-400" />
-        <p className="mt-2 font-medium text-navy-900">Chưa có cuộc gọi nào với khách này</p>
-        <p className="mt-1 text-sm text-ink-600">Cuộc gọi qua Callio với số này sẽ tự hiện ở đây kèm ghi âm.</p>
-        <button type="button" onClick={onTaiLai} className="mt-3 text-sm font-medium text-coral-500 hover:underline">Tải lại</button>
-      </div>
-    )
-  }
-  const ngheMay = ds.filter((c) => c.trang_thai === 'nghe_may')
-  const gan = new Date(ds[0].bat_dau)
-  const homNay = gan.toDateString() === new Date().toDateString()
-  const stat = [
-    ['Tổng cuộc gọi', ds.length, Phone, 'bg-navy-900 text-white', 'border-navy-900/15 bg-slate-50'],
-    ['Nghe máy', ngheMay.length, CircleCheck, 'bg-emerald-500 text-white', 'border-emerald-200 bg-emerald-50'],
-    ['Tổng thời lượng', tongThoiLuong(ds.reduce((a, c) => a + (c.thoi_luong_giay || 0), 0)), Clock, 'bg-coral-500 text-white', 'border-orange-200 bg-orange-50'],
-    ['Gọi gần nhất', homNay ? 'Hôm nay' : gan.toLocaleDateString('vi-VN'), CalendarClock, 'bg-sky-500 text-white', 'border-sky-200 bg-sky-50'],
-  ]
-  return (
-    <div>
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {stat.map(([nhan, v, Ic, mauIcon, mauO]) => (
-          <div key={nhan} className={`rounded-2xl border-2 px-3.5 py-3 ${mauO}`}>
-            <div className="flex items-center gap-2">
-              <div className={`flex h-8 w-8 flex-none items-center justify-center rounded-lg ${mauIcon}`}><Ic size={16} strokeWidth={2.4} /></div>
-              <p className="text-xs font-bold leading-tight text-ink-600">{nhan}</p>
-            </div>
-            <p className="mt-2 font-display text-2xl font-extrabold leading-tight text-navy-900">{v}</p>
-          </div>
-        ))}
-      </div>
-
-      <ul className="space-y-3">
-        {ds.map((c) => {
-          const Icon = c.trang_thai !== 'nghe_may' ? PhoneOff : c.huong === 'den' ? PhoneIncoming : PhoneOutgoing
-          const mau = c.trang_thai !== 'nghe_may' ? 'bg-rose-50 text-rose-500' : c.huong === 'den' ? 'bg-sky-50 text-sky-600' : 'bg-emerald-50 text-emerald-600'
-          const tt = TT_GOI[c.trang_thai] || TT_GOI.nghe_may
-          return (
-            <li key={c.id} className="rounded-xl border border-slate-100 p-3">
-              <div className="flex items-center gap-3">
-                <div className={`flex h-8 w-8 flex-none items-center justify-center rounded-full ${mau}`}><Icon size={15} /></div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-navy-900">
-                    {c.huong === 'den' ? 'Gọi đến' : 'Gọi đi'} · {ngayGoi(c.bat_dau)}
-                  </p>
-                  <p className="text-xs text-ink-400">{(c.sale_id && tenNguoi(c.sale_id)) || c.ten_sale || 'Không rõ'}{c.so_dien_thoai ? ` · ${c.so_dien_thoai}` : ''}</p>
-                </div>
-                <Badge className={tt.cls}>{tt.ten}</Badge>
-                <span className="w-12 flex-none text-right text-sm tabular-nums text-ink-600">{phutGiay(c.thoi_luong_giay)}</span>
-              </div>
-              {c.co_ghi_am && (() => {
-                const g = ghiAm[c.id]
-                if (g?.url) return (
-                  <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5">
-                    <audio controls autoPlay src={g.url} className="h-8 w-full" />
-                    <a href={g.url} download target="_blank" rel="noreferrer"
-                      className="flex-none text-ink-400 hover:text-coral-500" title="Tải ghi âm"><FileDown size={15} /></a>
-                  </div>
-                )
-                return (
-                  <div className="mt-2 flex items-center gap-3">
-                    <button type="button" onClick={() => nghe(c.id)} disabled={g?.dangTai}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-navy-900 hover:bg-slate-100 disabled:opacity-60">
-                      <Play size={13} /> {g?.dangTai ? 'Đang lấy ghi âm...' : 'Nghe ghi âm'}
-                    </button>
-                    {g?.loi && <span className="text-xs text-rose-500">{g.loi}</span>}
-                  </div>
-                )
-              })()}
-              {c.ghi_chu && <p className="mt-2 text-xs text-ink-600">Ghi chú: {c.ghi_chu}</p>}
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
-}
-
-
-// Khung cảnh báo: số điện thoại này có nhiều hồ sơ (do nhiều sale điền)
-function HoSoTrung({ customer }) {
-  const [ds, setDs] = useState([])
-  useEffect(() => {
-    let huy = false
-    supabase.rpc('ho_so_trung_sdt', { p_sdt: customer.sdt }).then(({ data }) => { if (!huy) setDs(data || []) })
-    return () => { huy = true }
-  }, [customer.id, customer.sdt])
-  if (ds.length < 2) return null
-  const hien = ds.filter((r) => r.xem_duoc || r.da_chot)
-  const an = ds.length - hien.length
-  const th = 'border border-amber-200 bg-amber-100/60 px-2 py-1.5 text-left font-medium text-amber-900'
-  const td = 'border border-amber-200 px-2 py-1.5'
-  const ngay = (v) => (v ? new Date(v).toLocaleDateString('vi-VN') : 'Chưa có')
-  return (
-    <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
-      <p className="mb-2 text-sm font-medium text-amber-900">Số {customer.sdt} có {ds.length} hồ sơ trong hệ thống</p>
-      <table className="w-full border-collapse bg-white text-xs">
-        <thead><tr>
-          <th className={th}>Sale</th><th className={th}>Phòng</th><th className={th}>Trạng thái</th>
-          <th className={th}>Liên hệ gần nhất</th><th className={th}>Ngày tạo</th><th className={th}></th>
-        </tr></thead>
-        <tbody>
-          {hien.map((r) => {
-            const dangXem = r.id === customer.id
-            return (
-              <tr key={r.id} className={dangXem ? 'bg-sky-50' : r.da_chot ? 'bg-emerald-50' : ''}>
-                <td className={`${td} font-medium`}>{r.sale_ten || '—'}</td>
-                <td className={td}>{r.phong_ban || '—'}</td>
-                <td className={`${td} ${r.da_chot ? 'font-medium text-emerald-700' : ''}`}>{r.trang_thai || '—'}</td>
-                <td className={td}>{ngay(r.lien_he_gan_nhat)}</td>
-                <td className={td}>{ngay(r.ngay_tao)}</td>
-                <td className={td}>
-                  {dangXem ? <span className="text-sky-700">Đang xem</span>
-                    : r.xem_duoc ? <button type="button" className="text-sky-700 hover:underline" onClick={() => window.dispatchEvent(new CustomEvent('mo-ho-so', { detail: r.id }))}>Mở hồ sơ</button>
-                    : null}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      {an > 0 && <p className="mt-2 text-xs text-amber-800">+ {an} hồ sơ khác (không hiển thị)</p>}
     </div>
   )
 }

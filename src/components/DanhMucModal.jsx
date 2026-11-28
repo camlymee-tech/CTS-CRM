@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import { Modal, Button, Input, Badge } from './ui'
 import { DANH_MUC, macDinhCua, dongTuyChinh, taiDanhMuc } from '../lib/danhMuc'
 import { DA_AN } from '../lib/constants'
+import { loiDeHieu } from '../lib/loi'
 
 function taoMa(ten) {
   return ten.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
@@ -31,7 +32,7 @@ export default function DanhMucModal({ onClose }) {
   ]
 
   async function xong(error) {
-    if (error) { setMsg('Lỗi: ' + error.message + (error.message.includes('danh_muc') ? ' — chị cần chạy file SQL migration_33 trước.' : '')); return }
+    if (error) { setMsg('Lỗi: ' + loiDeHieu(error) + (error.message.includes('danh_muc') ? ' — chị cần chạy file SQL migration_33 trước.' : '')); return }
     setMsg(''); await taiDanhMuc(); ve((x) => x + 1)
   }
 

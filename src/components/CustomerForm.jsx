@@ -4,6 +4,8 @@ import { supabase } from '../supabaseClient'
 import { Modal, Input, Select, Button, Badge } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
 import { TINH_THANH } from '../lib/constants'
+import { chuanSo } from '../lib/sdt'
+import { loiDeHieu } from '../lib/loi'
 
 export default function CustomerForm({ customer, profiles, currentProfile, onClose, onSaved, onTaiFile }) {
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, maTaoDon } = useTrangThai()
@@ -40,11 +42,11 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
   const [saleList, setSaleList] = useState({})
 
   const daChot = !!khachTrung?.daChot   // chỉ khách đã CHỐT mới chặn lưu
-  const chiSo = (v) => { const d = (v || '').replace(/\D/g, ''); return /^84\d{9,10}$/.test(d) ? '0' + d.slice(2) : d }
 
   // Kiểm tra trùng số điện thoại ngay khi gõ
   useEffect(() => {
-    const so = chiSo(form.sdt)
+    const so = chuanSo(form.sdt)
+    // oxlint-disable-next-line react/set-state-in-effect -- số chưa đủ dài: xoá ngay cảnh báo trùng cũ
     if (so.length < 8) { setKhachTrung(null); return }
     setDangKiemTra(true)
     const t = setTimeout(async () => {
@@ -62,6 +64,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
       setDangKiemTra(false)
     }, 500)
     return () => clearTimeout(t)
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- chỉ kiểm tra lại khi SĐT đổi
   }, [form.sdt])
 
   async function handleSubmit(e) {
@@ -95,7 +98,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
     if (error) {
       setError(error.message.includes('SDT_TRUNG')
         ? 'Số điện thoại này đã thuộc về một khách hàng khác trong hệ thống.'
-        : error.message)
+        : loiDeHieu(error))
       return
     }
 
@@ -113,7 +116,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
           onChange={(e) => setForm({ ...form, ten_khach: e.target.value })} />
         <div>
           <Input label="Số điện thoại" value={form.sdt}
-            onChange={(e) => setForm({ ...form, sdt: e.target.value.replace(/[\s.\-]/g, '') })}
+            onChange={(e) => setForm({ ...form, sdt: e.target.value.replace(/[\s.-]/g, '') })}
             className={khachTrung ? 'border-amber-400 bg-amber-50' : ''} />
           {dangKiemTra && <p className="mt-1 text-xs text-ink-400">Đang kiểm tra trùng...</p>}
         </div>

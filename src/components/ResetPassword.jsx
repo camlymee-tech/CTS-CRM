@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Button, Input } from './ui'
+import { loiDeHieu } from '../lib/loi'
 
 export default function ResetPassword({ onDone }) {
   const [password, setPassword] = useState('')
@@ -23,7 +24,7 @@ export default function ResetPassword({ onDone }) {
     const { error } = await supabase.auth.updateUser({ password })
     setLoading(false)
     if (error) {
-      setError(error.message)
+      setError(loiDeHieu(error))
       return
     }
     onDone()

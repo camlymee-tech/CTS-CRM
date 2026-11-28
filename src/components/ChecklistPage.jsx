@@ -1,15 +1,16 @@
 import { layHet } from '../lib/layHet'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Phone, CalendarCheck, CircleCheck, BarChart3 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
+import { layNhanSu } from '../lib/nhanSu'
+import { laAdmin, laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
 import { Select, Badge } from './ui'
 import CustomerDetail from './CustomerDetail'
 import OrderForm from './OrderForm'
 import BaoCaoAdsModal from './BaoCaoAdsModal'
 import MucTieuNgay from './MucTieuNgay'
 import { useTrangThai } from '../lib/StatusContext'
-import { homNayLocal, dinhDangNgay } from '../lib/taiKy'
+import { homNayLocal, dinhDangNgay } from '../lib/ngay'
 import { moTaHanBaoCao, CHU_KY_BAO_CAO } from '../lib/baoCaoAds'
 import { tinhNhacViec, tinhCanGoiLai, tinhFollowUpHomNay, SO_NGAY_GOI_LAI } from '../lib/nhacViec'
 
@@ -32,13 +33,14 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   const isAdmin = laQuanLy(currentProfile)   // admin hoặc leader: xem được nhiều người
   const homNay = homNayLocal()
 
+  // oxlint-disable-next-line react-hooks/exhaustive-deps, react/set-state-in-effect -- chỉ tải 1 lần khi mở trang
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
     const [{ data: c }, { data: p }, { data: hd }, { data: dn }, { data: it }, { data: bc }, { data: lg }] = await Promise.all([
       layHet(() => supabase.from('customers').select('*').order('ngay_cham_soc_tiep_theo').order('id')),
-      supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
+      layNhanSu(),
       supabase.from('contracts').select('*').eq('trang_thai', 'hieu_luc'),
       supabase.from('orders').select('*').neq('trang_thai', 'huy'),
       layHet(() => supabase.from('order_items').select('order_id, ten_dich_vu').order('id')),
@@ -52,30 +54,30 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   }
 
   const uids = useMemo(() => nhanSuXemDuoc(currentProfile, profiles), [currentProfile, profiles])
-  const dsPhong = useMemo(() => [...new Set(profiles.filter((p) => p.role !== 'admin' && p.phong_ban).map((p) => p.phong_ban))].sort((a, b) => a.localeCompare(b, 'vi')), [profiles])
+  const dsPhong = useMemo(() => [...new Set(profiles.filter((p) => !laAdmin(p) && p.phong_ban).map((p) => p.phong_ban))].sort((a, b) => a.localeCompare(b, 'vi')), [profiles])
   const idsPhong = useMemo(() => new Set(profiles.filter((p) => p.phong_ban === filterPhong).map((p) => p.id)), [profiles, filterPhong])
   // Khớp bộ lọc phòng + sale đang chọn
-  const khopLoc = (saleId) => (!filterSale || saleId === filterSale) && (!filterPhong || idsPhong.has(saleId))
+  const khopLoc = useCallback((saleId) => (!filterSale || saleId === filterSale) && (!filterPhong || idsPhong.has(saleId)), [filterSale, filterPhong, idsPhong])
   const tenSale = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
   // Follow-up đến hạn: ngày dự kiến liên hệ lại là hôm nay, bỏ qua khách đã chốt/đang triển khai/hoàn thành
   const dungHomNay = useMemo(() => tinhFollowUpHomNay({
     khach: customers, maDaChot, isAdmin: uids === null, userId: currentProfile?.id, uids, homNay,
   }).filter((c) => khopLoc(c.sale_id)),
-  [customers, homNay, uids, currentProfile?.id, filterSale, filterPhong, idsPhong, maDaChot])
+  [customers, homNay, uids, currentProfile?.id, khopLoc, maDaChot])
 
   // Khách cần gọi lại: trạng thái đã gửi báo giá / hẹn đi đơn mà 7 ngày chưa liên hệ lại, chưa đổi trạng thái
   const canGoiLai = useMemo(() => tinhCanGoiLai({
     khach: customers, logs: logsDoiTT, statuses, isAdmin: uids === null, userId: currentProfile?.id, uids, homNay,
   }).filter((r) => khopLoc(r.saleId)),
-  [customers, logsDoiTT, statuses, uids, currentProfile?.id, filterSale, filterPhong, idsPhong, homNay])
+  [customers, logsDoiTT, statuses, uids, currentProfile?.id, khopLoc, homNay])
 
   // Việc cần nhắc: tái ký hợp đồng ADS + báo cáo chỉ số ADS (sale chỉ thấy của mình, admin thấy cả team)
   const { nhacBaoCao } = useMemo(() => {
     const r = tinhNhacViec({ khach: customers, hopDong, don, items: itemsDon, baoCao, isAdmin: uids === null, userId: currentProfile?.id, uids })
     const loc = (ds) => ds.filter((x) => khopLoc(x.saleId))
     return { nhacBaoCao: loc(r.baoCaoAds) }
-  }, [customers, hopDong, don, itemsDon, baoCao, uids, currentProfile?.id, filterSale, filterPhong, idsPhong])
+  }, [customers, hopDong, don, itemsDon, baoCao, uids, currentProfile?.id, khopLoc])
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -97,7 +99,7 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
             )}
             <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-48">
               <option value="">{filterPhong ? `Tất cả sale phòng ${filterPhong}` : 'Tất cả sale'}</option>
-              {locNhanSu(currentProfile, profiles).filter((p) => p.role !== 'admin' && (!filterPhong || p.phong_ban === filterPhong)).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+              {locNhanSu(currentProfile, profiles).filter((p) => !laAdmin(p) && (!filterPhong || p.phong_ban === filterPhong)).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
             </Select>
           </div>
         )}

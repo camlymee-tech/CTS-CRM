@@ -5,12 +5,13 @@ import {
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Button } from './ui'
+import { loiDeHieu } from '../lib/loi'
 
 const BUCKET = 'tai-lieu'
 const GIOI_HAN_MB = 50
 
 // Loại file -> icon + cách xem
-export function kieuFile(ten = '') {
+function kieuFile(ten = '') {
   const duoi = ten.split('.').pop()?.toLowerCase() || ''
   if (duoi === 'pdf') return { nhom: 'pdf', icon: FileText, mau: 'text-rose-500', xemTrucTiep: true }
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(duoi))
@@ -47,6 +48,7 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = '
   const [pdfNhung, setPdfNhung] = useState([])   // PDF hiện thẳng trong trang (nếu bật nhungPdf)
   const inputRef = useRef(null)
 
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- tải lại khi đổi tài liệu
   useEffect(() => { load() }, [documentId])
 
   async function load() {
@@ -81,7 +83,7 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = '
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(key, f, {
         cacheControl: '3600', upsert: false,
       })
-      if (upErr) { setMsg('Lỗi tải lên: ' + upErr.message); continue }
+      if (upErr) { setMsg('Lỗi tải lên: ' + loiDeHieu(upErr)); continue }
 
       const { error: dbErr } = await supabase.from(bang).insert({
         [cotKhoa]: documentId,
@@ -90,7 +92,7 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = '
         loai: f.type || null,
         kich_thuoc: f.size,
       })
-      if (dbErr) setMsg('Lỗi lưu thông tin file: ' + dbErr.message)
+      if (dbErr) setMsg('Lỗi lưu thông tin file: ' + loiDeHieu(dbErr))
     }
 
     setDangTai(false)
@@ -103,7 +105,7 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = '
     if (!window.confirm(`Xoá file "${f.ten_file}"?`)) return
     // Xoá bản ghi trước rồi mới xoá file thật: nếu bị chặn quyền thì file vẫn còn nguyên, không thành link chết
     const { data: daXoa, error } = await supabase.from(bang).delete().eq('id', f.id).select('id')
-    if (error || !daXoa?.length) { setMsg('Không xoá được file' + (error ? ': ' + error.message : ' (có thể bạn không có quyền xoá file này).')); return }
+    if (error || !daXoa?.length) { setMsg('Không xoá được file' + (error ? ': ' + loiDeHieu(error) : ' (có thể bạn không có quyền xoá file này).')); return }
     const { error: loiKho } = await supabase.storage.from(BUCKET).remove([f.duong_dan])
     if (loiKho) console.warn('Đã xoá khỏi danh sách nhưng file trong kho chưa xoá được:', loiKho.message)
     setMsg('')
@@ -116,14 +118,14 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = '
     try {
       const url = await layLink(f.duong_dan, true)
       if (tab) tab.location.href = url; else window.location.href = url
-    } catch (err) { tab?.close(); setMsg('Không tải được: ' + err.message) }
+    } catch (err) { tab?.close(); setMsg('Không tải được: ' + loiDeHieu(err)) }
   }
 
   async function moXem(f) {
     try {
       const url = await layLink(f.duong_dan)
       setXemFile({ ...f, url })
-    } catch (err) { setMsg('Không mở được: ' + err.message) }
+    } catch (err) { setMsg('Không mở được: ' + loiDeHieu(err)) }
   }
 
   return (

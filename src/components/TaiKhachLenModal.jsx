@@ -6,9 +6,9 @@ import { useTrangThai } from '../lib/StatusContext'
 import { TINH_THANH } from '../lib/constants'
 import { maChuaLienHe } from '../lib/nhacViec'
 import { laQuanLy } from '../lib/quyen'
+import { chuanSo } from '../lib/sdt'
 
 const boDau = (t = '') => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim()
-const chiSo = (v) => { const d = String(v || '').replace(/\D/g, ''); return /^84\d{9,10}$/.test(d) ? '0' + d.slice(2) : d }
 const chuan = (v) => String(v ?? '').trim()
 
 // Tên cột trong file (so khớp không dấu, không phân biệt hoa thường)
@@ -27,7 +27,19 @@ const layCot = (row, khoa) => {
   return ''
 }
 
-export default function TaiKhachLenModal({ customers, profiles, currentProfile, onClose, onDone }) {
+// Đọc file tải lên. CSV: đọc như chữ UTF-8 để giữ dấu tiếng Việt cả khi file không có BOM
+// (thư viện tự đoán sẽ đọc thành "TÃªn khÃ¡ch hÃ ng"); file không phải UTF-8 thì để thư viện đọc như cũ.
+async function docWorkbook(XLSX, f) {
+  const buf = new Uint8Array(await f.arrayBuffer())
+  if (/\.csv$/i.test(f.name)) {
+    try {
+      return XLSX.read(new TextDecoder('utf-8', { fatal: true }).decode(buf), { type: 'string' })
+    } catch { /* không phải UTF-8 */ }
+  }
+  return XLSX.read(buf, { type: 'array' })
+}
+
+export default function TaiKhachLenModal({ profiles, currentProfile, onClose, onDone }) {
   const { statuses } = useTrangThai()
   const laAdmin = laQuanLy(currentProfile)   // admin / leader được ghi tên sale (leader: chỉ sale trong team)
   const inputRef = useRef(null)
@@ -38,7 +50,7 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
   const [dangLam, setDangLam] = useState(false)
   const [ketQua, setKetQua] = useState(null)
 
-  const ttHoatDong = statuses.filter((s) => s.active !== false)
+  const ttHoatDong = useMemo(() => statuses.filter((s) => s.active !== false), [statuses])
   const maMacDinh = maChuaLienHe(statuses)[0] || 'chua_lien_he'
 
   async function taiMau() {
@@ -59,13 +71,13 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
     setLoi(''); setKetQua(null); setRows(null); setTenFile(f.name)
     try {
       const XLSX = await import('xlsx')
-      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' })
+      const wb = await docWorkbook(XLSX, f)
       const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false })
       if (data.length === 0) { setLoi('File không có dòng dữ liệu nào.'); return }
       if (data.length > 20000) { setLoi('File quá lớn (tối đa 20.000 dòng mỗi lần). Chị chia nhỏ file rồi tải lại.'); return }
       setRows(data)
       // Hỏi hệ thống những số nào đã có (không lộ thông tin khách của người khác)
-      const so = [...new Set(data.map((r) => chiSo(layCot(r, 'sdt'))).filter((x) => x.length >= 8))]
+      const so = [...new Set(data.map((r) => chuanSo(layCot(r, 'sdt'))).filter((x) => x.length >= 8))]
       const m = new Map()
       for (let i = 0; i < so.length; i += 500) {
         const { data: kq } = await supabase.rpc('sdt_da_co', { p_ds: so.slice(i, i + 500) })
@@ -83,8 +95,8 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
     const sdtTrongFile = new Set()
     return rows.map((r, i) => {
       const ten = layCot(r, 'ten')
-      const sdt = String(layCot(r, 'sdt') || '').replace(/[\s.\-]/g, '')
-      const so = chiSo(sdt)
+      const sdt = String(layCot(r, 'sdt') || '').replace(/[\s.-]/g, '')
+      const so = chuanSo(sdt)
       const canhBao = []
       let loiDong = ''
       if (!ten) loiDong = 'Thiếu tên khách hàng'
@@ -124,7 +136,7 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
         },
       }
     })
-  }, [rows, customers, profiles, statuses, trungSdt])
+  }, [rows, profiles, trungSdt, ttHoatDong, maMacDinh, currentProfile.id, laAdmin])
 
   const hopLe = kiemTra.filter((r) => !r.loi)
   const biLoai = kiemTra.filter((r) => r.loi)

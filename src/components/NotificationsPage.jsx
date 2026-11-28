@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { Megaphone, FileText, UserPlus2, ShoppingBag, Cake, CheckCheck, Trash2, Send } from 'lucide-react'
 import { laAdmin as vaiLaAdmin, laLeader as vaiLaLeader, laQuanLy, locNhanSu } from '../lib/quyen'
 import { supabase } from '../supabaseClient'
+import { layNhanSu } from '../lib/nhanSu'
 import { Button, Input, Textarea, Select, Badge, Modal } from './ui'
+import { loiDeHieu } from '../lib/loi'
 
 const LOAI = {
   chung: { label: 'Thông báo chung', icon: Megaphone, className: 'bg-slate-100 text-slate-600' },
@@ -13,7 +15,7 @@ const LOAI = {
 }
 
 // Tính sinh nhật hôm nay từ danh sách hồ sơ (không lưu vào DB)
-export function sinhNhatHomNay(profiles) {
+function sinhNhatHomNay(profiles) {
   const now = new Date()
   const d = now.getDate()
   const m = now.getMonth() + 1
@@ -34,6 +36,7 @@ export default function NotificationsPage({ currentProfile, onRead }) {
   const isAdmin = vaiLaAdmin(currentProfile)
   const quanLy = laQuanLy(currentProfile)   // admin / leader được gửi thông báo
 
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- chỉ tải 1 lần khi mở trang
   useEffect(() => { load() }, [])
 
   async function load() {
@@ -41,7 +44,7 @@ export default function NotificationsPage({ currentProfile, onRead }) {
     const [{ data: notis }, { data: readRows }, { data: profs }, { data: an }] = await Promise.all([
       supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(100),
       supabase.from('notification_reads').select('notification_id').eq('user_id', currentProfile.id),
-      supabase.from('profiles').select('id, full_name, ngay_sinh, active'),
+      layNhanSu(),
       supabase.from('notification_dismissed').select('notification_id').eq('user_id', currentProfile.id),
     ])
     const daAn = new Set((an || []).map((r) => r.notification_id))
@@ -54,7 +57,7 @@ export default function NotificationsPage({ currentProfile, onRead }) {
   async function markRead(id) {
     if (reads.has(id)) return
     const { error } = await supabase.from('notification_reads').insert({ notification_id: id, user_id: currentProfile.id })
-    if (error && error.code !== '23505') { window.alert('Không đánh dấu đã đọc được: ' + error.message); return }   // 23505 = đã đọc từ trước
+    if (error && error.code !== '23505') { window.alert('Không đánh dấu đã đọc được: ' + loiDeHieu(error)); return }   // 23505 = đã đọc từ trước
     setReads(new Set([...reads, id]))
     onRead?.()
   }
@@ -65,7 +68,7 @@ export default function NotificationsPage({ currentProfile, onRead }) {
     const { error } = await supabase.from('notification_reads').insert(
       chuaDoc.map((i) => ({ notification_id: i.id, user_id: currentProfile.id }))
     )
-    if (error && error.code !== '23505') { window.alert('Không đánh dấu đã đọc được: ' + error.message); return }
+    if (error && error.code !== '23505') { window.alert('Không đánh dấu đã đọc được: ' + loiDeHieu(error)); return }
     setReads(new Set(items.map((i) => i.id)))
     onRead?.()
   }
@@ -73,7 +76,7 @@ export default function NotificationsPage({ currentProfile, onRead }) {
   async function remove(id) {
     if (!window.confirm('Xoá thông báo này?')) return
     const { error } = await supabase.from('notifications').delete().eq('id', id)
-    if (error) { window.alert('Không xoá được: ' + error.message); return }
+    if (error) { window.alert('Không xoá được: ' + loiDeHieu(error)); return }
     load()
   }
 
@@ -83,12 +86,12 @@ export default function NotificationsPage({ currentProfile, onRead }) {
     if (isAdmin) {
       if (!window.confirm(`Xoá TẤT CẢ ${items.length} thông báo? Thông báo bị xoá khỏi danh sách của mọi người và không khôi phục được.`)) return
       const { error } = await supabase.from('notifications').delete().in('id', items.map((i) => i.id))
-      if (error) { window.alert('Không xoá được: ' + error.message); return }
+      if (error) { window.alert('Không xoá được: ' + loiDeHieu(error)); return }
     } else {
       if (!window.confirm(`Xoá ${items.length} thông báo khỏi danh sách của bạn?`)) return
       const ids = items.map((i) => i.id)
       const { error } = await supabase.from('notification_dismissed').upsert(ids.map((id) => ({ notification_id: id, user_id: currentProfile.id })))
-      if (error) { window.alert('Không xoá được: ' + error.message); return }
+      if (error) { window.alert('Không xoá được: ' + loiDeHieu(error)); return }
       const chuaDoc = ids.filter((id) => !reads.has(id))
       if (chuaDoc.length) {
         const { error: loiDoc } = await supabase.from('notification_reads').upsert(chuaDoc.map((id) => ({ notification_id: id, user_id: currentProfile.id })))
@@ -200,13 +203,13 @@ function ComposeForm({ currentProfile, onClose, onSent }) {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
+      layNhanSu(),
       supabase.from('phong_ban').select('ten').order('ten'),
     ]).then(([{ data }, { data: pb }]) => {
       setProfiles(locNhanSu(currentProfile, data || []))
       setDsPB((pb || []).map((x) => x.ten))
     })
-  }, [])
+  }, [currentProfile])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -222,7 +225,7 @@ function ComposeForm({ currentProfile, onClose, onSent }) {
       created_by: currentProfile.id,
     })
     setSaving(false)
-    if (error) { setError(error.message); return }
+    if (error) { setError(loiDeHieu(error)); return }
     onSent()
   }
 

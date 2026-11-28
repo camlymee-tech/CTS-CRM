@@ -8,6 +8,7 @@ import {
 } from '../lib/baoGia'
 import { xuatBaoGia } from '../lib/baoGiaXlsx'
 import { xuatBaoGiaPdf } from '../lib/baoGiaPdf'
+import { loiDeHieu } from '../lib/loi'
 
 const vnd = (n) => (n === null || n === undefined || n === '' ? '' : Math.round(Number(n) || 0).toLocaleString('vi-VN'))
 const pt2 = (n) => (Number(n) || 0).toFixed(2).replace('.', ',') + '%'
@@ -361,7 +362,7 @@ function ChonKhach({ khach, onChon }) {
   const [kq, setKq] = useState([])
   const [mo, setMo] = useState(false)
   useEffect(() => {
-    if (tim.trim().length < 2) { setKq([]); return }
+    if (tim.trim().length < 2) return   // ô tìm ngắn: danh sách đã được xoá ngay lúc gõ
     const t = setTimeout(async () => {
       const s = tim.trim().replace(/[,()%]/g, ' ')
       const { data } = await supabase.from('customers').select('id, ma_khach, ten_khach, sdt')
@@ -383,13 +384,13 @@ function ChonKhach({ khach, onChon }) {
     <div className="relative">
       <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
         <Search size={15} className="text-ink-400" />
-        <input value={tim} onChange={(e) => { setTim(e.target.value); setMo(true) }} placeholder="Gõ tên, mã hoặc số điện thoại khách để chọn..."
+        <input value={tim} onChange={(e) => { setTim(e.target.value); setMo(true); if (e.target.value.trim().length < 2) setKq([]) }} placeholder="Gõ tên, mã hoặc số điện thoại khách để chọn..."
           className="w-full text-sm outline-none" />
       </div>
       {mo && kq.length > 0 && (
         <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
           {kq.map((c) => (
-            <button key={c.id} type="button" onClick={() => { onChon(c); setMo(false); setTim('') }}
+            <button key={c.id} type="button" onClick={() => { onChon(c); setMo(false); setTim(''); setKq([]) }}
               className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50">
               <span className="font-medium text-navy-900">{c.ten_khach}</span>
               <span className="text-xs text-ink-400">{c.ma_khach}{c.sdt ? ` · ${c.sdt}` : ''}</span>
@@ -435,7 +436,7 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
       ? await supabase.from('bao_gia').update(row).eq('id', idLuu).select('id').single()
       : await supabase.from('bao_gia').insert({ ...row, created_by: currentProfile?.id }).select('id').single()
     setDangLuu(false)
-    if (error) { alert('Không lưu được báo giá: ' + error.message); return }
+    if (error) { alert('Không lưu được báo giá: ' + loiDeHieu(error)); return }
     setIdLuu(r.id); setDaLuu(true); onSaved?.()
   }
 
@@ -481,14 +482,11 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
   )
 }
 
-// Trang Tính giá bán: bảng tính ở trên, danh sách báo giá đã lưu ngay bên dưới
+// Trang Tính giá bán
 export default function BaoGiaPage({ currentProfile }) {
-  const [mo, setMo] = useState(null)         // báo giá đang mở lại
-  const [khoa, setKhoa] = useState(0)        // đổi để dựng lại editor
-  const [lamMoi, setLamMoi] = useState(0)
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <BaoGiaEditor key={khoa} baoGiaMo={mo} currentProfile={currentProfile} onSaved={() => setLamMoi((n) => n + 1)} />
+      <BaoGiaEditor currentProfile={currentProfile} />
     </div>
   )
 }

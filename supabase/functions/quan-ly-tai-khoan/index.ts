@@ -1,4 +1,6 @@
 // Edge Function: admin tạo / sửa / xoá / đặt lại mật khẩu nhân sự; leader tạo, sửa, xoá và đặt lại mật khẩu cho sale trong team mình.
+// LƯU Ý TÊN: trên Supabase hàm này được deploy với tên `quan-ly-tai-khoa` (thiếu chữ "n" ở cuối) và TeamPage.jsx
+// gọi đúng tên đó. Thư mục ở đây vẫn tên quan-ly-tai-khoan. Đừng "sửa chính tả" một bên — trang Nhân sự sẽ hỏng.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const cors = {

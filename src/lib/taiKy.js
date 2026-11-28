@@ -1,28 +1,9 @@
 // Nhắc tái ký hợp đồng ADS khi sắp / đã hết hạn.
 // Không cần SQL: hạn dịch vụ hiện tại = ngày hết hạn của hợp đồng + thời hạn các lần đã tái ký.
 
+import { homNayLocal, congThang, soNgayGiua } from './ngay'
+
 export const SO_NGAY_NHAC = 7   // nhắc trước khi hết hạn bao nhiêu ngày
-
-const pad = (n) => String(n).padStart(2, '0')
-
-// Ngày hôm nay theo giờ máy (không dùng UTC để khỏi lệch ngày lúc sáng sớm)
-export function homNayLocal(d = new Date()) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-// Cộng n tháng vào ngày YYYY-MM-DD, nếu tháng đích ngắn hơn thì lấy ngày cuối tháng (giống Postgres)
-export function congThang(ymd, n) {
-  const [y, m, d] = String(ymd).slice(0, 10).split('-').map(Number)
-  const dich = new Date(Date.UTC(y, m - 1 + n, 1))
-  const cuoiThang = new Date(Date.UTC(dich.getUTCFullYear(), dich.getUTCMonth() + 1, 0)).getUTCDate()
-  return `${dich.getUTCFullYear()}-${pad(dich.getUTCMonth() + 1)}-${pad(Math.min(d, cuoiThang))}`
-}
-
-export function soNgayGiua(tu, den) {
-  const a = Date.UTC(...String(tu).slice(0, 10).split('-').map((x, i) => (i === 1 ? Number(x) - 1 : Number(x))))
-  const b = Date.UTC(...String(den).slice(0, 10).split('-').map((x, i) => (i === 1 ? Number(x) - 1 : Number(x))))
-  return Math.round((b - a) / 86400000)
-}
 
 // Hợp đồng ADS? Ưu tiên loai_dich_vu; hợp đồng cũ chưa có thì xem đơn gốc có dịch vụ quảng cáo không
 export function laHopDongAds(hd, itemsCuaDon = []) {
@@ -74,17 +55,4 @@ export function danhSachNhacTaiKy({ hopDong = [], don = [], items = [], homNay =
     })
   }
   return kq.sort((a, b) => a.conLai - b.conLai)
-}
-
-// Nhắc của riêng 1 hợp đồng (dùng ở tab Hợp đồng của khách). null nếu chưa cần nhắc.
-export function nhacChoHopDong(hd, don = [], items = [], homNay = homNayLocal(), soNgay = SO_NGAY_NHAC) {
-  return danhSachNhacTaiKy({ hopDong: [hd], don, items, homNay, soNgay })[0] || null
-}
-
-export const dinhDangNgay = (s) => (s ? String(s).slice(0, 10).split('-').reverse().join('/') : '')
-
-export function moTaConLai(conLai) {
-  if (conLai < 0) return `Đã hết hạn ${-conLai} ngày`
-  if (conLai === 0) return 'Hết hạn hôm nay'
-  return `Còn ${conLai} ngày`
 }

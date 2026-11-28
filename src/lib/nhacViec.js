@@ -1,9 +1,9 @@
 import { layHet } from './layHet'
 import { danhSachNhacTaiKy } from './taiKy'
 import { danhSachNhacBaoCao } from './baoCaoAds'
-import { homNayLocal } from './taiKy'
-import { ngayLocal } from './danhSachKhach'
+import { homNayLocal, ngayLocal } from './ngay'
 import { nhanSuXemDuoc } from './quyen'
+import { layNhanSu } from './nhanSu'
 
 // Gộp các việc cần nhắc (tái ký hợp đồng ADS + báo cáo chỉ số ADS), áp quyền xem:
 // sale chỉ thấy khách của mình, quản trị thấy cả team. Dùng chung cho trang Checklist và huy hiệu ở sidebar.
@@ -77,7 +77,7 @@ export async function demNhacViec(supabase, { isAdmin, userId, me = null }) {
     supabase.from('ads_bao_cao').select('contract_id, ngay_bao_cao'),   // chưa chạy SQL thì trả rỗng, không sao
     supabase.from('customer_statuses').select('ma, ten, la_chot, active'),
     supabase.from('customer_logs').select('customer_id, hanh_dong, created_at').eq('hanh_dong', 'Đổi trạng thái').order('created_at', { ascending: false }).limit(5000),
-    supabase.from('profiles').select('id, role, phong_ban'),
+    layNhanSu(),
   ])
   const k = khach || []
   const uids = me ? nhanSuXemDuoc(me, ps || []) : null
