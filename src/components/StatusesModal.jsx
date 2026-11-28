@@ -3,6 +3,7 @@ import { Plus, Trash2, Pencil, GripVertical } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { Modal, Button, Input, Select, Badge } from './ui'
 import { useTrangThai, MAU_BADGE, DANH_SACH_MAU } from '../lib/StatusContext'
+import { loiDeHieu } from '../lib/loi'
 
 // Tạo mã từ tên: "Chờ báo giá" -> "cho_bao_gia"
 function taoMa(ten) {
@@ -29,13 +30,13 @@ export default function StatusesModal({ onClose }) {
     }
     if (!window.confirm(`Xoá trạng thái "${s.ten}"?`)) return
     const { error } = await supabase.from('customer_statuses').delete().eq('ma', s.ma)
-    if (error) { setMsg('Không xoá được: ' + error.message); return }
+    if (error) { setMsg('Không xoá được: ' + loiDeHieu(error)); return }
     setMsg(''); reload()
   }
 
   async function batTat(s) {
     const { error } = await supabase.from('customer_statuses').update({ active: !s.active }).eq('ma', s.ma)
-    if (error) { setMsg('Không đổi được trạng thái: ' + error.message); return }
+    if (error) { setMsg('Không đổi được trạng thái: ' + loiDeHieu(error)); return }
     reload()
   }
 
@@ -144,7 +145,7 @@ function StatusForm({ tt, onClose, onSaved }) {
     if (error) {
       setError(error.message.includes('duplicate') || error.message.includes('primary key')
         ? 'Đã có trạng thái trùng tên này rồi.'
-        : error.message)
+        : loiDeHieu(error))
       return
     }
     onSaved()

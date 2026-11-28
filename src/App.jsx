@@ -14,6 +14,7 @@ import DaoTaoPage from './components/DaoTaoPage'
 import { demNhacViec } from './lib/nhacViec'
 import { useDanhMuc } from './lib/danhMuc'
 import BaoGiaPage from './components/BaoGiaPage'
+import { laAdmin, laQuanLy } from './lib/quyen'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -59,7 +60,7 @@ export default function App() {
   const loadViecCan = useCallback(async () => {
     if (!profile?.id) return
     try {
-      setViecCan(await demNhacViec(supabase, { isAdmin: profile.role === 'admin', userId: profile.id, me: profile }))
+      setViecCan(await demNhacViec(supabase, { isAdmin: laAdmin(profile), userId: profile.id, me: profile }))
     } catch { /* bo qua, khong anh huong cac man khac */ }
   }, [profile?.id, profile?.role, profile?.phong_ban])
 
@@ -111,7 +112,7 @@ export default function App() {
       {page === 'checklist' && <ChecklistPage currentProfile={profile} onDoiViec={loadViecCan} />}
       {page === 'customers' && <CustomerList currentProfile={profile} />}
       {page === 'baocao' && <BaoCaoPage currentProfile={profile} />}
-      {page === 'team' && profile?.role !== 'sale' && <TeamPage currentProfile={profile} />}
+      {page === 'team' && laQuanLy(profile) && <TeamPage currentProfile={profile} />}
       {page === 'pricing' && <BaoGiaPage currentProfile={profile} />}
       {page === 'daotao' && <DaoTaoPage currentProfile={profile} />}
       {page === 'documents' && <DocumentsPage currentProfile={profile} />}

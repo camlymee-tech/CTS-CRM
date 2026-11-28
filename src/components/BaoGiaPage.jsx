@@ -8,6 +8,7 @@ import {
 } from '../lib/baoGia'
 import { xuatBaoGia } from '../lib/baoGiaXlsx'
 import { xuatBaoGiaPdf } from '../lib/baoGiaPdf'
+import { loiDeHieu } from '../lib/loi'
 
 const vnd = (n) => (n === null || n === undefined || n === '' ? '' : Math.round(Number(n) || 0).toLocaleString('vi-VN'))
 const pt2 = (n) => (Number(n) || 0).toFixed(2).replace('.', ',') + '%'
@@ -435,7 +436,7 @@ export function BaoGiaEditor({ khachCo = null, baoGiaMo = null, currentProfile, 
       ? await supabase.from('bao_gia').update(row).eq('id', idLuu).select('id').single()
       : await supabase.from('bao_gia').insert({ ...row, created_by: currentProfile?.id }).select('id').single()
     setDangLuu(false)
-    if (error) { alert('Không lưu được báo giá: ' + error.message); return }
+    if (error) { alert('Không lưu được báo giá: ' + loiDeHieu(error)); return }
     setIdLuu(r.id); setDaLuu(true); onSaved?.()
   }
 

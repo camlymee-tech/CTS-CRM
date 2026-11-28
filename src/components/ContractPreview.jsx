@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Printer, FileDown, Pencil, RotateCcw } from 'lucide-react'
 import { renderAsync } from 'docx-preview'
 import { Modal, Button } from './ui'
+import { loiDeHieu } from '../lib/loi'
 
 // Sau khi Vercel deploy bản mới, tab trình duyệt đang mở vẫn nhớ đường dẫn file JS
 // của bản cũ — file đó không còn trên server nữa nên import động bị lỗi. Nhận diện
@@ -89,7 +90,7 @@ export default function ContractPreview({ hd, onClose }) {
           setBanCu(true)
           setError('Trang đang mở là bản cũ (do vừa có cập nhật mới) — tải lại trang rồi mở xem trước lại nhé.')
         } else {
-          setError('Không tạo được bản xem trước: ' + e.message)
+          setError('Không tạo được bản xem trước: ' + loiDeHieu(e))
         }
       } finally {
         if (!huy) setLoading(false)
@@ -177,7 +178,7 @@ export default function ContractPreview({ hd, onClose }) {
       link.remove()
       setTimeout(() => URL.revokeObjectURL(url), 2000)
     } catch (e) {
-      setError('Không tạo được file PDF: ' + e.message)
+      setError('Không tạo được file PDF: ' + loiDeHieu(e))
     } finally {
       setDangXuatPdf(false)
     }

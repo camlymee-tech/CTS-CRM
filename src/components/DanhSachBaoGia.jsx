@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Trash2, FileText } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { laAdmin } from '../lib/quyen'
 import { TEN_DV } from '../lib/baoGia'
+import { loiDeHieu } from '../lib/loi'
 
 const vnd = (n) => Math.round(Number(n) || 0).toLocaleString('vi-VN')
 const TH = 'border border-slate-300 bg-navy-900 px-3 py-2 text-center text-xs font-semibold text-white'
@@ -21,7 +23,7 @@ export default function DanhSachBaoGia({ customerId, currentProfile, lamMoi = 0,
       .order('updated_at', { ascending: false }).limit(500)
     if (customerId) q = q.eq('customer_id', customerId)
     const { data, error } = await q
-    if (error) alert('Không tải được báo giá: ' + error.message)
+    if (error) alert('Không tải được báo giá: ' + loiDeHieu(error))
     setDs(data || []); setDang(false); onDem?.((data || []).length)
   }
   useEffect(() => { tai() }, [customerId, lamMoi]) // eslint-disable-line
@@ -29,7 +31,7 @@ export default function DanhSachBaoGia({ customerId, currentProfile, lamMoi = 0,
   async function xoa(b) {
     if (!window.confirm(`Xoá báo giá "${b.ten || TEN_DV[b.loai]}"? Không khôi phục được.`)) return
     const { error } = await supabase.from('bao_gia').delete().eq('id', b.id)
-    if (error) { alert('Không xoá được: ' + error.message); return }
+    if (error) { alert('Không xoá được: ' + loiDeHieu(error)); return }
     tai()
   }
 
@@ -63,7 +65,7 @@ export default function DanhSachBaoGia({ customerId, currentProfile, lamMoi = 0,
                   <td className={TD}>{b.nguoi?.full_name}</td>
                   <td className={`${TD} text-center`}>{ngay(b.updated_at)}</td>
                   <td className={`${TD} w-10 text-center`}>
-                    {(currentProfile?.role === 'admin' || b.created_by === currentProfile?.id) && (
+                    {(laAdmin(currentProfile) || b.created_by === currentProfile?.id) && (
                       <button type="button" onClick={() => xoa(b)} className="text-ink-400 hover:text-rose-500"><Trash2 size={15} /></button>
                     )}
                   </td>

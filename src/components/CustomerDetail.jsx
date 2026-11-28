@@ -5,10 +5,12 @@ import {
   FileDown, Eye, PhoneCall, PhoneOutgoing, PhoneIncoming, PhoneOff, Clock, Play,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { locNhanSu } from '../lib/quyen'
+import { layNhanSu } from '../lib/nhanSu'
+import { loiDeHieu } from '../lib/loi'
+import { laAdmin, laLeader, locNhanSu } from '../lib/quyen'
 import { Button, Textarea, Select, Badge, Input } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
-import { XuatHopDongForm, hdTuHopDongDaLuu } from './ContractsPage'
+import { XuatHopDongForm, hdTuHopDongDaLuu } from './XuatHopDongForm'
 import ContractPreview from './ContractPreview'
 import OrderForm from './OrderForm'
 import DanhSachBaoGia from './DanhSachBaoGia'
@@ -16,8 +18,8 @@ import { BaoGiaEditor } from './BaoGiaPage'
 import BenBModal from './BenBModal'
 import { useBenB } from '../lib/benB'
 import { goiQuaCallio } from '../lib/callioExtension'
-import { nhacChoHopDong, hanDichVu, dinhDangNgay, moTaConLai, homNayLocal } from '../lib/taiKy'
-import { ngayLocal } from '../lib/danhSachKhach'
+import { nhacChoHopDong, hanDichVu, moTaConLai } from '../lib/taiKy'
+import { dinhDangNgay, homNayLocal, ngayLocal } from '../lib/ngay'
 import { baoCaoKeTiep, moTaHanBaoCao } from '../lib/baoCaoAds'
 import BaoCaoAdsModal from './BaoCaoAdsModal'
 import {
@@ -69,12 +71,12 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
 
   const cuaMinh = customer.sale_id === currentProfile?.id
   const chung = laKhachChung(customer)
-  const isAdmin = currentProfile?.role === 'admin'
+  const isAdmin = laAdmin(currentProfile)
   const { benB, taiLai: taiLaiBenB } = useBenB()
   const [moBenB, setMoBenB] = useState(false)
   const [hoiGoi, setHoiGoi] = useState(false)   // hộp xác nhận trước khi gọi qua Callio
   // Leader sửa được khách của sale cùng phòng ban
-  const cuaTeam = currentProfile?.role === 'leader' && !!currentProfile.phong_ban &&
+  const cuaTeam = laLeader(currentProfile) && !!currentProfile.phong_ban &&
     profiles.find((p) => p.id === customer.sale_id)?.phong_ban === currentProfile.phong_ban
   const suaDuoc = cuaMinh || cuaTeam || isAdmin || chung || !customer.sale_id
 
@@ -94,7 +96,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
         .order('ngay_thuc_hien', { ascending: false }),
       supabase.from('customer_logs').select('*').eq('customer_id', customer.id)
         .order('created_at', { ascending: false }).limit(50),
-      supabase.from('profiles').select('id, full_name, role, phong_ban'),
+      layNhanSu(),
       supabase.from('orders').select('*').eq('customer_id', customer.id).order('ngay_chot', { ascending: false }),
       supabase.from('contracts').select('*').eq('customer_id', customer.id).order('ngay_ky', { ascending: false }),
       supabase.from('service_packages').select('*'),
@@ -121,7 +123,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     if (!window.confirm(`Nhận ${customer.ten_khach} về phụ trách? Sale cũ sẽ không còn thấy khách này trong danh sách riêng.`)) return
     const { error } = await supabase.from('customers')
       .update({ sale_id: currentProfile.id }).eq('id', customer.id)
-    if (error) { setMsg('Lỗi: ' + error.message); return }
+    if (error) { setMsg('Lỗi: ' + loiDeHieu(error)); return }
     setCustomer({ ...customer, sale_id: currentProfile.id })
     setMsg('')
     load(); onChanged?.()
@@ -130,7 +132,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   async function xoaTuongTac(it) {
     if (!window.confirm('Xoá dòng lịch sử chăm sóc này?')) return
     const { error } = await supabase.from('customer_interactions').delete().eq('id', it.id)
-    if (error) { setMsg('Không xoá được: ' + error.message); return }
+    if (error) { setMsg('Không xoá được: ' + loiDeHieu(error)); return }
     setMsg(''); load(); onChanged?.()
   }
 
@@ -138,7 +140,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     const truoc = customer.trang_thai_cham_soc
     const { error } = await supabase.from('customers')
       .update({ trang_thai_cham_soc: tt }).eq('id', customer.id)
-    if (error) { setMsg('Lỗi: ' + error.message); return }
+    if (error) { setMsg('Lỗi: ' + loiDeHieu(error)); return }
     const moi = { ...customer, trang_thai_cham_soc: tt }
     setCustomer(moi)
     load(); onChanged?.()
@@ -154,21 +156,21 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
   async function xoaDon(o) {
     if (!window.confirm(`Xoá đơn ${o.ma_don}? Thao tác này không hoàn tác được, hợp đồng gắn với đơn (nếu có) cũng sẽ bị xoá theo.`)) return
     const { error } = await supabase.from('orders').delete().eq('id', o.id)
-    if (error) { setMsg('Không xoá được: ' + error.message); return }
+    if (error) { setMsg('Không xoá được: ' + loiDeHieu(error)); return }
     setMsg(''); load(); onChanged?.()
   }
 
   async function xoaBaoCaoAds(b) {
     if (!window.confirm(`Xoá lần báo cáo ngày ${dinhDangNgay(b.ngay_bao_cao)}? Lịch nhắc báo cáo sẽ tính lại.`)) return
     const { error } = await supabase.from('ads_bao_cao').delete().eq('id', b.id)
-    if (error) { setMsg('Không xoá được: ' + error.message); return }
+    if (error) { setMsg('Không xoá được: ' + loiDeHieu(error)); return }
     setMsg(''); load()
   }
 
   async function xoaHopDong(hd) {
     if (!window.confirm(`Xoá hợp đồng ${hd.so_hop_dong}? Thao tác này không hoàn tác được. Đơn dịch vụ liên quan vẫn được giữ nguyên.`)) return
     const { error } = await supabase.from('contracts').delete().eq('id', hd.id)
-    if (error) { setMsg('Không xoá được: ' + error.message); return }
+    if (error) { setMsg('Không xoá được: ' + loiDeHieu(error)); return }
     setMsg(''); load(); onChanged?.()
   }
 
@@ -208,7 +210,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
     if (error) {
       setMsg(error.message.includes('SDT_TRUNG')
         ? 'Số điện thoại này đã thuộc về một khách hàng khác trong hệ thống.'
-        : 'Không lưu được: ' + error.message)
+        : 'Không lưu được: ' + loiDeHieu(error))
       return
     }
     setMsg('')
@@ -359,7 +361,7 @@ export default function CustomerDetail({ customer: khachBanDau, currentProfile, 
                       <Select label="Sale phụ trách" value={formTT.sale_id}
                         onChange={(e) => setFormTT({ ...formTT, sale_id: e.target.value })}>
                         <option value="">-- Chưa gán --</option>
-                        {(currentProfile?.role === 'leader' ? locNhanSu(currentProfile, profiles) : profiles).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                        {(laLeader(currentProfile) ? locNhanSu(currentProfile, profiles) : profiles).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                       </Select>
                       <Input label="Chăm sóc tiếp theo" type="date" value={formTT.ngay_cham_soc_tiep_theo}
                         onChange={(e) => setFormTT({ ...formTT, ngay_cham_soc_tiep_theo: e.target.value })} />
@@ -786,12 +788,12 @@ function AddInteraction({ customerId, currentProfile, ngayHen, onAdded }) {
     const { error } = await supabase.from('customer_interactions').insert({
       customer_id: customerId, sale_id: currentProfile?.id, loai, noi_dung: noiDung.trim(),
     })
-    if (error) { setSaving(false); window.alert('Không lưu được trao đổi: ' + error.message); return }
+    if (error) { setSaving(false); window.alert('Không lưu được trao đổi: ' + loiDeHieu(error)); return }
 
     const patch = { ngay_lien_he_gan_nhat: homNayLocal() }
     if (ngayTiepTheo) patch.ngay_cham_soc_tiep_theo = ngayTiepTheo
     const { error: loiNgay } = await supabase.from('customers').update(patch).eq('id', customerId)
-    if (loiNgay) window.alert('Đã lưu trao đổi nhưng chưa cập nhật được ngày liên hệ / ngày chăm sóc tiếp: ' + loiNgay.message)
+    if (loiNgay) window.alert('Đã lưu trao đổi nhưng chưa cập nhật được ngày liên hệ / ngày chăm sóc tiếp: ' + loiDeHieu(loiNgay))
 
     setSaving(false)
     setNoiDung('')
@@ -861,7 +863,7 @@ async function goiHamCallio(body) {
     if (data?.error) return { error: { text: data.error, code: data.code || 'loi' } }
     return { data }
   } catch (e) {
-    return { error: { text: 'Lỗi kết nối: ' + e.message, code: 'loi' } }
+    return { error: { text: 'Lỗi kết nối: ' + loiDeHieu(e), code: 'loi' } }
   }
 }
 

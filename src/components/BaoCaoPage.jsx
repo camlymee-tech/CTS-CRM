@@ -2,14 +2,14 @@ import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Users, Trophy, PhoneCall, Hourglass, MessageCircle, UserPlus, AlertTriangle } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { layNhanSu } from '../lib/nhanSu'
 import { Select, Input } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
-import { homNayLocal } from '../lib/taiKy'
-import { ngayLocal } from '../lib/danhSachKhach'
+import { homNayLocal, ngayLocal, dinhDangNgay } from '../lib/ngay'
 import { maChuaLienHe, maKhNgheMay, tinhCanGoiLai, SO_NGAY_GOI_LAI } from '../lib/nhacViec'
 import { hienPt2 } from '../lib/dashboardXlsx'
 import { xuatBangXlsx } from '../lib/baoCaoXlsx'
-import { laQuanLy } from '../lib/quyen'
+import { laAdmin, laLeader, laQuanLy, laSale } from '../lib/quyen'
 
 const TABS = [
   { key: 'tong_quan', label: 'Tổng quan' },
@@ -22,8 +22,8 @@ const MAU_HEX = {
 }
 
 const pad = (n) => String(n).padStart(2, '0')
-const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-const dmy = (s) => String(s).split('-').reverse().join('/')
+const ymd = homNayLocal
+const dmy = dinhDangNgay
 
 // Khoảng ngày [từ, đến] (đều tính cả hai đầu)
 function khoangKy(ky, tu, den) {
@@ -38,7 +38,7 @@ function khoangKy(ky, tu, den) {
 }
 
 export default function BaoCaoPage({ currentProfile }) {
-  const laAdmin = laQuanLy(currentProfile)   // admin hoặc leader: có ô lọc Sale (leader chỉ thấy team mình)
+  const quanLy = laQuanLy(currentProfile)   // admin hoặc leader: có ô lọc Sale (leader chỉ thấy team mình)
   const { options: TRANG_THAI, statuses } = useTrangThai()
   const [tab, setTab] = useState('tong_quan')
   const [ky, setKy] = useState('thang_nay')
@@ -58,10 +58,10 @@ export default function BaoCaoPage({ currentProfile }) {
 
   async function load() {
     setLoading(true)
-    const laSale = currentProfile?.role === 'sale'
-    const truyVanProfiles = supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name')
+    const chiCuaMinh = laSale(currentProfile)
+    const truyVanProfiles = layNhanSu()
     // Sale không xem trực tiếp được khách/nhật ký của đồng nghiệp: dùng hàm team_* (chỉ trả số liệu, không có tên/SĐT khách)
-    const [a, b, c, d, e, f] = laSale ? await Promise.all([
+    const [a, b, c, d, e, f] = chiCuaMinh ? await Promise.all([
       layHet(() => supabase.rpc('team_khach')),
       truyVanProfiles,
       layHet(() => supabase.rpc('team_interactions')),
@@ -87,15 +87,15 @@ export default function BaoCaoPage({ currentProfile }) {
 
   // Phạm vi xem: admin = tất cả phòng · leader và sale = các thành viên cùng phòng ban của mình
   const thanhVien = useMemo(() => {
-    const khongAdmin = profiles.filter((p) => p.role !== 'admin')
-    if (currentProfile?.role === 'admin') return khongAdmin
+    const khongAdmin = profiles.filter((p) => !laAdmin(p))
+    if (laAdmin(currentProfile)) return khongAdmin
     if (currentProfile?.phong_ban) return khongAdmin.filter((p) => p.phong_ban === currentProfile.phong_ban)
     return khongAdmin.filter((p) => p.id === currentProfile?.id)
   }, [profiles, currentProfile])
   const xemChuaChia = false   // chỉ xem data chưa chia cho sale nào
   const dsPhong = useMemo(() => [...new Set(thanhVien.map((p) => p.phong_ban).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi')), [thanhVien])
   const thanhVienLoc = useMemo(() => (locPhong ? thanhVien.filter((p) => p.phong_ban === locPhong) : thanhVien), [thanhVien, locPhong])
-  const saleDangXem = laAdmin && !xemChuaChia ? locSale : ''
+  const saleDangXem = quanLy && !xemChuaChia ? locSale : ''
   const dsSale = useMemo(() => {
     if (xemChuaChia) return []
     return saleDangXem ? thanhVienLoc.filter((p) => p.id === saleDangXem) : thanhVienLoc
@@ -142,7 +142,7 @@ export default function BaoCaoPage({ currentProfile }) {
     return out.sort((a, b) => (a.ngay < b.ngay ? 1 : a.ngay > b.ngay ? -1 : a.sale.full_name.localeCompare(b.sale.full_name, 'vi')))
   }, [tuNgay, denNgay, dsSale, soMt, chonMt, logs, cs, maChua.join(), maNghe.join()])
 
-  const laAdminHan = currentProfile?.role === 'admin'
+  const laAdminHan = laAdmin(currentProfile)
   const tenPB = (s) => s.phong_ban || 'Chưa có phòng ban'
   const tb1 = (x) => (Math.round(x * 10) / 10).toLocaleString('vi-VN')
 
@@ -178,7 +178,7 @@ export default function BaoCaoPage({ currentProfile }) {
     const m = new Map()
     for (const sl of dsSale) {
       const mine = khachKy.filter((c) => c.sale_id === sl.id)
-      if (sl.role === 'leader' && mine.length === 0) continue
+      if (laLeader(sl) && mine.length === 0) continue
       const dem = {}
       for (const c of mine) dem[c.trang_thai_cham_soc] = (dem[c.trang_thai_cham_soc] || 0) + 1
       const k = tenPB(sl)
@@ -215,7 +215,7 @@ export default function BaoCaoPage({ currentProfile }) {
     }
   }), [dsSale, customers, cs, logs, dongMucTieu, canGoiLai, tuNgay, denNgay, maChua.join(), maNghe.join()])
 
-  const dongHienThi = useMemo(() => dongSale.filter((r) => r.sale.role !== 'leader' || r.phuTrach > 0 || r.mt > 0 || r.luot > 0), [dongSale])
+  const dongHienThi = useMemo(() => dongSale.filter((r) => !laLeader(r.sale) || r.phuTrach > 0 || r.mt > 0 || r.luot > 0), [dongSale])
   const KEYS = ['phuTrach', 'moi', 'luot', 'nghe', 'ht', 'mt', 'ton']
   const gopNhom = (ten, rows) => {
     const sum = Object.fromEntries(KEYS.map((k) => [k, rows.reduce((a, r) => a + r[k], 0)]))
@@ -230,7 +230,7 @@ export default function BaoCaoPage({ currentProfile }) {
   const tatCa = useMemo(() => gopNhom('Toàn công ty', dongHienThi), [dongHienThi])
 
   const tenKy = ky === 'tat_ca' ? 'Tất cả thời gian' : ky === 'hom_nay' ? `Hôm nay (${dmy(tuNgay)})` : ky === 'hom_qua' ? `Hôm qua (${dmy(tuNgay)})` : `${dmy(tuNgay)} – ${dmy(denNgay)}`
-  const tenSaleXem = laAdmin ? (xemChuaChia ? 'Data chưa chia' : locSale ? dsSale[0]?.full_name : locPhong ? `Phòng ${locPhong}` : (currentProfile?.role === 'leader' ? `Phòng ${currentProfile.phong_ban || ''}` : 'Tất cả sale')) : `Phòng ${currentProfile?.phong_ban || ''}`
+  const tenSaleXem = quanLy ? (xemChuaChia ? 'Data chưa chia' : locSale ? dsSale[0]?.full_name : locPhong ? `Phòng ${locPhong}` : (laLeader(currentProfile) ? `Phòng ${currentProfile.phong_ban || ''}` : 'Tất cả sale')) : `Phòng ${currentProfile?.phong_ban || ''}`
   const phuDe = `Kỳ: ${tenKy} · ${tenSaleXem || ''}`
 
   // ===== Excel =====
@@ -310,7 +310,7 @@ export default function BaoCaoPage({ currentProfile }) {
               {dsPhong.map((p) => <option key={p} value={p}>{p}</option>)}
             </Select>
           )}
-          {laAdmin && (
+          {quanLy && (
             <Select label="Sale" value={locSale} onChange={(e) => setLocSale(e.target.value)} className="w-64">
               <option value="">{locPhong ? `Tất cả sale phòng ${locPhong}` : 'Tất cả sale'}</option>
               {thanhVienLoc.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}

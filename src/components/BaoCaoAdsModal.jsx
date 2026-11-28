@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Modal, Input, Textarea, Button } from './ui'
-import { homNayLocal, dinhDangNgay } from '../lib/taiKy'
+import { homNayLocal, dinhDangNgay } from '../lib/ngay'
+import { loiDeHieu } from '../lib/loi'
 
 // Ghi nhận 1 lần đã báo cáo chỉ số ADS cho khách (mỗi 2 tuần 1 lần)
 export default function BaoCaoAdsModal({ hd, khach, lanThu, currentProfile, onClose, onSaved }) {
@@ -27,7 +28,7 @@ export default function BaoCaoAdsModal({ hd, khach, lanThu, currentProfile, onCl
     if (err) {
       setError(/ads_bao_cao/.test(err.message)
         ? 'Chưa tạo bảng lưu báo cáo ADS trong Supabase — chị chạy file migration_32 trước nhé.'
-        : 'Không lưu được: ' + err.message)
+        : 'Không lưu được: ' + loiDeHieu(err))
       return
     }
     onSaved?.()

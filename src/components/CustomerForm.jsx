@@ -4,6 +4,8 @@ import { supabase } from '../supabaseClient'
 import { Modal, Input, Select, Button, Badge } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
 import { TINH_THANH } from '../lib/constants'
+import { chuanSo } from '../lib/sdt'
+import { loiDeHieu } from '../lib/loi'
 
 export default function CustomerForm({ customer, profiles, currentProfile, onClose, onSaved, onTaiFile }) {
   const { options: TRANG_THAI, tenTrangThai, classTrangThai, maTaoDon } = useTrangThai()
@@ -40,11 +42,10 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
   const [saleList, setSaleList] = useState({})
 
   const daChot = !!khachTrung?.daChot   // chỉ khách đã CHỐT mới chặn lưu
-  const chiSo = (v) => { const d = (v || '').replace(/\D/g, ''); return /^84\d{9,10}$/.test(d) ? '0' + d.slice(2) : d }
 
   // Kiểm tra trùng số điện thoại ngay khi gõ
   useEffect(() => {
-    const so = chiSo(form.sdt)
+    const so = chuanSo(form.sdt)
     if (so.length < 8) { setKhachTrung(null); return }
     setDangKiemTra(true)
     const t = setTimeout(async () => {
@@ -95,7 +96,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
     if (error) {
       setError(error.message.includes('SDT_TRUNG')
         ? 'Số điện thoại này đã thuộc về một khách hàng khác trong hệ thống.'
-        : error.message)
+        : loiDeHieu(error))
       return
     }
 

@@ -6,9 +6,9 @@ import { useTrangThai } from '../lib/StatusContext'
 import { TINH_THANH } from '../lib/constants'
 import { maChuaLienHe } from '../lib/nhacViec'
 import { laQuanLy } from '../lib/quyen'
+import { chuanSo } from '../lib/sdt'
 
 const boDau = (t = '') => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim()
-const chiSo = (v) => { const d = String(v || '').replace(/\D/g, ''); return /^84\d{9,10}$/.test(d) ? '0' + d.slice(2) : d }
 const chuan = (v) => String(v ?? '').trim()
 
 // Tên cột trong file (so khớp không dấu, không phân biệt hoa thường)
@@ -65,7 +65,7 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
       if (data.length > 20000) { setLoi('File quá lớn (tối đa 20.000 dòng mỗi lần). Chị chia nhỏ file rồi tải lại.'); return }
       setRows(data)
       // Hỏi hệ thống những số nào đã có (không lộ thông tin khách của người khác)
-      const so = [...new Set(data.map((r) => chiSo(layCot(r, 'sdt'))).filter((x) => x.length >= 8))]
+      const so = [...new Set(data.map((r) => chuanSo(layCot(r, 'sdt'))).filter((x) => x.length >= 8))]
       const m = new Map()
       for (let i = 0; i < so.length; i += 500) {
         const { data: kq } = await supabase.rpc('sdt_da_co', { p_ds: so.slice(i, i + 500) })
@@ -84,7 +84,7 @@ export default function TaiKhachLenModal({ customers, profiles, currentProfile, 
     return rows.map((r, i) => {
       const ten = layCot(r, 'ten')
       const sdt = String(layCot(r, 'sdt') || '').replace(/[\s.\-]/g, '')
-      const so = chiSo(sdt)
+      const so = chuanSo(sdt)
       const canhBao = []
       let loiDong = ''
       if (!ten) loiDong = 'Thiếu tên khách hàng'

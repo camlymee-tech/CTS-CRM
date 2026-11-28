@@ -1,22 +1,5 @@
 import { giaTruocVat } from './constants'
 
-const pad = (n) => String(n).padStart(2, '0')
-
-// Ngày theo GIỜ MÁY (YYYY-MM-DD) từ 1 mốc thời gian — tránh lệch ngày do giờ UTC
-export function ngayLocal(ts) {
-  if (!ts) return ''
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return String(ts).slice(0, 10)
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-export function gioNgay(ts) {
-  if (!ts) return ''
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
 // Trao đổi gần nhất của mỗi khách = lần CHĂM SÓC được ghi gần nhất (gọi điện, nhắn tin, gặp mặt...).
 // Không lấy nhật ký hệ thống (đổi trạng thái, cập nhật vấn đề/giải pháp...) — khách chưa có lần chăm sóc nào thì để trống.
 export function traoDoiGanNhat(interactions = []) {

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Modal, Button, Input, Select } from './ui'
 import { BEN_B_MAC_DINH, BEN_B_TRUONG } from '../lib/benB'
+import { loiDeHieu } from '../lib/loi'
 
 const LOAI_OPTIONS = [
   { value: 'xay_shop', label: 'Hợp đồng Seller (Xây shop / Tối ưu) — TUKIGROUP' },
@@ -30,7 +31,7 @@ export default function BenBModal({ benB, loaiBanDau = 'xay_shop', onClose, onSa
     if (error) {
       setMsg(/ben_b_settings/.test(error.message)
         ? 'Chưa tạo bảng lưu Bên B trong Supabase — chị chạy file migration_31 trước nhé.'
-        : 'Không lưu được: ' + error.message)
+        : 'Không lưu được: ' + loiDeHieu(error))
       return
     }
     onSaved?.()

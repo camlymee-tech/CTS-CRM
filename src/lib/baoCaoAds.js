@@ -1,4 +1,5 @@
-import { congThang, soNgayGiua, laHopDongAds, homNayLocal } from './taiKy'
+import { laHopDongAds } from './taiKy'
+import { congThang, congNgay, soNgayGiua, homNayLocal } from './ngay'
 
 // Sau khi ký hợp đồng chạy ADS: cứ 2 tuần phải báo cáo chỉ số cho khách 1 lần.
 // Lần báo cáo kế tiếp = lần báo cáo gần nhất + 14 ngày (chưa báo cáo lần nào thì tính từ ngày ký).
@@ -6,13 +7,6 @@ import { congThang, soNgayGiua, laHopDongAds, homNayLocal } from './taiKy'
 
 export const CHU_KY_BAO_CAO = 14          // ngày
 export const SO_NGAY_BAO_TRUOC = 2        // nhắc trước hạn bao nhiêu ngày
-
-export function congNgay(ymd, n) {
-  const [y, m, d] = String(ymd).slice(0, 10).split('-').map(Number)
-  const t = new Date(Date.UTC(y, m - 1, d + n))
-  const pad = (x) => String(x).padStart(2, '0')
-  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`
-}
 
 // Hạn dịch vụ hiện tại + mốc bắt đầu "liên tục": tái ký kịp thời thì chu kỳ báo cáo đi tiếp;
 // tái ký trễ (sau khi hết hạn) thì dịch vụ chạy lại từ ngày chốt đơn và chu kỳ báo cáo tính lại từ đó.

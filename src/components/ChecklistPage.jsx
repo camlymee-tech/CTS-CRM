@@ -2,14 +2,15 @@ import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { Phone, CalendarCheck, CircleCheck, BarChart3 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
+import { layNhanSu } from '../lib/nhanSu'
+import { laAdmin, laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
 import { Select, Badge } from './ui'
 import CustomerDetail from './CustomerDetail'
 import OrderForm from './OrderForm'
 import BaoCaoAdsModal from './BaoCaoAdsModal'
 import MucTieuNgay from './MucTieuNgay'
 import { useTrangThai } from '../lib/StatusContext'
-import { homNayLocal, dinhDangNgay } from '../lib/taiKy'
+import { homNayLocal, dinhDangNgay } from '../lib/ngay'
 import { moTaHanBaoCao, CHU_KY_BAO_CAO } from '../lib/baoCaoAds'
 import { tinhNhacViec, tinhCanGoiLai, tinhFollowUpHomNay, SO_NGAY_GOI_LAI } from '../lib/nhacViec'
 
@@ -38,7 +39,7 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
     setLoading(true)
     const [{ data: c }, { data: p }, { data: hd }, { data: dn }, { data: it }, { data: bc }, { data: lg }] = await Promise.all([
       layHet(() => supabase.from('customers').select('*').order('ngay_cham_soc_tiep_theo').order('id')),
-      supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
+      layNhanSu(),
       supabase.from('contracts').select('*').eq('trang_thai', 'hieu_luc'),
       supabase.from('orders').select('*').neq('trang_thai', 'huy'),
       layHet(() => supabase.from('order_items').select('order_id, ten_dich_vu').order('id')),
@@ -52,7 +53,7 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   }
 
   const uids = useMemo(() => nhanSuXemDuoc(currentProfile, profiles), [currentProfile, profiles])
-  const dsPhong = useMemo(() => [...new Set(profiles.filter((p) => p.role !== 'admin' && p.phong_ban).map((p) => p.phong_ban))].sort((a, b) => a.localeCompare(b, 'vi')), [profiles])
+  const dsPhong = useMemo(() => [...new Set(profiles.filter((p) => !laAdmin(p) && p.phong_ban).map((p) => p.phong_ban))].sort((a, b) => a.localeCompare(b, 'vi')), [profiles])
   const idsPhong = useMemo(() => new Set(profiles.filter((p) => p.phong_ban === filterPhong).map((p) => p.id)), [profiles, filterPhong])
   // Khớp bộ lọc phòng + sale đang chọn
   const khopLoc = (saleId) => (!filterSale || saleId === filterSale) && (!filterPhong || idsPhong.has(saleId))
@@ -97,7 +98,7 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
             )}
             <Select value={filterSale} onChange={(e) => setFilterSale(e.target.value)} className="w-48">
               <option value="">{filterPhong ? `Tất cả sale phòng ${filterPhong}` : 'Tất cả sale'}</option>
-              {locNhanSu(currentProfile, profiles).filter((p) => p.role !== 'admin' && (!filterPhong || p.phong_ban === filterPhong)).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+              {locNhanSu(currentProfile, profiles).filter((p) => !laAdmin(p) && (!filterPhong || p.phong_ban === filterPhong)).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
             </Select>
           </div>
         )}

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Phone, Plus, X, Target, CircleCheck, Lock, Clock } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { layNhanSu } from '../lib/nhanSu'
 import { Button, Select, Badge } from './ui'
 import { useTrangThai } from '../lib/StatusContext'
-import { homNayLocal } from '../lib/taiKy'
+import { homNayLocal } from '../lib/ngay'
 import { maChuaLienHe } from '../lib/nhacViec'
-import { laQuanLy, locNhanSu } from '../lib/quyen'
+import { laAdmin, laQuanLy, locNhanSu } from '../lib/quyen'
+import { loiDeHieu } from '../lib/loi'
 
 // Mục tiêu ngày: (1) số khách chuyển từ "Chưa liên hệ" sang trạng thái khác (KH liên hệ được) hôm nay,
 // (2) danh sách khách cần liên hệ lại do sale tự chọn — tự báo "Đã hoàn thành" khi đổi trạng thái hoặc có trao đổi mới.
@@ -28,8 +30,8 @@ function KhuQuanLy({ currentProfile, customers, onMoKhach, phong = '' }) {
   const [sales, setSales] = useState([])
   const [saleId, setSaleId] = useState('')
   useEffect(() => {
-    supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name')
-      .then(({ data }) => setSales(locNhanSu(currentProfile, data || []).filter((x) => x.role !== 'admin')))
+    layNhanSu()
+      .then(({ data }) => setSales(locNhanSu(currentProfile, data || []).filter((x) => !laAdmin(x))))
   }, [])
   const salesHienThi = sales.filter((x) => !phong || x.phong_ban === phong)
   const sale = salesHienThi.find((x) => x.id === saleId)
@@ -69,7 +71,7 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
   const [mucTieu, setMucTieu] = useState({ kh_nghe_may: '', lien_he_lai: '' })   // số mục tiêu sale tự điền
 
   const homNay = homNayLocal()
-  const homNayUtc = new Date().toISOString().slice(0, 10)
+  const homNayUtc = new Date().toISOString().slice(0, 10)   // cố ý: dữ liệu cũ từng lưu ngày theo UTC
   const isAdmin = false   // luôn lọc theo chủ bộ mục tiêu
 
   useEffect(() => { load() }, [customers])
@@ -86,7 +88,7 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
       kh_nghe_may: so?.find((x) => x.loai === 'kh_nghe_may')?.muc_tieu ?? '',
       lien_he_lai: so?.find((x) => x.loai === 'lien_he_lai')?.muc_tieu ?? '',
     })
-    if (error) setLoi(error.message.includes('muc_tieu_ngay') ? 'Cần chạy file SQL migration_36 để dùng phần chọn khách cần liên hệ lại.' : error.message)
+    if (error) setLoi(error.message.includes('muc_tieu_ngay') ? 'Cần chạy file SQL migration_36 để dùng phần chọn khách cần liên hệ lại.' : loiDeHieu(error))
     else setLoi('')
     setRows(mt || [])
     setLogs(lg || [])
@@ -127,14 +129,14 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
     const v = String(mucTieu[loai]).trim()
     if (v === '') {
       const { error } = await supabase.from('muc_tieu_so').delete().eq('user_id', currentProfile.id).eq('ngay', homNay).eq('loai', loai)
-      if (error) setLoi('Không bỏ được mục tiêu: ' + error.message)
+      if (error) setLoi('Không bỏ được mục tiêu: ' + loiDeHieu(error))
       return
     }
     const so = Math.max(0, Math.round(Number(v) || 0))
     setMucTieu((m) => ({ ...m, [loai]: so }))
     const { error } = await supabase.from('muc_tieu_so').upsert(
       { user_id: currentProfile.id, ngay: homNay, loai, muc_tieu: so }, { onConflict: 'user_id,ngay,loai' })
-    if (error) setLoi(error.message.includes('muc_tieu_so') ? 'Cần chạy file SQL migration_36 để lưu mục tiêu.' : error.message)
+    if (error) setLoi(error.message.includes('muc_tieu_so') ? 'Cần chạy file SQL migration_36 để lưu mục tiêu.' : loiDeHieu(error))
   }
 
   const oSoMucTieu = (loai) => (
@@ -151,7 +153,7 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
     if (!chon || khoa) return
     const { error } = await supabase.from('muc_tieu_ngay')
       .insert({ user_id: currentProfile.id, customer_id: chon, ngay: homNay })
-    if (error) { setLoi('Không thêm được: ' + error.message); return }
+    if (error) { setLoi('Không thêm được: ' + loiDeHieu(error)); return }
     setChon(''); load()
   }
 
@@ -159,7 +161,7 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
     if (khoa) return
     const { error } = await supabase.from('muc_tieu_ngay').delete()
       .eq('user_id', currentProfile.id).eq('customer_id', c.id).eq('ngay', homNay)
-    if (error) { setLoi('Không bỏ được khách: ' + error.message); return }
+    if (error) { setLoi('Không bỏ được khách: ' + loiDeHieu(error)); return }
     load()
   }
 
@@ -319,13 +321,13 @@ function BaoCaoMucTieu({ customers, currentProfile, phong = '' }) {
     setLoading(true)
     const dau = new Date(`${ngay}T00:00:00`); const cuoi = new Date(dau); cuoi.setDate(cuoi.getDate() + 1)
     const [{ data: p }, { data: a }, { data: b }, { data: c }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, role, phong_ban').order('full_name'),
+      layNhanSu(),
       supabase.from('muc_tieu_so').select('user_id, loai, muc_tieu').eq('ngay', ngay),
       supabase.from('muc_tieu_ngay').select('user_id, customer_id').eq('ngay', ngay),
       supabase.from('customer_logs').select('customer_id, user_id, hanh_dong, chi_tiet, created_at')
         .eq('hanh_dong', 'Đổi trạng thái').gte('created_at', dau.toISOString()).lt('created_at', cuoi.toISOString()),
     ])
-    setSales(locNhanSu(currentProfile, p || []).filter((x) => x.role !== 'admin'))
+    setSales(locNhanSu(currentProfile, p || []).filter((x) => !laAdmin(x)))
     setSo(a || []); setChon(b || []); setLogs(c || [])
     setLoading(false)
   }

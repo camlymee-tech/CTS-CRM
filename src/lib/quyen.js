@@ -2,6 +2,7 @@
 // Team = Phòng ban: ai cùng phòng ban với leader thì thuộc team của leader đó.
 export const laAdmin = (p) => p?.role === 'admin'
 export const laLeader = (p) => p?.role === 'leader'
+export const laSale = (p) => p?.role === 'sale'
 export const laQuanLy = (p) => laAdmin(p) || laLeader(p)   // được xem dữ liệu của người khác
 export const tenVaiTro = (r) => ({ admin: 'Quản trị', leader: 'Leader', sale: 'Sale' }[r] || 'Sale')
 

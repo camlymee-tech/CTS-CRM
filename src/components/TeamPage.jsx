@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { UserPlus, Lock, Unlock, Pencil, Link2, Trash2, Building2, X, KeyRound, Search } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { quenNhanSu } from '../lib/nhanSu'
 import { Button, Input, Select, Badge, Modal } from './ui'
-import { laAdmin, laLeader, laQuanLy, tenVaiTro } from '../lib/quyen'
+import { laAdmin, laLeader, laQuanLy, laSale, tenVaiTro } from '../lib/quyen'
+import { loiDeHieu } from '../lib/loi'
 
 const EMPTY = {
   full_name: '', email: '', password: '', ma_sale: '', role: 'sale', phong_ban: '',
@@ -25,6 +27,7 @@ export default function TeamPage({ currentProfile }) {
 
   async function load() {
     setLoading(true)
+    quenNhanSu()   // vừa thêm / sửa / khoá tài khoản -> các trang khác tải lại danh sách nhân sự mới
     const [{ data }, { data: pb }] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at'),
       supabase.from('phong_ban').select('ten').order('ten'),
@@ -47,15 +50,15 @@ export default function TeamPage({ currentProfile }) {
       setMessage(''); load(); return
     }
     const { error } = await supabase.from('profiles').update(patch).eq('id', id)
-    if (error) { setMessage('Lỗi: ' + error.message); return }
+    if (error) { setMessage('Lỗi: ' + loiDeHieu(error)); return }
     setMessage('')
     load()
   }
 
   // Đổi vai trò, có chặn trường hợp hệ thống không còn quản trị viên nào
   async function changeRole(p, newRole) {
-    const soAdmin = profiles.filter((x) => x.role === 'admin').length
-    if (p.role === 'admin' && newRole !== 'admin' && soAdmin <= 1) {
+    const soAdmin = profiles.filter((x) => laAdmin(x)).length
+    if (laAdmin(p) && newRole !== 'admin' && soAdmin <= 1) {
       setMessage('Không thể hạ vai trò: hệ thống cần ít nhất một quản trị viên. Hãy nâng người khác lên Quản trị trước.')
       return
     }
@@ -87,7 +90,7 @@ export default function TeamPage({ currentProfile }) {
   const boDau = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
   const dsHienThi = tim.trim() ? profiles.filter((p) => [p.full_name, p.email, p.ma_sale].some((x) => boDau(x).includes(boDau(tim.trim())))) : profiles
   // Admin: thao tác với mọi người; leader: chỉ sale trong phòng mình (danh sách đã lọc theo phòng)
-  const duocQuanLy = (p) => laAdmin(currentProfile) || p.role === 'sale'
+  const duocQuanLy = (p) => laAdmin(currentProfile) || laSale(p)
 
   if (!laQuanLy(currentProfile)) {
     return (
@@ -184,13 +187,13 @@ export default function TeamPage({ currentProfile }) {
                     </Badge>
                   </td>
                   <td className="border border-slate-200 whitespace-nowrap px-5 py-3 text-right">
-                    {(laAdmin(currentProfile) || p.role === 'sale') && (
+                    {(laAdmin(currentProfile) || laSale(p)) && (
                     <button onClick={() => setEditing(p)}
                       className="mr-3 inline-flex items-center gap-1 text-xs text-ink-600 hover:text-coral-500">
                       <Pencil size={13} /> Sửa
                     </button>
                     )}
-                    {!isMe && (laAdmin(currentProfile) || p.role === 'sale') && (
+                    {!isMe && (laAdmin(currentProfile) || laSale(p)) && (
                       <button onClick={() => updateProfile(p.id, { active: p.active === false })}
                         className="inline-flex items-center gap-1 text-xs text-ink-600 hover:text-coral-500">
                         {p.active === false ? <><Unlock size={13} /> Mở khoá</> : <><Lock size={13} /> Khoá</>}
@@ -274,7 +277,7 @@ function PhongBanModal({ ds, soNguoi, onClose, onChanged }) {
     if (!t) return
     if (ds.some((x) => x.toLowerCase() === t.toLowerCase())) { setLoi('Phòng ban này đã có rồi.'); return }
     const { error } = await supabase.from('phong_ban').insert({ ten: t })
-    if (error) { setLoi(error.message.includes('phong_ban') ? 'Cần chạy file SQL migration_37 trước.' : error.message); return }
+    if (error) { setLoi(error.message.includes('phong_ban') ? 'Cần chạy file SQL migration_37 trước.' : loiDeHieu(error)); return }
     setTen(''); setLoi(''); onChanged()
   }
 
@@ -282,7 +285,7 @@ function PhongBanModal({ ds, soNguoi, onClose, onChanged }) {
     if (soNguoi(t) > 0) { setLoi(`Còn ${soNguoi(t)} nhân sự thuộc "${t}". Hãy chuyển họ sang phòng ban khác trước khi xoá.`); return }
     if (!window.confirm(`Xoá phòng ban "${t}"?`)) return
     const { error } = await supabase.from('phong_ban').delete().eq('ten', t)
-    if (error) { setLoi(error.message); return }
+    if (error) { setLoi(loiDeHieu(error)); return }
     setLoi(''); onChanged()
   }
 
@@ -432,7 +435,7 @@ function EditProfileForm({ profile, isMe, me, dsPhongBan, onClose, onSaved }) {
       ? await supabase.functions.invoke('quan-ly-tai-khoa', { body: { action: 'update', id: profile.id, patch } }).then(({ data, error: fe }) => ({ error: (data?.error || fe?.message) ? { message: data?.error || fe?.message } : null }))
       : await supabase.from('profiles').update(patch).eq('id', profile.id)
     setSaving(false)
-    if (err) { setError(err.message); return }
+    if (err) { setError(loiDeHieu(err)); return }
     onSaved()
   }
 
@@ -458,7 +461,7 @@ function EditProfileForm({ profile, isMe, me, dsPhongBan, onClose, onSaved }) {
               <option value="leader">Leader — thấy toàn bộ team (phòng ban) của mình</option>
               <option value="admin">Quản trị — thấy toàn bộ công ty</option>
             </Select>
-            {isMe && form.role !== 'admin' && profile.role === 'admin' && (
+            {isMe && form.role !== 'admin' && laAdmin(profile) && (
               <p className="mt-1 text-xs text-orange-600">
                 Bạn đang tự hạ vai trò của mình. Sau khi lưu sẽ mất quyền quản trị.
               </p>

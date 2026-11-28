@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CircleCheck, Circle, Lock, ClipboardCheck, ExternalLink, Plus, Pencil, Trash2, ChevronLeft } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { layNhanSu } from '../lib/nhanSu'
 import { laAdmin, laQuanLy, locNhanSu } from '../lib/quyen'
 import { Button, Input, Select, Textarea, Modal } from './ui'
 import DocumentFiles from './DocumentFiles'
+import { loiDeHieu } from '../lib/loi'
 
 const TEN_NGAY = { 1: 'Hiểu công ty và dịch vụ', 2: 'Báo giá và chăm sóc', 3: 'Tình huống và ôn tập' }
 const LOAI = { doc: 'Đọc', video: 'Video', thuc_hanh: 'Thực hành' }
@@ -23,7 +25,7 @@ export default function DaoTaoPage({ currentProfile }) {
     const [b, t, p] = await Promise.all([
       supabase.from('dao_tao_bai').select('*').order('ngay').order('thu_tu'),
       supabase.from('dao_tao_tien_do').select('user_id, bai_id, xong_luc'),
-      supabase.from('profiles').select('id, full_name, role, phong_ban'),
+      layNhanSu(),
     ])
     setBai(b.data || []); setTienDo(t.data || []); setProfiles(p.data || [])
     setLoading(false)
@@ -39,8 +41,10 @@ export default function DaoTaoPage({ currentProfile }) {
   const hocXongHet = bai.length > 0 && tongXong === bai.length
 
   async function danhDau(b, xong) {
-    if (xong) await supabase.from('dao_tao_tien_do').upsert({ user_id: currentProfile.id, bai_id: b.id })
-    else await supabase.from('dao_tao_tien_do').delete().eq('user_id', currentProfile.id).eq('bai_id', b.id)
+    const { error } = xong
+      ? await supabase.from('dao_tao_tien_do').upsert({ user_id: currentProfile.id, bai_id: b.id })
+      : await supabase.from('dao_tao_tien_do').delete().eq('user_id', currentProfile.id).eq('bai_id', b.id)
+    if (error) window.alert('Chưa lưu được tiến độ học: ' + loiDeHieu(error))
     await load()
     setMo(null)
   }
@@ -49,19 +53,19 @@ export default function DaoTaoPage({ currentProfile }) {
     const payload = { ngay: Number(f.ngay), thu_tu: Number(f.thu_tu) || 1, tieu_de: f.tieu_de.trim(), loai: f.loai, phut: Number(f.phut) || 0, noi_dung: f.noi_dung || null, link: f.link || null }
     if (!payload.tieu_de) return 'Nhập tên bài học'
     const { error } = f.id ? await supabase.from('dao_tao_bai').update(payload).eq('id', f.id) : await supabase.from('dao_tao_bai').insert(payload)
-    if (error) return error.message
+    if (error) return loiDeHieu(error)
     await load(); setSua(null); setMo(null)
     return ''
   }
   async function xoaBai(b) {
     if (!window.confirm(`Xoá bài "${b.tieu_de}"?`)) return
     const { error } = await supabase.from('dao_tao_bai').delete().eq('id', b.id)
-    if (error) { window.alert('Không xoá được bài: ' + error.message); return }
+    if (error) { window.alert('Không xoá được bài: ' + loiDeHieu(error)); return }
     await load(); setSua(null); setMo(null)
   }
 
   // Bảng tiến độ cho leader / admin
-  const dsSale = useMemo(() => locNhanSu(currentProfile, profiles).filter((p) => p.role !== 'admin' || p.id === currentProfile.id).filter((p) => p.id !== currentProfile.id || !quanLy), [currentProfile, profiles, quanLy])
+  const dsSale = useMemo(() => locNhanSu(currentProfile, profiles).filter((p) => !laAdmin(p) || p.id === currentProfile.id).filter((p) => p.id !== currentProfile.id || !quanLy), [currentProfile, profiles, quanLy])
   const demXong = (uid, n) => {
     const ids = new Set(tienDo.filter((t) => t.user_id === uid).map((t) => t.bai_id))
     return baiCuaNgay(n).filter((b) => ids.has(b.id)).length

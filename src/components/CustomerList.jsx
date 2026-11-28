@@ -2,6 +2,8 @@ import { layHet } from '../lib/layHet'
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search, Link2, Store, Users2, Trash2, Settings2, ListPlus, Columns3, User, ArrowUp, ArrowDown, ArrowUpDown, Download, UserRoundCheck } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { layNhanSu } from '../lib/nhanSu'
+import { loiDeHieu } from '../lib/loi'
 import { Button, Input, Select, Badge, Phantrang } from './ui'
 import CustomerForm from './CustomerForm'
 import CustomerDetail from './CustomerDetail'
@@ -10,9 +12,11 @@ import StatusesModal from './StatusesModal'
 import DanhMucModal from './DanhMucModal'
 import TaiKhachLenModal from './TaiKhachLenModal'
 import ChiaKhachModal from './ChiaKhachModal'
-import { laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
+import { laAdmin, laQuanLy, nhanSuXemDuoc, locNhanSu } from '../lib/quyen'
 import { useTrangThai } from '../lib/StatusContext'
-import { ngayLocal, gioNgay, traoDoiGanNhat, demLuotChamSoc, tongDoanhThu, sapXepKhach } from '../lib/danhSachKhach'
+import { chuanSo } from '../lib/sdt'
+import { traoDoiGanNhat, demLuotChamSoc, tongDoanhThu, sapXepKhach } from '../lib/danhSachKhach'
+import { ngayLocal, gioNgay, dinhDangNgay } from '../lib/ngay'
 import {
   NEN_TANG_OPTIONS,
   DICH_VU_OPTIONS,
@@ -23,11 +27,6 @@ import {
   labelOf,
 } from '../lib/constants'
 
-// Khách "chung" — cả team đều xem được (khớp với hàm la_khach_chung trong database)
-
-
-const chuanSo = (v) => { const d = String(v || '').replace(/\D/g, ''); return /^84\d{9,10}$/.test(d) ? '0' + d.slice(2) : d }
-const chiSo = chuanSo
 
 
 // Tìm khách: khớp chữ thường, hoặc khớp số điện thoại không phân biệt dấu cách / chấm / gạch
@@ -130,7 +129,7 @@ export default function CustomerList({ currentProfile }) {
     if (error) {
       alert(error.message.includes('KHACH_CO_DON')
         ? `Khách "${c.ten_khach}" đã có đơn dịch vụ. Chỉ quản trị viên mới xoá được khách này.`
-        : 'Không xoá được: ' + error.message)
+        : 'Không xoá được: ' + loiDeHieu(error))
       return
     }
     loadCustomers()
@@ -139,7 +138,7 @@ export default function CustomerList({ currentProfile }) {
 
   // Gõ đủ số điện thoại -> tra cứu được cả khách của sale khác
   useEffect(() => {
-    const so = chiSo(search)
+    const so = chuanSo(search)
     if (so.length < 8) { setPhoneHits([]); return }
     const t = setTimeout(async () => {
       const { data } = await supabase.rpc('tim_khach_theo_sdt', { p_sdt: search })
@@ -150,7 +149,7 @@ export default function CustomerList({ currentProfile }) {
   }, [search])
 
   async function loadProfiles() {
-    const { data } = await supabase.from('profiles').select('*').order('full_name')
+    const { data } = await layNhanSu()
     setProfiles(data || [])
   }
 
@@ -177,7 +176,7 @@ export default function CustomerList({ currentProfile }) {
     setDonHang(dh || [])
   }
 
-  const isAdmin = currentProfile?.role === 'admin'
+  const isAdmin = laAdmin(currentProfile)
   const uids = useMemo(() => nhanSuXemDuoc(currentProfile, profiles), [currentProfile, profiles])   // null = xem tất cả
   const dsSale = useMemo(() => locNhanSu(currentProfile, profiles), [currentProfile, profiles])   // admin: tất cả · leader: team · sale: chính mình
   const xemDuoc = (id) => uids === null || (!!id && uids.has(id))
@@ -318,7 +317,7 @@ export default function CustomerList({ currentProfile }) {
     if (!ok) return
     for (let i = 0; i < ids.length; i += 100) {
       const { error } = await supabase.from('customers').delete().in('id', ids.slice(i, i + 100))
-      if (error) { alert('Không xoá được: ' + error.message); loadCustomers(); return }
+      if (error) { alert('Không xoá được: ' + loiDeHieu(error)); loadCustomers(); return }
     }
     setDaChon(new Set())
     loadCustomers()
@@ -601,7 +600,7 @@ export default function CustomerList({ currentProfile }) {
                       <p className="mt-1 whitespace-nowrap text-xs text-ink-600">
                         {hen
                           ? <span className={hen < homNay ? 'font-medium text-rose-600' : hen === homNay ? 'font-medium text-coral-600' : ''}>
-                              Hẹn {hen.split('-').reverse().join('/')}{hen < homNay ? ' · trễ' : hen === homNay ? ' · hôm nay' : ''}
+                              Hẹn {dinhDangNgay(hen)}{hen < homNay ? ' · trễ' : hen === homNay ? ' · hôm nay' : ''}
                             </span>
                           : <span className="text-ink-400">Chưa đặt lịch hẹn</span>}
                       </p>
