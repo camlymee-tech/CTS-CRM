@@ -1,5 +1,5 @@
 import { layHet } from '../lib/layHet'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Phone, CalendarCheck, CircleCheck, BarChart3 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { layNhanSu } from '../lib/nhanSu'
@@ -33,6 +33,7 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   const isAdmin = laQuanLy(currentProfile)   // admin hoặc leader: xem được nhiều người
   const homNay = homNayLocal()
 
+  // oxlint-disable-next-line react-hooks/exhaustive-deps, react/set-state-in-effect -- chỉ tải 1 lần khi mở trang
   useEffect(() => { load() }, [])
 
   async function load() {
@@ -56,27 +57,27 @@ export default function ChecklistPage({ currentProfile, onDoiViec }) {
   const dsPhong = useMemo(() => [...new Set(profiles.filter((p) => !laAdmin(p) && p.phong_ban).map((p) => p.phong_ban))].sort((a, b) => a.localeCompare(b, 'vi')), [profiles])
   const idsPhong = useMemo(() => new Set(profiles.filter((p) => p.phong_ban === filterPhong).map((p) => p.id)), [profiles, filterPhong])
   // Khớp bộ lọc phòng + sale đang chọn
-  const khopLoc = (saleId) => (!filterSale || saleId === filterSale) && (!filterPhong || idsPhong.has(saleId))
+  const khopLoc = useCallback((saleId) => (!filterSale || saleId === filterSale) && (!filterPhong || idsPhong.has(saleId)), [filterSale, filterPhong, idsPhong])
   const tenSale = (id) => profiles.find((p) => p.id === id)?.full_name || 'Chưa gán'
 
   // Follow-up đến hạn: ngày dự kiến liên hệ lại là hôm nay, bỏ qua khách đã chốt/đang triển khai/hoàn thành
   const dungHomNay = useMemo(() => tinhFollowUpHomNay({
     khach: customers, maDaChot, isAdmin: uids === null, userId: currentProfile?.id, uids, homNay,
   }).filter((c) => khopLoc(c.sale_id)),
-  [customers, homNay, uids, currentProfile?.id, filterSale, filterPhong, idsPhong, maDaChot])
+  [customers, homNay, uids, currentProfile?.id, khopLoc, maDaChot])
 
   // Khách cần gọi lại: trạng thái đã gửi báo giá / hẹn đi đơn mà 7 ngày chưa liên hệ lại, chưa đổi trạng thái
   const canGoiLai = useMemo(() => tinhCanGoiLai({
     khach: customers, logs: logsDoiTT, statuses, isAdmin: uids === null, userId: currentProfile?.id, uids, homNay,
   }).filter((r) => khopLoc(r.saleId)),
-  [customers, logsDoiTT, statuses, uids, currentProfile?.id, filterSale, filterPhong, idsPhong, homNay])
+  [customers, logsDoiTT, statuses, uids, currentProfile?.id, khopLoc, homNay])
 
   // Việc cần nhắc: tái ký hợp đồng ADS + báo cáo chỉ số ADS (sale chỉ thấy của mình, admin thấy cả team)
   const { nhacBaoCao } = useMemo(() => {
     const r = tinhNhacViec({ khach: customers, hopDong, don, items: itemsDon, baoCao, isAdmin: uids === null, userId: currentProfile?.id, uids })
     const loc = (ds) => ds.filter((x) => khopLoc(x.saleId))
     return { nhacBaoCao: loc(r.baoCaoAds) }
-  }, [customers, hopDong, don, itemsDon, baoCao, uids, currentProfile?.id, filterSale, filterPhong, idsPhong])
+  }, [customers, hopDong, don, itemsDon, baoCao, uids, currentProfile?.id, khopLoc])
 
   return (
     <div className="flex-1 overflow-y-auto">

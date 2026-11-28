@@ -11,7 +11,7 @@ const BUCKET = 'tai-lieu'
 const GIOI_HAN_MB = 50
 
 // Loại file -> icon + cách xem
-export function kieuFile(ten = '') {
+function kieuFile(ten = '') {
   const duoi = ten.split('.').pop()?.toLowerCase() || ''
   if (duoi === 'pdf') return { nhom: 'pdf', icon: FileText, mau: 'text-rose-500', xemTrucTiep: true }
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(duoi))
@@ -48,6 +48,7 @@ export default function DocumentFiles({ documentId, isAdmin, onChanged, bang = '
   const [pdfNhung, setPdfNhung] = useState([])   // PDF hiện thẳng trong trang (nếu bật nhungPdf)
   const inputRef = useRef(null)
 
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- tải lại khi đổi tài liệu
   useEffect(() => { load() }, [documentId])
 
   async function load() {

@@ -23,6 +23,7 @@ export default function TeamPage({ currentProfile }) {
   const [tim, setTim] = useState('')   // tìm theo tên, email, mã sale
   const [datMK, setDatMK] = useState(null)   // nhân sự đang đặt lại mật khẩu
 
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- chỉ tải 1 lần khi mở trang
   useEffect(() => { load() }, [])
 
   async function load() {

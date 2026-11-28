@@ -8,7 +8,8 @@ không tự ý refactor lớn. Mọi chữ hiện cho người dùng viết bằ
 
 ## Kiểm tra trước khi báo xong
 - `npm run build` phải chạy được.
-- `npm run lint` không được tăng thêm cảnh báo ở file vừa sửa.
+- `npm run lint` phải **0 cảnh báo** (28/11 đã dọn hết). Cảnh báo báo nhầm (vd. effect cố ý chỉ tải 1 lần khi mở trang)
+  thì tắt đúng dòng đó: `// oxlint-disable-next-line <luật> -- lý do`, không tắt cả file.
 - Không có test tự động: sửa logic tính tiền / ngày / quyền thì tự chạy thử bằng ví dụ cụ thể và nói rõ đã thử gì.
 
 ## Dùng lại, đừng viết lại
@@ -21,7 +22,7 @@ không tự ý refactor lớn. Mọi chữ hiện cho người dùng viết bằ
 | Hiện lỗi cho người dùng | `loiDeHieu(error)` trong `src/lib/loi.js` | hiện thẳng `error.message` (tiếng Anh của database) |
 | Danh sách nhân sự | `layNhanSu()` trong `src/lib/nhanSu.js` (nhớ tạm 1 phút) | `supabase.from('profiles').select(...)` ở từng trang |
 | Lấy hơn 1.000 dòng | `layHet(() => query)` trong `src/lib/layHet.js` | gọi thẳng (Supabase cắt ở 1.000 dòng, mất dữ liệu không báo) |
-| Trạng thái khách (tên, màu, khách chung, đã chốt…) | `useTrangThai()` trong `src/lib/StatusContext.jsx` | viết cứng mã trạng thái |
+| Trạng thái khách (tên, màu, khách chung, đã chốt…) | `useTrangThai()` trong `src/lib/StatusContext.jsx` (phần tải dữ liệu ở `StatusProvider.jsx`) | viết cứng mã trạng thái |
 
 Đang sửa file nào mà thấy chỗ viết tay như cột "Đừng" thì đổi sang hàm dùng chung luôn (gom dần, không làm đợt lớn).
 
@@ -31,7 +32,7 @@ không tự ý refactor lớn. Mọi chữ hiện cho người dùng viết bằ
 
 ## Database (Supabase)
 - Không có Supabase CLI. Migration là file `supabase/migration_NN_ten.sql`, người dùng **chạy tay** trong SQL Editor.
-- Đổi database = tạo file migration **số tiếp theo** (hiện mới nhất là 48), viết sao cho **chạy lại nhiều lần vẫn an toàn**
+- Đổi database = tạo file migration **số tiếp theo** (hiện mới nhất là 49), viết sao cho **chạy lại nhiều lần vẫn an toàn**
   (`create … if not exists`, `drop policy if exists` rồi `create policy`, `create or replace function`).
   Đưa file cho người dùng chạy và nói rõ cần chạy — code mới không tự có bảng/cột mới.
 - `supabase/schema.sql` và các migration trong repo **không đủ** để dựng lại database: thiếu 19, 20, 26, 27, 36 (bảng
@@ -46,15 +47,22 @@ Deploy bằng cách dán code vào Supabase Dashboard → Edge Functions.
 - Token / service key chỉ nằm trong secret của Supabase, không bao giờ đưa xuống trình duyệt hay vào repo.
 
 ## Cấu trúc
-- `src/App.jsx` — đăng nhập + chuyển trang (state `page`, chưa có router). Menu ở `src/components/Sidebar.jsx`.
-- Trang đang dùng: Checklist (`ChecklistPage`, `MucTieuNgay`), Khách hàng (`CustomerList`, `CustomerDetail`, `CustomerForm`,
-  `TaiKhachLenModal`, `ChiaKhachModal`, `OrderForm`, `XuatHopDongForm`), Báo cáo (`BaoCaoPage`), Tính giá bán (`BaoGiaPage`),
+- `src/App.jsx` — đăng nhập + chuyển trang. Trang đang mở ghi trên địa chỉ web dạng `#/khach-hang` (bảng `DUONG_DAN`),
+  hồ sơ khách là `#/khach-hang/<id>`. Chỉ đọc hash bắt đầu bằng `#/` — đừng đụng hash khác (link đặt lại mật khẩu của
+  Supabase dùng `#access_token=…`). Mỗi trang nạp bằng `React.lazy` (chỉ tải khi mở). Menu ở `src/components/Sidebar.jsx`.
+- Trang đang dùng: Checklist (`ChecklistPage`, `MucTieuNgay`), Khách hàng (`CustomerList` + `khachHang/`, hồ sơ
+  `CustomerDetail` + `hoSoKhach/` mỗi tab một file, `CustomerForm`, `TaiKhachLenModal`, `ChiaKhachModal`, `OrderForm`),
+  Báo cáo (`BaoCaoPage` + `baoCao/`, số liệu tính ở `lib/baoCao.js`), Tính giá bán (`BaoGiaPage`),
   Tài liệu, Đào tạo, Thông báo, Nhân sự (`TeamPage`, chỉ admin/leader).
+- Trang Khách hàng tải hết khách rồi lọc / phân trang trên trình duyệt (~3.500 khách vẫn nhanh). Cột nhật ký / chăm sóc gần
+  nhất + số lượt lấy qua `lib/tomTatKhach.js` (hàm DB `tom_tat_khach`, migration 49 — chưa chạy thì tự tải cách cũ).
+- Trang lớn thì tách: file trang giữ state + tải dữ liệu, phần hiển thị vào thư mục con, phần tính toán vào `src/lib/`.
 - `src/components/ui.jsx` — Button, Input, Select, Modal, Badge… dùng chung.
-- `src/lib/` — logic không có giao diện (tính giá, hợp đồng Word/PDF, Excel, nhắc việc, tái ký ADS…).
-- Thư viện nặng (`xlsx`, `exceljs`, `docx`, `jspdf`, `html2canvas`) luôn `await import(...)` lúc cần, không import ở đầu file.
-- Thêm trang mới: tạo component, thêm vào `NAV` trong `Sidebar.jsx` và vào `App.jsx`. Trang bỏ khỏi menu thì xoá file luôn,
-  đừng để code chết (vẫn lấy lại được từ git).
+- `src/lib/` — logic không có giao diện (tính giá, báo cáo, lọc khách, Excel, nhắc việc, tái ký ADS, gọi Callio…).
+- Xuất hợp đồng Word/PDF và sửa Bên B đã gỡ (28/11, tab Hợp đồng bị ẩn từ 17/11). Cần lại thì lấy từ git trước commit gỡ.
+- Thư viện nặng (`xlsx`, `exceljs`, `jspdf`, `html2canvas`) luôn `await import(...)` lúc cần, không import ở đầu file.
+- Thêm trang mới: tạo component, thêm vào `NAV` trong `Sidebar.jsx`, vào `DUONG_DAN` + `lazy(...)` trong `App.jsx`.
+  Trang bỏ khỏi menu thì xoá file luôn, đừng để code chết (vẫn lấy lại được từ git).
 
 ## Git
 - Commit message tiếng Việt, ngắn gọn, nói thay đổi gì cho người dùng.

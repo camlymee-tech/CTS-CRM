@@ -15,7 +15,7 @@ const LOAI = {
 }
 
 // Tính sinh nhật hôm nay từ danh sách hồ sơ (không lưu vào DB)
-export function sinhNhatHomNay(profiles) {
+function sinhNhatHomNay(profiles) {
   const now = new Date()
   const d = now.getDate()
   const m = now.getMonth() + 1
@@ -36,6 +36,7 @@ export default function NotificationsPage({ currentProfile, onRead }) {
   const isAdmin = vaiLaAdmin(currentProfile)
   const quanLy = laQuanLy(currentProfile)   // admin / leader được gửi thông báo
 
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- chỉ tải 1 lần khi mở trang
   useEffect(() => { load() }, [])
 
   async function load() {
@@ -208,7 +209,7 @@ function ComposeForm({ currentProfile, onClose, onSent }) {
       setProfiles(locNhanSu(currentProfile, data || []))
       setDsPB((pb || []).map((x) => x.ten))
     })
-  }, [])
+  }, [currentProfile])
 
   async function handleSubmit(e) {
     e.preventDefault()

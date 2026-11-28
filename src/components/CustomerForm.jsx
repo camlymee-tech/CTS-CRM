@@ -46,6 +46,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
   // Kiểm tra trùng số điện thoại ngay khi gõ
   useEffect(() => {
     const so = chuanSo(form.sdt)
+    // oxlint-disable-next-line react/set-state-in-effect -- số chưa đủ dài: xoá ngay cảnh báo trùng cũ
     if (so.length < 8) { setKhachTrung(null); return }
     setDangKiemTra(true)
     const t = setTimeout(async () => {
@@ -63,6 +64,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
       setDangKiemTra(false)
     }, 500)
     return () => clearTimeout(t)
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- chỉ kiểm tra lại khi SĐT đổi
   }, [form.sdt])
 
   async function handleSubmit(e) {
@@ -114,7 +116,7 @@ export default function CustomerForm({ customer, profiles, currentProfile, onClo
           onChange={(e) => setForm({ ...form, ten_khach: e.target.value })} />
         <div>
           <Input label="Số điện thoại" value={form.sdt}
-            onChange={(e) => setForm({ ...form, sdt: e.target.value.replace(/[\s.\-]/g, '') })}
+            onChange={(e) => setForm({ ...form, sdt: e.target.value.replace(/[\s.-]/g, '') })}
             className={khachTrung ? 'border-amber-400 bg-amber-50' : ''} />
           {dangKiemTra && <p className="mt-1 text-xs text-ink-400">Đang kiểm tra trùng...</p>}
         </div>

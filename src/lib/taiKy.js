@@ -56,14 +56,3 @@ export function danhSachNhacTaiKy({ hopDong = [], don = [], items = [], homNay =
   }
   return kq.sort((a, b) => a.conLai - b.conLai)
 }
-
-// Nhắc của riêng 1 hợp đồng (dùng ở tab Hợp đồng của khách). null nếu chưa cần nhắc.
-export function nhacChoHopDong(hd, don = [], items = [], homNay = homNayLocal(), soNgay = SO_NGAY_NHAC) {
-  return danhSachNhacTaiKy({ hopDong: [hd], don, items, homNay, soNgay })[0] || null
-}
-
-export function moTaConLai(conLai) {
-  if (conLai < 0) return `Đã hết hạn ${-conLai} ngày`
-  if (conLai === 0) return 'Hết hạn hôm nay'
-  return `Còn ${conLai} ngày`
-}

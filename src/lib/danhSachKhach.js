@@ -1,4 +1,6 @@
-import { giaTruocVat } from './constants'
+import { giaTruocVat, labelOf, NGUON_KHACH_OPTIONS } from './constants'
+import { chuanSo } from './sdt'
+import { ngayLocal, gioNgay } from './ngay'
 
 // Trao đổi gần nhất của mỗi khách = lần CHĂM SÓC được ghi gần nhất (gọi điện, nhắn tin, gặp mặt...).
 // Không lấy nhật ký hệ thống (đổi trạng thái, cập nhật vấn đề/giải pháp...) — khách chưa có lần chăm sóc nào thì để trống.
@@ -54,5 +56,61 @@ export function sapXepKhach(list, cot, dir, ctx) {
     const rongX = x === '' || x === 0, rongY = y === '' || y === 0
     if (rongX !== rongY && cot !== 'doanh_thu') return rongX ? 1 : -1
     return (x < y ? -1 : 1) * h
+  })
+}
+
+// Tìm khách: khớp chữ thường, hoặc khớp số điện thoại không phân biệt dấu cách / chấm / gạch
+export const khopTim = (c, search) => {
+  const q = search.toLowerCase().trim()
+  if (`${c.ten_khach} ${c.ma_khach} ${c.sdt || ''} ${c.nganh_hang || ''}`.toLowerCase().includes(q)) return true
+  const so = q.replace(/\D/g, '')
+  if (so.length < 3) return false
+  const cs = chuanSo(c.sdt)
+  return cs.includes(so) || cs.includes(chuanSo(q)) || chuanSo(c.sdt).includes(so)
+}
+
+// Bộ lọc trang Khách hàng khi chưa lọc gì
+export const BO_LOC_TRONG = { search: '', trangThai: '', sale: '', phong: '', dichVu: '', tuNgay: '', denNgay: '' }
+
+// Lọc danh sách khách theo bộ lọc của trang Khách hàng.
+// boLoc: { search, trangThai, sale, phong, dichVu, tuNgay, denNgay } · bỏ qua lọc trạng thái khi boTrangThai = true
+// (dùng để đếm số khách trên từng thẻ trạng thái) · xemDuoc(saleId) nếu có thì chỉ giữ khách người xem được phép xem.
+export function locKhach(ds, boLoc, { phongBanCua, xemDuoc, boTrangThai = false }) {
+  const { search, trangThai, sale, phong, dichVu, tuNgay, denNgay } = boLoc
+  return ds.filter((c) => {
+    if (xemDuoc && !xemDuoc(c.sale_id)) return false
+    if (search && !khopTim(c, search)) {
+      if (!c._tuTraCuu) return false
+    }
+    if (!boTrangThai && trangThai && c.trang_thai_cham_soc !== trangThai) return false
+    if (sale && c.sale_id !== sale) return false
+    if (phong && phongBanCua(c.sale_id) !== phong) return false
+    if (dichVu && !(c.dich_vu || []).includes(dichVu)) return false
+    const ngayTao = ngayLocal(c.created_at)
+    if (tuNgay && (!ngayTao || ngayTao < tuNgay)) return false
+    if (denNgay && (!ngayTao || ngayTao > denNgay)) return false
+    return true
+  })
+}
+
+// Các dòng của file Excel danh sách khách
+export function dongExcelKhach(ds, { profileName, phongBanCua, tenTrangThai, luotCS, traoDoi, doanhThu }) {
+  return ds.map((c, i) => {
+    const td = traoDoi[c.id]
+    return {
+      '#': i + 1,
+      'Mã KH': c.ma_khach,
+      'Tên khách hàng': c.ten_khach,
+      'Điện thoại': c.sdt || '',
+      'Tên sale': profileName(c.sale_id),
+      'Phòng ban': phongBanCua(c.sale_id),
+      'Trạng thái': tenTrangThai(c.trang_thai_cham_soc),
+      'Hẹn chăm sóc tiếp': c.ngay_cham_soc_tiep_theo || '',
+      'Số lượt chăm sóc': luotCS[c.id] || 0,
+      'Trao đổi gần nhất': td ? `${profileName(td.nguoi)} (${gioNgay(td.thoiGian)}): ${td.noiDung}` : '',
+      'Nguồn khách hàng': labelOf(NGUON_KHACH_OPTIONS, c.nguon_khach) || '',
+      'Ngày tạo': ngayLocal(c.created_at),
+      'Tổng doanh thu (chưa VAT)': doanhThu[c.id] || 0,
+    }
   })
 }

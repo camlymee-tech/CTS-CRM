@@ -1,6 +1,6 @@
 # CTS CRM
 
-CRM nội bộ cho đội sale **CTS Logistics**: quản lý khách hàng, chia data, lịch sử chăm sóc, đơn dịch vụ, hợp đồng,
+CRM nội bộ cho đội sale **CTS Logistics**: quản lý khách hàng, chia data, lịch sử chăm sóc, đơn dịch vụ,
 báo giá, checklist việc hằng ngày, báo cáo theo sale / team, tài liệu, đào tạo và gọi điện qua Callio.
 
 - **Giao diện:** React 19 + Vite + Tailwind CSS 4
@@ -28,8 +28,8 @@ Kiểm tra trước khi đẩy code: `npm run lint` và `npm run build`.
 
 ## Thư mục
 ```
-src/App.jsx            đăng nhập, chuyển trang
-src/components/        các màn hình và cửa sổ
-src/lib/               logic dùng chung (quyền, ngày, SĐT, báo lỗi, tính giá, hợp đồng, Excel…)
+src/App.jsx            đăng nhập, chuyển trang (trang đang mở ghi trên địa chỉ web: …/#/khach-hang)
+src/components/        các màn hình và cửa sổ (trang lớn chia thư mục con: hoSoKhach/, khachHang/, baoCao/)
+src/lib/               logic dùng chung (quyền, ngày, SĐT, báo lỗi, tính giá, báo cáo, lọc khách, Excel…)
 supabase/              file SQL cập nhật database (migration_NN_*.sql) + Edge Functions
 ```

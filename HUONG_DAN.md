@@ -5,7 +5,7 @@ Tài liệu cho người quản trị hệ thống: chạy thử trên máy, đ�
 ## 1. Hệ thống gồm những gì
 | Phần | Ở đâu | Ghi chú |
 |---|---|---|
-| Code | GitHub `camlymee-tech/TUKI-CRM`, nhánh `main` | |
+| Code | GitHub `camlymee-tech/CTS-CRM` (tên cũ `TUKI-CRM` vẫn tự chuyển hướng), nhánh `main` | |
 | Web | Vercel | Đẩy code lên `main` là Vercel tự deploy bản mới |
 | Database, đăng nhập, file | Supabase | Sửa cấu trúc bằng file SQL (mục 4) |
 | Hàm máy chủ | Supabase → Edge Functions | `callio` và `quan-ly-tai-khoa` (mục 5) |
@@ -27,13 +27,13 @@ npm run dev
 Mở http://localhost:5173. Bản chạy trên máy dùng **chung database thật** — thao tác ở đây là sửa dữ liệu thật.
 
 ## 3. Đưa bản mới lên web
-1. Kiểm tra: `npm run lint` và `npm run build` (build phải báo `✓ built`).
+1. Kiểm tra: `npm run lint` (phải 0 cảnh báo) và `npm run build` (build phải báo `✓ built`).
 2. Commit rồi `git push` lên `main`. Vercel tự build và thay bản mới sau 1–2 phút.
 3. Nếu bản mới cần bảng / cột mới: **chạy file SQL trước** (mục 4), rồi mới đẩy code.
 4. Bản mới lỗi: Vercel → Deployments → chọn bản trước đó → *Promote to Production* để quay lại ngay.
 
 ## 4. Cập nhật database (migration)
-- Mỗi thay đổi database là một file `supabase/migration_NN_ten.sql`, đánh số tăng dần (mới nhất hiện là **48**).
+- Mỗi thay đổi database là một file `supabase/migration_NN_ten.sql`, đánh số tăng dần (mới nhất hiện là **49**).
 - Cách chạy: Supabase → SQL Editor → *New query* → dán toàn bộ nội dung file → *Run*. Các file đều viết để chạy lại nhiều lần vẫn an toàn.
 - Nên ghi lại ngày chạy từng file (ví dụ ở cuối mục này), vì database không tự ghi nhớ file nào đã chạy.
 
@@ -44,7 +44,7 @@ và thiếu các migration 19, 20, 26, 27, 37–40, 46 (vai trò leader, phòng 
 - Không xoá project Supabase, không chạy lệnh `drop table` khi chưa sao lưu.
 
 Bảng còn trong database nhưng app **không dùng nữa** (từ các trang cũ đã gỡ): `cuoc_goi`, `checklist_tasks`, `checklist_done`,
-`muc_tieu_nhan_su`, `nhom_dinh_gia`, `shopee_fees`, `shopee_settings`. Cứ để đó, không ảnh hưởng gì; chỉ xoá khi đã sao lưu và chắc chắn không cần dữ liệu cũ.
+`muc_tieu_nhan_su`, `nhom_dinh_gia`, `shopee_fees`, `shopee_settings`, `ben_b_settings` (thông tin Bên B của phần xuất hợp đồng đã gỡ). Cứ để đó, không ảnh hưởng gì; chỉ xoá khi đã sao lưu và chắc chắn không cần dữ liệu cũ.
 
 ## 5. Hàm máy chủ (Edge Functions)
 Không có Supabase CLI, nên deploy bằng tay: Supabase → Edge Functions → mở hàm → *Code* → dán bản mới → *Deploy*.

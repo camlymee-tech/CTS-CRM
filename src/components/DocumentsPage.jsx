@@ -6,7 +6,7 @@ import DocumentFiles from './DocumentFiles'
 import { laAdmin, laLeader, laQuanLy } from '../lib/quyen'
 import { loiDeHieu } from '../lib/loi'
 
-export const DANH_MUC = [
+const DANH_MUC = [
   { value: 'tai_lieu_cong_viec', label: 'Tài liệu công việc', className: 'bg-slate-100 text-slate-600' },
   { value: 'dao_tao_sale', label: 'Đào tạo sale mới', className: 'bg-teal-50 text-teal-600' },
   { value: 'quy_dinh', label: 'Quy định công ty', className: 'bg-navy-900 text-white' },

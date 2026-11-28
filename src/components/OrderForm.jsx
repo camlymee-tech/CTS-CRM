@@ -76,6 +76,7 @@ export default function OrderForm({ order, customer, customers = [], profiles = 
           })))
         })
     }
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- chỉ tải 1 lần khi mở form (đơn / đơn sao chép không đổi trong lúc mở)
   }, [])
 
   function setItem(idx, patch) {

@@ -19,7 +19,7 @@ export default function ChiaKhachModal({ mode, customers, daChon, profiles, onCl
 
   const nguoiNhan = profiles.filter((p) => p.id !== saleNghi)
   const dem = (id) => customers.filter((c) => c.sale_id === id).length
-  const toggle = (id) => setNhan((s) => { const m = new Set(s); m.has(id) ? m.delete(id) : m.add(id); return m })
+  const toggle = (id) => setNhan((s) => { const m = new Set(s); if (m.has(id)) m.delete(id); else m.add(id); return m })
   const ids = [...nhan].filter((id) => id !== saleNghi)
   const moiNguoi = ids.length ? Math.ceil(dsKhach.length / ids.length) : 0
 

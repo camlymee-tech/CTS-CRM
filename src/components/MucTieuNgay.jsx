@@ -32,7 +32,7 @@ function KhuQuanLy({ currentProfile, customers, onMoKhach, phong = '' }) {
   useEffect(() => {
     layNhanSu()
       .then(({ data }) => setSales(locNhanSu(currentProfile, data || []).filter((x) => !laAdmin(x))))
-  }, [])
+  }, [currentProfile])
   const salesHienThi = sales.filter((x) => !phong || x.phong_ban === phong)
   const sale = salesHienThi.find((x) => x.id === saleId)
   return (
@@ -74,8 +74,6 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
   const homNayUtc = new Date().toISOString().slice(0, 10)   // cố ý: dữ liệu cũ từng lưu ngày theo UTC
   const isAdmin = false   // luôn lọc theo chủ bộ mục tiêu
 
-  useEffect(() => { load() }, [customers])
-
   async function load() {
     const dauNgay = new Date(); dauNgay.setHours(0, 0, 0, 0)
     const [{ data: mt, error }, { data: lg }, { data: so }] = await Promise.all([
@@ -93,6 +91,8 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
     setRows(mt || [])
     setLogs(lg || [])
   }
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- tải lại khi danh sách khách đổi (load không cần làm điều kiện)
+  useEffect(() => { load() }, [customers])
 
   const khachTheoId = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers])
 
@@ -113,7 +113,7 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
     logs.some((l) => l.customer_id === c.id)
   const soXong = danhSach.filter(daXong).length
 
-  const daChonIds = new Set(rows.map((r) => r.customer_id))
+  const daChonIds = useMemo(() => new Set(rows.map((r) => r.customer_id)), [rows])
   const lua = useMemo(() => {
     if (!tt) return []
     return customers
@@ -121,7 +121,7 @@ function MucTieuCuaToi({ nguoiDung, chuNhan, quanLy = false, nhung = false, cust
       .filter((c) => c.trang_thai_cham_soc === tt)
       .sort((a, b) => (a.ten_khach || '').localeCompare(b.ten_khach || '', 'vi'))
       .slice(0, 60)
-  }, [customers, tt, rows])
+  }, [customers, tt, daChonIds, currentProfile.id])
 
   // Sale tự điền số mục tiêu của mình cho hôm nay; để trống = bỏ mục tiêu
   async function luuMucTieu(loai) {
@@ -315,8 +315,6 @@ function BaoCaoMucTieu({ customers, currentProfile, phong = '' }) {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load() }, [ngay])
-
   async function load() {
     setLoading(true)
     const dau = new Date(`${ngay}T00:00:00`); const cuoi = new Date(dau); cuoi.setDate(cuoi.getDate() + 1)
@@ -331,6 +329,8 @@ function BaoCaoMucTieu({ customers, currentProfile, phong = '' }) {
     setSo(a || []); setChon(b || []); setLogs(c || [])
     setLoading(false)
   }
+  // oxlint-disable-next-line react-hooks/exhaustive-deps, react/set-state-in-effect -- tải lại khi đổi ngày xem
+  useEffect(() => { load() }, [ngay])
 
   const maChua = maChuaLienHe(statuses)
   const khachTheoId = new Map(customers.map((c) => [c.id, c]))

@@ -43,7 +43,7 @@ function ghep() {
       else ra.push(muc)
     }
     const mang = DANH_MUC[loai].mang
-    mang.splice(0, mang.length, ...ra.map(({ thu_tu, ...m }) => m))
+    mang.splice(0, mang.length, ...ra.map(({ thu_tu: _thuTu, ...m }) => m))   // bỏ cột thu_tu, giữ đúng dạng danh mục cũ
   }
   phienBan += 1
   nguoiNghe.forEach((f) => f(phienBan))

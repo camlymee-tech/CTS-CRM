@@ -30,6 +30,7 @@ export default function DaoTaoPage({ currentProfile }) {
     setBai(b.data || []); setTienDo(t.data || []); setProfiles(p.data || [])
     setLoading(false)
   }
+  // oxlint-disable-next-line react-hooks/exhaustive-deps, react/set-state-in-effect -- chỉ tải 1 lần khi mở trang
   useEffect(() => { load() }, [])
 
   const xongCuaToi = useMemo(() => new Set(tienDo.filter((t) => t.user_id === currentProfile.id).map((t) => t.bai_id)), [tienDo, currentProfile.id])
